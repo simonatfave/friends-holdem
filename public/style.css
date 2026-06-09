@@ -11,6 +11,10 @@
   --red: #e25555;
   --green: #3ec97a;
   --accent: #4a8cff;
+  /* 카드 크기 (반응형). 데스크톱 기본 = 기존의 약 2배 */
+  --cc-w: 92px;  --cc-h: 128px;  /* 커뮤니티 카드 */
+  --hc-w: 64px;  --hc-h: 90px;   /* 홀 카드 */
+  --seat-w: 152px;
 }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
@@ -91,7 +95,7 @@ button { font-family: inherit; }
 }
 .community {
   position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%);
-  display: flex; gap: 6px;
+  display: flex; gap: 8px; max-width: 96%;
 }
 .pot-display {
   position: absolute; top: 60%; left: 50%; transform: translateX(-50%);
@@ -99,17 +103,17 @@ button { font-family: inherit; }
   background: rgba(0,0,0,.35); padding: 4px 14px; border-radius: 14px;
 }
 
-/* 카드 */
+/* 카드 — 크기는 :root 변수로 반응형 제어 */
 .card {
-  width: 46px; height: 64px; border-radius: 6px; background: #fff;
+  width: var(--cc-w); height: var(--cc-h); border-radius: 8px; background: #fff;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-weight: 800; box-shadow: 0 3px 6px rgba(0,0,0,.4); position: relative;
+  font-weight: 800; box-shadow: 0 4px 9px rgba(0,0,0,.45); position: relative;
 }
-.card.sm { width: 34px; height: 48px; font-size: 13px; }
-.card .rank { font-size: 20px; line-height: 1; }
-.card.sm .rank { font-size: 15px; }
-.card .suit { font-size: 15px; line-height: 1; }
-.card.sm .suit { font-size: 11px; }
+.card.sm { width: var(--hc-w); height: var(--hc-h); }
+.card .rank { font-size: calc(var(--cc-h) * 0.31); line-height: 1; }
+.card.sm .rank { font-size: calc(var(--hc-h) * 0.32); }
+.card .suit { font-size: calc(var(--cc-h) * 0.23); line-height: 1; }
+.card.sm .suit { font-size: calc(var(--hc-h) * 0.24); }
 .card.red { color: #d4283f; }
 .card.black { color: #14181f; }
 .card.back {
@@ -121,7 +125,7 @@ button { font-family: inherit; }
 /* 좌석 */
 .seat {
   position: absolute; transform: translate(-50%,-50%);
-  width: 132px; text-align: center;
+  width: var(--seat-w); text-align: center;
 }
 .seat-inner {
   background: var(--panel); border: 2px solid #33404f; border-radius: 12px;
@@ -132,7 +136,7 @@ button { font-family: inherit; }
 .seat.eliminated .seat-inner { opacity: .3; filter: grayscale(1); }
 .seat .pname { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .seat .pchips { font-size: 12px; color: var(--gold); }
-.seat .phole { display: flex; gap: 3px; justify-content: center; margin-top: 4px; }
+.seat .phole { display: flex; gap: 4px; justify-content: center; margin-top: 5px; }
 .seat .pbadges { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; }
 .dealer-btn {
   width: 20px; height: 20px; border-radius: 50%; background: #fff; color: #000;
@@ -196,10 +200,29 @@ button { font-family: inherit; }
 .final-card li { padding: 4px 0; }
 .final-card li.first { color: var(--gold); font-weight: 700; font-size: 18px; }
 
+/* ---------- 반응형: 화면이 좁아지면 카드 변수만 줄여 자동 축소 ---------- */
+/* 태블릿 / 작은 노트북 */
+@media (max-width: 900px) {
+  :root { --cc-w: 74px; --cc-h: 103px; --hc-w: 54px; --hc-h: 76px; --seat-w: 130px; }
+}
+/* 휴대폰 (가로 폭 기준) */
 @media (max-width: 640px) {
-  .card { width: 38px; height: 54px; }
-  .card .rank { font-size: 16px; }
-  .seat { width: 104px; }
+  :root { --cc-w: 58px; --cc-h: 81px; --hc-w: 46px; --hc-h: 64px; --seat-w: 118px; }
+  .community { gap: 6px; }
   .seat .pname { font-size: 12px; }
-  .sidepanel { height: 90px; }
+  .seat-inner { padding: 5px 5px; }
+  .sidepanel { height: 86px; }
+  .actionbar button { padding: 11px 16px; font-size: 14px; }
+  .raise-controls input[type=range] { width: 110px; }
+}
+/* 작은 휴대폰 */
+@media (max-width: 400px) {
+  :root { --cc-w: 48px; --cc-h: 67px; --hc-w: 40px; --hc-h: 56px; --seat-w: 104px; }
+  .community { gap: 5px; }
+  .topbar .badge { font-size: 11px; padding: 5px 9px; }
+}
+/* 가로가 길고 세로가 짧은 경우(가로 모드) 테이블 높이 보정 */
+@media (max-height: 560px) {
+  .sidepanel { height: 64px; }
+  .poker-table { aspect-ratio: 16 / 8.5; }
 }
