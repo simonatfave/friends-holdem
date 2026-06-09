@@ -37,6 +37,7 @@ function tone(freq, dur, type = 'sine', vol = 0.15, when = 0) {
 const sfxDeal = () => { tone(520, 0.08, 'triangle', 0.12); tone(360, 0.08, 'triangle', 0.1, 0.04); };
 const sfxChip = () => { tone(900, 0.05, 'square', 0.07); tone(1250, 0.05, 'square', 0.05, 0.03); };
 const sfxTurn = () => tone(680, 0.13, 'sine', 0.16);
+const sfxTick = (urgent) => tone(urgent ? 1200 : 820, 0.06, 'square', 0.1);
 const sfxWin = () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.26, 'triangle', 0.13, i * 0.09));
 const sfxFanfare = () => {
   const seq = [523, 659, 784, 1046, 988, 1046, 1318];
@@ -227,15 +228,25 @@ function tickTimers() {
     } else {
       at.classList.add('hidden');
     }
-    const seatTimer = document.querySelector('.seat.active .seat-timer');
-    if (seatTimer) {
-      seatTimer.textContent = '⏱ ' + Math.max(0, Math.ceil(rem / 1000));
-      seatTimer.classList.toggle('warn', frac < 0.34);
+    // 현재 차례 캐릭터 아래 타임 바
+    const bar = document.querySelector('.seat.active .seat-timerbar-fill');
+    if (bar) {
+      bar.style.width = (frac * 100) + '%';
+      bar.classList.toggle('warn', frac < 0.34);
+    }
+    // 내 차례 마지막 구간 째깍 소리 (음소거 토글로 끌 수 있음)
+    if (s.toActId === myId && rem > 0) {
+      const sec = Math.ceil(rem / 1000);
+      if (sec <= 5 && sec !== lastTickSec) { lastTickSec = sec; sfxTick(sec <= 2); }
+    } else {
+      lastTickSec = null;
     }
   } else {
     at.classList.add('hidden');
+    lastTickSec = null;
   }
 }
+let lastTickSec = null;
 setInterval(tickTimers, 250);
 
 socket.on('chat', ({ name, text }) => {
@@ -465,6 +476,7 @@ function renderSeats(s) {
     seat.className = 'seat';
     seat.dataset.pid = p.id;
     if (p.isToAct) seat.classList.add('active');
+    if (p.isToAct && p.id === myId) seat.classList.add('myturn');
     if (p.folded) seat.classList.add('folded');
     if (p.eliminated) seat.classList.add('eliminated');
     const isWinner = s.results && s.phase === 'handComplete' &&
@@ -479,7 +491,7 @@ function renderSeats(s) {
         ${p.isButton ? '<div class="pbadges"><span class="dealer-btn">D</span></div>' : ''}
         <div class="pname">${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}</div>
         <div class="pchips">${p.eliminated ? '탈락' : `<span class="chip-mini"></span><span class="amt">${p.chips}</span>`}</div>
-        ${p.isToAct ? '<div class="seat-timer"></div>' : ''}
+        ${p.isToAct ? '<div class="seat-timerbar"><div class="seat-timerbar-fill"></div></div>' : ''}
         <div class="phole">${renderHole(p, i)}</div>
         <div class="hand-result">${result ? esc(result.handName) : ''}</div>
         ${p.bet > 0 ? `<div class="bet-chip">${p.bet}</div>` : ''}

@@ -109,9 +109,21 @@ button { font-family: inherit; }
 #actionTimerFill { height: 100%; width: 100%; background: linear-gradient(90deg, var(--green), var(--gold)); border-radius: 4px; transition: width .2s linear; }
 #actionTimerFill.warn { background: var(--red); }
 
-/* 좌석 카운트다운 */
-.seat-timer { font-size: 13px; font-weight: 800; color: var(--gold); margin-top: 1px; }
-.seat-timer.warn { color: var(--red); }
+/* 좌석 카운트다운 (현재 차례 캐릭터 아래 타임 바) */
+.seat-timerbar {
+  height: 7px; margin-top: 5px; border-radius: 4px; overflow: hidden;
+  background: rgba(255,255,255,.15);
+}
+.seat-timerbar-fill {
+  height: 100%; width: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--green), var(--gold));
+  transition: width .25s linear;
+}
+.seat-timerbar-fill.warn { background: var(--red); }
+/* 내 차례일 때 좌석 전체가 더 강조 + 바 반짝 */
+.seat.active.myturn .seat-inner { box-shadow: 0 0 26px rgba(232,196,102,.85); }
+.seat-timerbar-fill.warn { animation: barBlink .5s steps(2) infinite; }
+@keyframes barBlink { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
 
 /* 관전 배지 */
 .spectate-badge { color: var(--accent); border-color: var(--accent); }
