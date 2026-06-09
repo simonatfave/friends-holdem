@@ -140,7 +140,9 @@ button { font-family: inherit; }
 .table-wrap { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding-bottom: 60px; }
 .poker-table {
   position: relative;
-  width: min(94vw, 900px);
+  /* 화면 높이에 맞춰 크기 제한 → 좌석이 액션 영역을 침범하지 않음 */
+  width: auto;
+  height: min(56vh, 58vw, 540px);
   aspect-ratio: 16 / 10;
   background: radial-gradient(ellipse at center, var(--felt), var(--felt-dark));
   border: 12px solid #5a3a22;
@@ -335,7 +337,9 @@ button { font-family: inherit; }
 }
 
 /* 액션바 — 위: 베팅 사이징 / 아래: 메인 액션 버튼 */
-.actionbar { display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; min-height: 64px; padding: 4px 0; }
+.actionbar { display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; min-height: 64px; padding: 8px 0; position: relative; z-index: 30; background: #0e1219; border-radius: 14px; }
+.action-timer { position: relative; z-index: 30; }
+.sidepanel { position: relative; z-index: 30; }
 .action-main { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; }
 .action-raise { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; flex-wrap: wrap; }
 .actionbar button {
@@ -431,7 +435,7 @@ button { font-family: inherit; }
 @media (max-width: 640px) {
   :root { --cc-w: 58px; --cc-h: 81px; --hc-w: 46px; --hc-h: 64px; --seat-w: 118px; }
   /* 세로 화면에선 테이블을 정사각형에 가깝게 키워 좌석/팟 공간 확보 */
-  .poker-table { width: min(94vw, 66vh); aspect-ratio: 1 / 1; border-width: 9px; }
+  .poker-table { width: min(94vw, 56vh); height: auto; aspect-ratio: 1 / 1; border-width: 9px; }
   .table-wrap { padding-bottom: 30px; }
   .community { gap: 6px; top: 38%; }
   .pot-stack { top: 54%; }
