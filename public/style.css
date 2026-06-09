@@ -101,7 +101,21 @@ button { font-family: inherit; }
   position: absolute; top: 60%; left: 50%; transform: translateX(-50%);
   color: var(--gold); font-weight: 700; font-size: 15px;
   background: rgba(0,0,0,.35); padding: 4px 14px; border-radius: 14px;
+  z-index: 2;
 }
+.community { z-index: 2; }
+
+/* 브랜드 로고 (로비) */
+.brand-logo { text-align: center; margin-bottom: 4px; }
+.brand-logo svg { width: 230px; max-width: 82%; height: auto; }
+
+/* 테이블 중앙 워터마크 로고 */
+.table-logo {
+  position: absolute; top: 49%; left: 50%; transform: translate(-50%,-50%);
+  width: 42%; max-width: 280px; color: var(--gold);
+  opacity: 0.12; pointer-events: none; z-index: 0;
+}
+.table-logo svg { width: 100%; height: auto; display: block; }
 
 /* 카드 — 크기는 :root 변수로 반응형 제어 */
 .card {
@@ -162,11 +176,72 @@ button { font-family: inherit; }
   border: 2px solid var(--gold); z-index: 30;
 }
 
+/* ---------- 애니메이션 / 게임 효과 ---------- */
+@keyframes dealIn {
+  from { opacity: 0; transform: translateY(-70px) scale(.45) rotate(-12deg); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+.card.deal-in { animation: dealIn .42s cubic-bezier(.2,.8,.3,1.25) backwards; }
+
+@keyframes flipIn {
+  from { opacity: 0; transform: rotateY(90deg) scale(.8); }
+  to   { opacity: 1; transform: rotateY(0) scale(1); }
+}
+.card.flip-in { animation: flipIn .5s ease backwards; }
+
+@keyframes chipPop {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(.3); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.bet-chip { animation: chipPop .25s cubic-bezier(.2,.8,.3,1.4) backwards; }
+
+@keyframes potBump {
+  0% { transform: translateX(-50%) scale(1); }
+  40% { transform: translateX(-50%) scale(1.2); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+.pot-display.bump { animation: potBump .4s ease; }
+@keyframes badgeBump { 0%{transform:scale(1);} 40%{transform:scale(1.18);} 100%{transform:scale(1);} }
+.badge.bump { animation: badgeBump .4s ease; }
+
+@keyframes activePulse {
+  0%,100% { box-shadow: 0 0 14px rgba(232,196,102,.5); }
+  50% { box-shadow: 0 0 30px rgba(232,196,102,.95); }
+}
+.seat.active .seat-inner { animation: activePulse 1.1s ease-in-out infinite; }
+
+@keyframes winnerPulse {
+  0%,100% { box-shadow: 0 0 18px rgba(62,201,122,.6); }
+  50% { box-shadow: 0 0 40px rgba(62,201,122,1); }
+}
+.seat.winner .seat-inner { animation: winnerPulse .7s ease-in-out 4; border-color: var(--green) !important; }
+
+.winner-banner { animation: bannerPop .45s cubic-bezier(.2,.8,.3,1.5); }
+@keyframes bannerPop {
+  0% { opacity: 0; transform: translate(-50%,-50%) scale(.5); }
+  60% { transform: translate(-50%,-50%) scale(1.1); }
+  100% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+}
+
+/* 승자에게 날아가는 칩 */
+.fly-chip {
+  position: fixed; width: 30px; height: 30px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe9a8, #e8c466 70%);
+  border: 2px solid #b8932f; z-index: 300; pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,.5);
+}
+
 /* 액션바 */
 .actionbar { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; min-height: 56px; }
 .actionbar button {
   padding: 13px 22px; border-radius: 12px; border: none; font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
 }
+.actionbar button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.actionbar button:active { transform: translateY(2px) scale(.97); }
+.btn-raise:hover { box-shadow: 0 0 16px rgba(232,196,102,.6); }
+.btn-call:hover { box-shadow: 0 0 16px rgba(62,201,122,.5); }
 .btn-fold { background: #4a5563; color: #fff; }
 .btn-check { background: var(--accent); color: #fff; }
 .btn-call { background: var(--green); color: #06301a; }

@@ -3,10 +3,48 @@ let myId = null;
 let myName = '';
 let isHost = false;
 let lastState = null;
+let prevSnap = null;        // 직전 상태 스냅샷 (애니메이션/사운드 diff용)
+let _dealNewHand = false;   // 이번 렌더에서 홀카드 딜링 애니 적용?
+let _newCommFrom = 99;      // 이 인덱스부터의 커뮤니티 카드는 새 카드(플립 애니)
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
+
+// ---------- 효과음 (Web Audio, 에셋 없이 생성) ----------
+let soundOn = true;
+let audioCtx = null;
+function ac() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function tone(freq, dur, type = 'sine', vol = 0.15, when = 0) {
+  if (!soundOn) return;
+  const c = ac(); if (!c) return;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.value = freq;
+  o.connect(g); g.connect(c.destination);
+  const t = c.currentTime + when;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+const sfxDeal = () => { tone(520, 0.08, 'triangle', 0.12); tone(360, 0.08, 'triangle', 0.1, 0.04); };
+const sfxChip = () => { tone(900, 0.05, 'square', 0.07); tone(1250, 0.05, 'square', 0.05, 0.03); };
+const sfxTurn = () => tone(680, 0.13, 'sine', 0.16);
+const sfxWin = () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.26, 'triangle', 0.13, i * 0.09));
+// 첫 사용자 동작에서 오디오 컨텍스트 활성화
+document.addEventListener('pointerdown', () => ac(), { once: true });
+// 음소거 토글
+$('muteBtn').onclick = () => {
+  soundOn = !soundOn;
+  $('muteBtn').textContent = soundOn ? '🔊' : '🔇';
+  if (soundOn) sfxChip();
+};
 
 // 서버는 무늬를 숫자 0~3으로 보냄: 0=♠,1=♥,2=♦,3=♣
 const SUIT_SYM = ['♠', '♥', '♦', '♣'];
@@ -122,15 +160,27 @@ function renderWaiting(s) {
 
 // ---------- 게임 렌더 ----------
 function renderGame(s) {
+  // 직전 상태와 비교해 애니메이션/사운드 트리거 계산
+  const prev = prevSnap;
+  _dealNewHand = !prev || prev.handNumber !== s.handNumber;
+  _newCommFrom = (prev && prev.handNumber === s.handNumber) ? prev.commCount : 0;
+
   $('handBadge').textContent = `핸드 #${s.handNumber}`;
   $('blindBadge').textContent = `블라인드 ${s.blinds.sb}/${s.blinds.bb}${s.blinds.ante ? ` (앤티 ${s.blinds.ante})` : ''}`;
   $('levelBadge').textContent = `레벨 ${s.level} · 다음까지 ${s.nextLevelIn + 1}핸드`;
   $('potBadge').textContent = `팟 ${s.pot}`;
 
-  // 커뮤니티 카드
+  // 커뮤니티 카드 (새로 깔린 카드는 플립 인 애니)
   const comm = $('community');
   comm.innerHTML = '';
-  for (const c of s.community) comm.appendChild(cardEl(c));
+  s.community.forEach((c, idx) => {
+    const el = cardEl(c);
+    if (idx >= _newCommFrom) {
+      el.classList.add('flip-in');
+      el.style.animationDelay = ((idx - _newCommFrom) * 0.12) + 's';
+    }
+    comm.appendChild(el);
+  });
   $('potDisplay').textContent = s.pot > 0 ? `팟: ${s.pot}` : '';
 
   renderSeats(s);
@@ -138,7 +188,77 @@ function renderGame(s) {
   renderLog(s);
   renderWinner(s);
 
+  handleFx(s, prev);
+  prevSnap = {
+    handNumber: s.handNumber,
+    commCount: s.community.length,
+    phase: s.phase,
+    pot: s.pot,
+    toActId: s.toActId,
+  };
+
   if (s.finished && s.finalResults) renderFinal(s);
+}
+
+// 사운드 + 효과 트리거
+function handleFx(s, prev) {
+  if (!prev) return; // 첫 렌더는 조용히
+  const newHand = s.handNumber !== prev.handNumber;
+  if (newHand) sfxDeal();
+  else if (s.community.length > prev.commCount) sfxDeal();
+
+  if (s.pot > prev.pot && !newHand) {
+    bump($('potBadge'));
+    bump($('potDisplay'));
+    sfxChip();
+  }
+  if (s.toActId === myId && prev.toActId !== myId) sfxTurn();
+
+  if (s.phase === 'handComplete' && prev.phase !== 'handComplete' && s.results) {
+    sfxWin();
+    flyPotToWinners(s);
+  }
+}
+
+function bump(el) {
+  if (!el) return;
+  el.classList.remove('bump');
+  void el.offsetWidth; // 리플로우로 애니 재시작
+  el.classList.add('bump');
+}
+
+// 팟이 승자 좌석으로 날아가는 칩 효과
+function flyPotToWinners(s) {
+  const table = document.querySelector('.poker-table');
+  if (!table || !s.results) return;
+  const tr = table.getBoundingClientRect();
+  const cx = tr.left + tr.width / 2, cy = tr.top + tr.height / 2;
+  const ids = new Set();
+  s.results.awards.forEach((a) => a.winners.forEach((w) => ids.add(w.id)));
+  ids.forEach((id) => {
+    const seat = document.querySelector(`.seat[data-pid="${cssEsc(id)}"]`);
+    if (!seat) return;
+    const sr = seat.getBoundingClientRect();
+    const dx = sr.left + sr.width / 2 - cx;
+    const dy = sr.top + sr.height / 2 - cy;
+    for (let k = 0; k < 5; k++) {
+      const chip = document.createElement('div');
+      chip.className = 'fly-chip';
+      chip.style.left = cx + 'px';
+      chip.style.top = cy + 'px';
+      chip.style.transform = 'translate(-50%,-50%)';
+      document.body.appendChild(chip);
+      requestAnimationFrame(() => {
+        chip.style.transition = `transform .6s cubic-bezier(.3,.7,.3,1) ${k * 0.06}s, opacity .6s ${k * 0.06}s`;
+        chip.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.75)`;
+        chip.style.opacity = '0.2';
+      });
+      setTimeout(() => chip.remove(), 1000 + k * 70);
+    }
+  });
+}
+function cssEsc(s) {
+  return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&');
 }
 
 function renderSeats(s) {
@@ -154,9 +274,13 @@ function renderSeats(s) {
     const pos = positions[i];
     const seat = document.createElement('div');
     seat.className = 'seat';
+    seat.dataset.pid = p.id;
     if (p.isToAct) seat.classList.add('active');
     if (p.folded) seat.classList.add('folded');
     if (p.eliminated) seat.classList.add('eliminated');
+    const isWinner = s.results && s.phase === 'handComplete' &&
+      s.results.awards?.some((a) => a.winners.some((w) => w.id === p.id));
+    if (isWinner) seat.classList.add('winner');
     seat.style.left = pos.x + '%';
     seat.style.top = pos.y + '%';
 
@@ -166,7 +290,7 @@ function renderSeats(s) {
         ${p.isButton ? '<div class="pbadges"><span class="dealer-btn">D</span></div>' : ''}
         <div class="pname">${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}</div>
         <div class="pchips">${p.eliminated ? '탈락' : '💰 ' + p.chips}</div>
-        <div class="phole">${renderHole(p)}</div>
+        <div class="phole">${renderHole(p, i)}</div>
         <div class="hand-result">${result ? esc(result.handName) : ''}</div>
         ${p.bet > 0 ? `<div class="bet-chip">${p.bet}</div>` : ''}
       </div>`;
@@ -174,11 +298,17 @@ function renderSeats(s) {
   }
 }
 
-function renderHole(p) {
+function renderHole(p, seatIdx = 0) {
   if (!p.hole) return '';
-  return p.hole.map((c) => {
-    if (c.hidden) return cardHtml(null, true, p.folded);
-    return cardHtml(c, false, p.folded);
+  return p.hole.map((c, ci) => {
+    let extra = '', style = '';
+    if (_dealNewHand) {
+      extra = 'deal-in';
+      const delay = (seatIdx * 0.12 + ci * 0.07).toFixed(2);
+      style = `style="animation-delay:${delay}s"`;
+    }
+    if (c.hidden) return cardHtml(null, true, p.folded, extra, style);
+    return cardHtml(c, false, p.folded, extra, style);
   }).join('');
 }
 
@@ -299,10 +429,10 @@ function renderFinal(s) {
 }
 
 // ---------- 카드 렌더 ----------
-function cardHtml(c, back, muck) {
-  if (back || !c) return `<div class="card sm back"></div>`;
+function cardHtml(c, back, muck, extra = '', style = '') {
+  if (back || !c) return `<div class="card sm back ${extra}" ${style}></div>`;
   const red = isRedSuit(c.s);
-  return `<div class="card sm ${red ? 'red' : 'black'} ${muck ? 'muck' : ''}">
+  return `<div class="card sm ${red ? 'red' : 'black'} ${muck ? 'muck' : ''} ${extra}" ${style}>
     <span class="rank">${rankLabel(c.r)}</span><span class="suit">${SUIT_SYM[c.s]}</span>
   </div>`;
 }

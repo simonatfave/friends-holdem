@@ -1,7 +1,7 @@
 {
-  "name": "friends-holdem",
+  "name": "dice",
   "version": "1.0.0",
-  "description": "친구들끼리 즐기는 실시간 온라인 텍사스 홀덤 (토너먼트 모드)",
+  "description": "Dice — 친구들끼리 즐기는 실시간 온라인 텍사스 홀덤 (토너먼트 모드)",
   "type": "module",
   "main": "server.js",
   "scripts": {

@@ -10,7 +10,13 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: '*' } });
 
-app.use(express.static(join(__dirname, 'public')));
+// 정적 파일은 항상 최신을 받도록 캐시 비활성화 (업데이트 즉시 반영)
+app.use(
+  express.static(join(__dirname, 'public'), {
+    etag: true,
+    setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+  })
+);
 app.get('/health', (_req, res) => res.json({ ok: true, rooms: rooms.size }));
 
 const PORT = process.env.PORT || 3000;
@@ -208,5 +214,5 @@ function clampInt(v, min, max, def) {
 }
 
 httpServer.listen(PORT, () => {
-  console.log(`♠ Friends Hold'em 서버 실행: http://localhost:${PORT}`);
+  console.log(`🎲 Dice 서버 실행: http://localhost:${PORT}`);
 });
