@@ -8,7 +8,9 @@ const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
 
-const SUIT_SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
+// 서버는 무늬를 숫자 0~3으로 보냄: 0=♠,1=♥,2=♦,3=♣
+const SUIT_SYM = ['♠', '♥', '♦', '♣'];
+const isRedSuit = (s) => s === 1 || s === 2;
 const RANK_LBL = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A', 10: '10' };
 const rankLabel = (r) => RANK_LBL[r] || String(r);
 
@@ -299,7 +301,7 @@ function renderFinal(s) {
 // ---------- 카드 렌더 ----------
 function cardHtml(c, back, muck) {
   if (back || !c) return `<div class="card sm back"></div>`;
-  const red = c.s === 'h' || c.s === 'd';
+  const red = isRedSuit(c.s);
   return `<div class="card sm ${red ? 'red' : 'black'} ${muck ? 'muck' : ''}">
     <span class="rank">${rankLabel(c.r)}</span><span class="suit">${SUIT_SYM[c.s]}</span>
   </div>`;
@@ -308,7 +310,7 @@ function cardHtml(c, back, muck) {
 // 커뮤니티 카드는 큰 사이즈
 function cardEl(c) {
   const tmp = document.createElement('div');
-  const red = c.s === 'h' || c.s === 'd';
+  const red = isRedSuit(c.s);
   tmp.innerHTML = `<div class="card ${red ? 'red' : 'black'}">
     <span class="rank">${rankLabel(c.r)}</span><span class="suit">${SUIT_SYM[c.s]}</span></div>`;
   return tmp.firstElementChild;
