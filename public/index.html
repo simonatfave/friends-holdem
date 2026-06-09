@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>🎲 Dice — 친구들과 포커</title>
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css?v=10" />
 </head>
 <body>
   <!-- 로비 화면 -->
@@ -118,8 +118,12 @@
     </div>
 
     <div id="finalScreen" class="overlay hidden">
+      <div id="confetti" class="confetti"></div>
       <div class="final-card">
-        <h2>🏆 토너먼트 종료</h2>
+        <div class="champ-trophy">🏆</div>
+        <div class="champ-label">CHAMPION</div>
+        <div id="champName" class="champ-name"></div>
+        <div class="champ-sub">토너먼트 우승!</div>
         <ol id="finalRanks"></ol>
         <button onclick="location.reload()" class="primary">새 게임</button>
       </div>
@@ -127,6 +131,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=9"></script>
+  <script src="client.js?v=10"></script>
 </body>
 </html>

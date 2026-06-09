@@ -37,6 +37,11 @@ const sfxDeal = () => { tone(520, 0.08, 'triangle', 0.12); tone(360, 0.08, 'tria
 const sfxChip = () => { tone(900, 0.05, 'square', 0.07); tone(1250, 0.05, 'square', 0.05, 0.03); };
 const sfxTurn = () => tone(680, 0.13, 'sine', 0.16);
 const sfxWin = () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.26, 'triangle', 0.13, i * 0.09));
+const sfxFanfare = () => {
+  const seq = [523, 659, 784, 1046, 988, 1046, 1318];
+  seq.forEach((f, i) => tone(f, 0.32, 'triangle', 0.15, i * 0.14));
+  [262, 330, 392].forEach((f) => tone(f, 1.0, 'sine', 0.08, 0.9)); // 마무리 코드
+};
 // 첫 사용자 동작에서 오디오 컨텍스트 활성화
 document.addEventListener('pointerdown', () => ac(), { once: true });
 // 음소거 토글
@@ -424,49 +429,56 @@ function renderActions(s) {
   }
 
   const callAct = s.legal.find((a) => a.type === 'call');
+  const checkAct = s.legal.find((a) => a.type === 'check');
   const raiseAct = s.legal.find((a) => a.type === 'raise' || a.type === 'bet');
 
+  const mainRow = document.createElement('div');
+  mainRow.className = 'action-main';
+
   // 폴드
-  const fold = btn('btn-fold', '폴드', () => act('fold'));
-  bar.appendChild(fold);
+  mainRow.appendChild(btn('btn-fold', '폴드', () => act('fold')));
 
-  // 체크/콜
-  if (s.legal.find((a) => a.type === 'check')) {
-    bar.appendChild(btn('btn-check', '체크', () => act('check')));
-  } else if (callAct) {
-    bar.appendChild(btn('btn-call', `콜 ${callAct.amount}`, () => act('call')));
-  }
+  // 체크 / 콜
+  if (checkAct) mainRow.appendChild(btn('btn-check', '체크', () => act('check')));
+  else if (callAct) mainRow.appendChild(btn('btn-call', `콜 ${callAct.amount}`, () => act('call')));
 
-  // 레이즈/벳
+  // 레이즈/벳 — 사이징 행(슬라이더·퀵벳) 위, 메인 버튼 아래
   if (raiseAct) {
-    const wrap = document.createElement('div');
-    wrap.className = 'raise-controls';
+    const raiseRow = document.createElement('div');
+    raiseRow.className = 'action-raise';
     const min = raiseAct.min, max = raiseAct.max;
+    const label = raiseAct.type === 'bet' ? '벳' : '레이즈';
+
     const slider = document.createElement('input');
     slider.type = 'range';
     slider.min = min; slider.max = max; slider.value = min; slider.step = Math.max(1, s.blinds.sb);
     const amt = document.createElement('span');
     amt.className = 'raise-amount';
     amt.textContent = min;
-    slider.oninput = () => (amt.textContent = slider.value);
+
+    const goBtn = btn('btn-raise', `${label} ${min}`, () => act('raise', parseInt(slider.value, 10)));
+    const setVal = (v) => {
+      v = Math.max(min, Math.min(max, Math.floor(v)));
+      slider.value = v; amt.textContent = v; goBtn.textContent = `${label} ${v}`;
+    };
+    slider.oninput = () => setVal(slider.value);
 
     const pot = s.pot;
     const quick = document.createElement('div');
     quick.className = 'quick-bets';
-    const setVal = (v) => { v = Math.max(min, Math.min(max, Math.floor(v))); slider.value = v; amt.textContent = v; };
     quick.appendChild(qbtn('½팟', () => setVal(pot * 0.5)));
     quick.appendChild(qbtn('팟', () => setVal(pot)));
     quick.appendChild(qbtn('올인', () => setVal(max)));
 
-    const label = raiseAct.type === 'bet' ? '벳' : '레이즈';
-    const goBtn = btn('btn-raise', label, () => act('raise', parseInt(slider.value, 10)));
+    raiseRow.appendChild(quick);
+    raiseRow.appendChild(slider);
+    raiseRow.appendChild(amt);
+    bar.appendChild(raiseRow);
 
-    wrap.appendChild(slider);
-    wrap.appendChild(amt);
-    wrap.appendChild(quick);
-    wrap.appendChild(goBtn);
-    bar.appendChild(wrap);
+    mainRow.appendChild(goBtn);
   }
+
+  bar.appendChild(mainRow);
 }
 
 function btn(cls, label, fn) {
@@ -503,13 +515,53 @@ function renderWinner(s) {
   }
 }
 
+let finalShown = false;
 function renderFinal(s) {
-  const ol = $('finalRanks');
   const ranked = [...s.finalResults].sort((a, b) => a.place - b.place);
+  const champ = ranked.find((r) => r.place === 1);
+  $('champName').textContent = champ ? champ.name : '';
+  const ol = $('finalRanks');
   ol.innerHTML = ranked.map((r) =>
     `<li class="${r.place === 1 ? 'first' : ''}">${r.place}위 — ${esc(r.name)} ${r.place === 1 ? '🏆' : ''}</li>`
   ).join('');
   show('finalScreen');
+  if (!finalShown) {
+    finalShown = true;
+    launchConfetti();
+    sfxFanfare();
+  }
+}
+
+function launchConfetti() {
+  const c = $('confetti');
+  c.innerHTML = '';
+  const colors = ['#e8c466', '#e25555', '#3ec97a', '#4a8cff', '#9b59b6', '#ffffff'];
+  for (let i = 0; i < 130; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = colors[i % colors.length];
+    p.style.animationDelay = (Math.random() * 1.2) + 's';
+    p.style.animationDuration = (2.4 + Math.random() * 1.8) + 's';
+    if (Math.random() < 0.5) p.style.borderRadius = '50%';
+    p.style.width = (6 + Math.random() * 6) + 'px';
+    p.style.height = (10 + Math.random() * 8) + 'px';
+    c.appendChild(p);
+  }
+  // 반복 발사 (3회) 로 풍성하게
+  let bursts = 0;
+  const iv = setInterval(() => {
+    if (++bursts >= 3) { clearInterval(iv); return; }
+    for (let i = 0; i < 60; i++) {
+      const p = document.createElement('div');
+      p.className = 'confetti-piece';
+      p.style.left = Math.random() * 100 + '%';
+      p.style.background = colors[i % colors.length];
+      p.style.animationDuration = (2.4 + Math.random() * 1.8) + 's';
+      if (Math.random() < 0.5) p.style.borderRadius = '50%';
+      c.appendChild(p);
+    }
+  }, 1100);
 }
 
 // ---------- 카드 렌더 (실제 트럼프 카드 레이아웃) ----------

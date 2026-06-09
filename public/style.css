@@ -296,8 +296,10 @@ button { font-family: inherit; }
   box-shadow: 0 2px 6px rgba(0,0,0,.5);
 }
 
-/* 액션바 */
-.actionbar { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; min-height: 64px; padding: 4px 0; }
+/* 액션바 — 위: 베팅 사이징 / 아래: 메인 액션 버튼 */
+.actionbar { display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; min-height: 64px; padding: 4px 0; }
+.action-main { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; }
+.action-raise { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; flex-wrap: wrap; }
 .actionbar button {
   padding: 16px 30px; border-radius: 14px; border: none; font-size: 19px; font-weight: 800; cursor: pointer;
   letter-spacing: .3px; box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 6px 14px rgba(0,0,0,.35);
@@ -311,17 +313,17 @@ button { font-family: inherit; }
 .btn-check { background: linear-gradient(180deg, #5a9bff, var(--accent)); color: #fff; }
 .btn-call { background: linear-gradient(180deg, #57e093, var(--green)); color: #06301a; }
 .btn-raise { background: linear-gradient(180deg, #ffd877, var(--gold)); color: #2a2106; }
-.raise-controls { display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,.28); padding: 8px 14px; border-radius: 16px; }
-.raise-controls input[type=range] {
+.action-raise { display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,.28); padding: 8px 14px; border-radius: 16px; }
+.action-raise input[type=range] {
   width: 150px; height: 8px; -webkit-appearance: none; appearance: none;
   background: linear-gradient(90deg, var(--gold), #8a6d22); border-radius: 6px; outline: none;
 }
-.raise-controls input[type=range]::-webkit-slider-thumb {
+.action-raise input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff, var(--gold)); border: 2px solid #b8932f; cursor: pointer;
   box-shadow: 0 2px 6px rgba(0,0,0,.5);
 }
-.raise-controls input[type=range]::-moz-range-thumb {
+.action-raise input[type=range]::-moz-range-thumb {
   width: 26px; height: 26px; border-radius: 50%; background: var(--gold); border: 2px solid #b8932f; cursor: pointer;
 }
 .raise-amount { color: var(--gold); font-weight: 800; font-size: 20px; min-width: 64px; text-align: center; }
@@ -348,11 +350,37 @@ button { font-family: inherit; }
   position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex;
   align-items: center; justify-content: center; z-index: 100;
 }
-.final-card { background: var(--panel); border-radius: 18px; padding: 30px; text-align: center; min-width: 300px; }
-.final-card h2 { color: var(--gold); margin-bottom: 16px; }
-.final-card ol { text-align: left; margin: 0 0 20px 20px; }
-.final-card li { padding: 4px 0; }
-.final-card li.first { color: var(--gold); font-weight: 700; font-size: 18px; }
+.final-card {
+  background: linear-gradient(180deg, #232b38, #1a212c);
+  border: 1px solid #3a4756; border-radius: 22px; padding: 30px 34px; text-align: center;
+  min-width: 300px; max-width: 90vw; position: relative; z-index: 2;
+  box-shadow: 0 24px 70px rgba(0,0,0,.6);
+  animation: cardPop .5s cubic-bezier(.2,.8,.3,1.4);
+}
+@keyframes cardPop { 0%{opacity:0; transform:scale(.7) translateY(20px);} 100%{opacity:1; transform:none;} }
+.champ-trophy { font-size: 72px; line-height: 1; animation: trophyBounce 1.2s ease-in-out infinite; }
+@keyframes trophyBounce { 0%,100%{transform:translateY(0) rotate(-4deg);} 50%{transform:translateY(-12px) rotate(4deg);} }
+.champ-label { color: var(--muted); font-size: 14px; letter-spacing: 6px; margin-top: 8px; }
+.champ-name {
+  color: var(--gold); font-size: 36px; font-weight: 800; margin: 6px 0 2px;
+  text-shadow: 0 0 18px rgba(232,196,102,.6); animation: nameGlow 1.5s ease-in-out infinite;
+}
+@keyframes nameGlow { 0%,100%{text-shadow:0 0 18px rgba(232,196,102,.5);} 50%{text-shadow:0 0 32px rgba(232,196,102,.95);} }
+.champ-sub { color: var(--text); font-size: 16px; margin-bottom: 20px; }
+.final-card ol { text-align: left; margin: 0 auto 22px; display: inline-block; }
+.final-card li { padding: 5px 0; color: var(--muted); font-size: 15px; }
+.final-card li.first { color: var(--gold); font-weight: 800; font-size: 19px; }
+
+/* 컨페티 */
+.confetti { position: absolute; inset: 0; overflow: hidden; z-index: 1; pointer-events: none; }
+.confetti-piece {
+  position: absolute; top: -16px; width: 9px; height: 15px; opacity: .95;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(-16px) rotate(0); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(720deg); opacity: .9; }
+}
 
 /* ---------- 반응형: 화면이 좁아지면 카드 변수만 줄여 자동 축소 ---------- */
 /* 태블릿 / 작은 노트북 */
@@ -371,11 +399,14 @@ button { font-family: inherit; }
   .seat-inner { padding: 5px 5px; }
   .sidepanel { height: 86px; }
   .actionbar { gap: 8px; }
-  .actionbar button { padding: 14px 22px; font-size: 17px; }
-  .quick-bets button { padding: 10px 13px; font-size: 14px; }
-  .raise-controls { gap: 9px; padding: 7px 11px; }
-  .raise-controls input[type=range] { width: 120px; }
-  .raise-amount { font-size: 18px; min-width: 52px; }
+  .actionbar button { padding: 15px 18px; font-size: 17px; }
+  .action-main { gap: 8px; padding: 0 4px; }
+  .action-main button { flex: 1; padding: 16px 8px; }
+  .action-raise { gap: 9px; padding: 8px 11px; width: calc(100% - 8px); }
+  .quick-bets { flex: 0 0 auto; }
+  .quick-bets button { padding: 11px 13px; font-size: 14px; }
+  .action-raise input[type=range] { flex: 1 1 80px; width: auto; min-width: 70px; }
+  .raise-amount { font-size: 18px; min-width: 48px; }
 }
 /* 작은 휴대폰 */
 @media (max-width: 400px) {
