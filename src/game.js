@@ -26,8 +26,10 @@ export class Game {
   constructor(opts = {}) {
     this.startingChips = opts.startingChips ?? 1500;
     this.handsPerLevel = opts.handsPerLevel ?? 8;
+    this.levelDurationSec = opts.levelDurationSec ?? 0; // >0 이면 시간 기반 블라인드 상승
     this.blindSchedule = opts.blindSchedule ?? defaultBlindSchedule();
     this.actionTimeout = opts.actionTimeout ?? 0; // ms, 0=무제한
+    this.startedAt = null;
 
     this.players = []; // { id, name, chips, connected, sittingOut }
     this.started = false;
@@ -92,6 +94,7 @@ export class Game {
       this.addPlayer('bot_' + Date.now(), '🤖 Bot', true);
     }
     this.started = true;
+    this.startedAt = Date.now();
     this.button = Math.floor(Math.random() * this.players.length);
     this.pushLog(`토너먼트 시작! 시작 스택 ${this.startingChips}`);
     this.startHand();
@@ -111,11 +114,19 @@ export class Game {
       return;
     }
     this.handNumber++;
-    // 레벨 업
-    this.level = Math.min(
-      Math.floor((this.handNumber - 1) / this.handsPerLevel),
-      this.blindSchedule.length - 1
-    );
+    // 레벨 업: 시간 기반(levelDurationSec>0) 또는 핸드 기반
+    if (this.levelDurationSec > 0 && this.startedAt) {
+      const elapsed = (Date.now() - this.startedAt) / 1000;
+      this.level = Math.min(
+        Math.floor(elapsed / this.levelDurationSec),
+        this.blindSchedule.length - 1
+      );
+    } else {
+      this.level = Math.min(
+        Math.floor((this.handNumber - 1) / this.handsPerLevel),
+        this.blindSchedule.length - 1
+      );
+    }
     const blinds = this.currentBlinds();
 
     // 버튼 이동 (살아있는 플레이어 중 다음으로)
@@ -609,6 +620,14 @@ export class Game {
       };
     });
 
+    // 시간 기반 블라인드일 때 다음 레벨까지 남은 초
+    let secondsToNextLevel = null;
+    if (this.levelDurationSec > 0 && this.startedAt && this.started && !this.finished
+        && this.level < this.blindSchedule.length - 1) {
+      const elapsed = (Date.now() - this.startedAt) / 1000;
+      secondsToNextLevel = Math.max(0, Math.ceil(this.levelDurationSec - (elapsed % this.levelDurationSec)));
+    }
+
     return {
       started: this.started,
       finished: this.finished,
@@ -616,6 +635,8 @@ export class Game {
       level: this.level + 1,
       blinds,
       nextLevelIn: this.handsPerLevel - ((this.handNumber - 1) % this.handsPerLevel) - 1,
+      timedBlinds: this.levelDurationSec > 0,
+      secondsToNextLevel,
       pot: h?.pot ?? 0,
       community: h?.community ?? [],
       phase: h?.phase ?? null,

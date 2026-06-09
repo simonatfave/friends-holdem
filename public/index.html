@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>🎲 Dice — 친구들과 포커</title>
-  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="stylesheet" href="style.css?v=12" />
 </head>
 <body>
   <!-- 로비 화면 -->
@@ -29,6 +29,7 @@
       <div class="tabs">
         <button class="tab active" data-tab="create">방 만들기</button>
         <button class="tab" data-tab="join">방 참여</button>
+        <button class="tab" data-tab="rooms">방 목록</button>
       </div>
 
       <div id="createPane" class="pane">
@@ -38,10 +39,12 @@
             <input id="startingChips" type="number" value="1500" min="500" step="100" />
           </div>
           <div>
-            <label>레벨당 핸드 수</label>
-            <input id="handsPerLevel" type="number" value="8" min="2" max="50" />
+            <label>블라인드 상승(분)</label>
+            <input id="levelMinutes" type="number" value="3" min="1" max="60" />
           </div>
         </div>
+        <label>행동 제한시간(초, 0=무제한)</label>
+        <input id="actionSeconds" type="number" value="25" min="0" max="120" />
         <button id="createBtn" class="primary">방 만들기</button>
       </div>
 
@@ -49,6 +52,14 @@
         <label>방 코드</label>
         <input id="codeInput" maxlength="4" placeholder="ABCD" style="text-transform:uppercase" />
         <button id="joinBtn" class="primary">참여하기</button>
+      </div>
+
+      <div id="roomsPane" class="pane hidden">
+        <div class="rooms-head">
+          <span>현재 방</span>
+          <button id="refreshRooms" class="ghost">새로고침</button>
+        </div>
+        <div id="roomList" class="room-list"></div>
       </div>
 
       <p id="lobbyError" class="error"></p>
@@ -104,6 +115,7 @@
       </div>
     </div>
 
+    <div class="action-timer hidden" id="actionTimer"><div id="actionTimerFill"></div></div>
     <div class="actionbar" id="actionbar"></div>
 
     <div class="sidepanel">
@@ -131,6 +143,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=10"></script>
+  <script src="client.js?v=12"></script>
 </body>
 </html>

@@ -90,6 +90,32 @@ button { font-family: inherit; }
 .step-btn:active { transform: scale(.94); }
 .step-btn:disabled { opacity: .35; cursor: not-allowed; }
 
+/* 방 목록 */
+.rooms-head { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 8px; color: var(--muted); font-size: 14px; }
+.room-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+.room-row { display: flex; align-items: center; gap: 10px; background: #161c25; border: 1px solid #3a4756; border-radius: 10px; padding: 10px 12px; }
+.room-row .rc { font-family: monospace; font-size: 18px; font-weight: 800; color: var(--gold); letter-spacing: 2px; }
+.room-row .rinfo { flex: 1; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.rstat { font-size: 11px; padding: 2px 8px; border-radius: 8px; display: inline-block; }
+.rstat.wait { background: #1f3a2a; color: var(--green); }
+.rstat.play { background: #3a2f1f; color: var(--gold); }
+.room-row button { padding: 9px 14px; border-radius: 9px; border: none; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.room-row .join-btn { background: var(--green); color: #06301a; }
+.room-row .spec-btn { background: var(--panel-light); color: var(--text); border: 1px solid #3f4b5a; }
+.room-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 22px; }
+
+/* 턴 시간 제한 바 */
+.action-timer { width: 100%; max-width: 560px; height: 7px; background: rgba(255,255,255,.12); border-radius: 4px; margin: 0 auto; overflow: hidden; }
+#actionTimerFill { height: 100%; width: 100%; background: linear-gradient(90deg, var(--green), var(--gold)); border-radius: 4px; transition: width .2s linear; }
+#actionTimerFill.warn { background: var(--red); }
+
+/* 좌석 카운트다운 */
+.seat-timer { font-size: 13px; font-weight: 800; color: var(--gold); margin-top: 1px; }
+.seat-timer.warn { color: var(--red); }
+
+/* 관전 배지 */
+.spectate-badge { color: var(--accent); border-color: var(--accent); }
+
 /* ---------- 게임 ---------- */
 #game { display: flex; flex-direction: column; height: 100vh; padding: 10px; gap: 8px; }
 .topbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -99,7 +125,7 @@ button { font-family: inherit; }
 }
 #potBadge { color: var(--gold); border-color: var(--gold); }
 
-.table-wrap { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.table-wrap { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding-bottom: 60px; }
 .poker-table {
   position: relative;
   width: min(94vw, 900px);
@@ -304,7 +330,9 @@ button { font-family: inherit; }
   padding: 16px 30px; border-radius: 14px; border: none; font-size: 19px; font-weight: 800; cursor: pointer;
   letter-spacing: .3px; box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 6px 14px rgba(0,0,0,.35);
   transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
+  white-space: nowrap;
 }
+.quick-bets button { white-space: nowrap; min-width: 52px; }
 .actionbar button:hover { filter: brightness(1.1); transform: translateY(-1px); }
 .actionbar button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.35); }
 .btn-raise:hover { box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 0 20px rgba(232,196,102,.7); }
@@ -391,7 +419,8 @@ button { font-family: inherit; }
 @media (max-width: 640px) {
   :root { --cc-w: 58px; --cc-h: 81px; --hc-w: 46px; --hc-h: 64px; --seat-w: 118px; }
   /* 세로 화면에선 테이블을 정사각형에 가깝게 키워 좌석/팟 공간 확보 */
-  .poker-table { width: min(94vw, 72vh); aspect-ratio: 1 / 1; border-width: 9px; }
+  .poker-table { width: min(94vw, 66vh); aspect-ratio: 1 / 1; border-width: 9px; }
+  .table-wrap { padding-bottom: 30px; }
   .community { gap: 6px; top: 38%; }
   .pot-stack { top: 54%; }
   .pot-display { top: 56%; }

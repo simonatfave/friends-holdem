@@ -33,12 +33,22 @@ function makeRoomCode() {
   return code;
 }
 
+function stateFor(room, viewerId) {
+  const st = room.game.getStateFor(viewerId);
+  st.actionDeadline = room.actionDeadline || null;
+  st.actionLimit = room.actionLimit || null;
+  st.spectator = room.spectators ? room.spectators.has(viewerId) : false;
+  return st;
+}
 function broadcast(code) {
   const room = rooms.get(code);
   if (!room) return;
   const { game } = room;
   for (const p of game.players) {
-    io.to(p.socketId || '').emit('state', game.getStateFor(p.id));
+    if (p.socketId) io.to(p.socketId).emit('state', stateFor(room, p.id));
+  }
+  if (room.spectators) {
+    for (const sid of room.spectators) io.to(sid).emit('state', stateFor(room, sid));
   }
 }
 
@@ -53,10 +63,42 @@ function scheduleNextHand(code) {
   room.timer = setTimeout(() => {
     if (!rooms.has(code)) return;
     game.nextHand();
+    startActionTimer(code);
     broadcast(code);
     if (game.hand && game.hand.phase === 'handComplete') scheduleNextHand(code);
     else maybeBotAct(code);
   }, delay);
+}
+
+// 턴 시간 제한: 사람 차례에 마감시간 설정, 초과 시 자동 체크/폴드
+function startActionTimer(code) {
+  const room = rooms.get(code);
+  if (!room) return;
+  if (room.actionTimer) { clearTimeout(room.actionTimer); room.actionTimer = null; }
+  room.actionDeadline = null;
+  const g = room.game;
+  if (!g.hand || g.finished) return;
+  const h = g.hand;
+  if (h.phase === 'handComplete' || h.phase === 'showdown') return;
+  if (!room.actionLimit) return; // 0 = 무제한
+  const seat = h.seats[h.toActIndex];
+  if (!seat) return;
+  const p = g.getPlayer(seat.id);
+  if (!p || p.isBot) return; // 봇은 maybeBotAct가 처리
+  room.actionDeadline = Date.now() + room.actionLimit;
+  room.actionTimer = setTimeout(() => {
+    if (!rooms.has(code)) return;
+    const legal = g.legalActions(seat.id);
+    if (!legal) return;
+    const check = legal.find((a) => a.type === 'check');
+    const res = g.handleAction(seat.id, check ? 'check' : 'fold');
+    if (res.ok) {
+      startActionTimer(code);
+      broadcast(code);
+      scheduleNextHand(code);
+      maybeBotAct(code);
+    }
+  }, room.actionLimit);
 }
 
 // 봇 차례면 잠시 뒤 자동으로 행동 (테스트용 간단 정책: 콜링 스테이션 + 가끔 레이즈)
@@ -86,10 +128,13 @@ function maybeBotAct(code) {
     else if (call) action = { type: 'call' };
     else action = { type: 'fold' };
     const res = g.handleAction(seat.id, action.type, action.amount);
-    broadcast(code);
     if (res.ok) {
+      startActionTimer(code);
+      broadcast(code);
       scheduleNextHand(code);
       maybeBotAct(code);
+    } else {
+      broadcast(code);
     }
   }, 1300);
 }
@@ -100,13 +145,15 @@ io.on('connection', (socket) => {
 
   socket.on('create', ({ name, settings }, cb) => {
     const code = makeRoomCode();
+    const levelMinutes = clampInt(settings?.levelMinutes, 1, 60, 3);
     const game = new Game({
       startingChips: clampInt(settings?.startingChips, 500, 100000, 1500),
-      handsPerLevel: clampInt(settings?.handsPerLevel, 2, 50, 8),
+      levelDurationSec: levelMinutes * 60, // 시간 기반 블라인드 상승
     });
     game.addPlayer(playerId, name);
     game.getPlayer(playerId).socketId = socket.id;
-    rooms.set(code, { game, hostId: playerId });
+    const actionSec = clampInt(settings?.actionSeconds, 0, 120, 25);
+    rooms.set(code, { game, hostId: playerId, actionLimit: actionSec > 0 ? actionSec * 1000 : 0 });
     roomCode = code;
     socket.join(code);
     cb?.({ ok: true, code, youId: playerId });
@@ -148,6 +195,7 @@ io.on('connection', (socket) => {
     if (room.hostId !== playerId) return cb?.({ ok: false, error: '방장만 시작할 수 있습니다' });
     const r = room.game.start();
     cb?.(r);
+    startActionTimer(roomCode);
     broadcast(roomCode);
     scheduleNextHand(roomCode);
     maybeBotAct(roomCode);
@@ -188,10 +236,45 @@ io.on('connection', (socket) => {
     const r = room.game.handleAction(playerId, type, amount);
     cb?.(r);
     if (r.ok) {
+      startActionTimer(roomCode);
       broadcast(roomCode);
       scheduleNextHand(roomCode);
       maybeBotAct(roomCode);
     }
+  });
+
+  // 현재 방 목록 조회
+  socket.on('listRooms', (_d, cb) => {
+    const list = [];
+    for (const [code, room] of rooms) {
+      const g = room.game;
+      list.push({
+        code,
+        humans: g.players.filter((p) => !p.isBot).length,
+        total: g.players.length,
+        started: g.started,
+        finished: g.finished,
+        handNumber: g.handNumber,
+        hostName: (g.players.find((p) => p.id === room.hostId) || {}).name || '',
+        blinds: g.started && !g.finished ? g.currentBlinds() : null,
+      });
+    }
+    // 대기중 → 진행중 → 종료 순
+    list.sort((a, b) => (a.started ? 1 : 0) - (b.started ? 1 : 0) || a.code.localeCompare(b.code));
+    cb?.({ ok: true, rooms: list });
+  });
+
+  // 진행중인 방 관전
+  socket.on('spectate', ({ code }, cb) => {
+    code = (code || '').toUpperCase().trim();
+    const room = rooms.get(code);
+    if (!room) return cb?.({ ok: false, error: '방을 찾을 수 없습니다' });
+    roomCode = code;
+    if (!room.spectators) room.spectators = new Set();
+    room.spectators.add(socket.id);
+    socket.join(code);
+    cb?.({ ok: true, code, youId: socket.id, spectator: true });
+    io.to(socket.id).emit('state', stateFor(room, socket.id));
   });
 
   socket.on('chat', ({ text }) => {
@@ -205,6 +288,11 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const room = rooms.get(roomCode);
     if (!room) return;
+    // 관전자였으면 제거 후 종료
+    if (room.spectators && room.spectators.has(socket.id)) {
+      room.spectators.delete(socket.id);
+      if (!room.game.getPlayer(playerId)) return;
+    }
     const { game } = room;
     const p = game.getPlayer(playerId);
     if (p) p.connected = false;
@@ -216,6 +304,8 @@ io.on('connection', (socket) => {
       }
       if (game.players.length === 0) {
         if (room.timer) clearTimeout(room.timer);
+        if (room.actionTimer) clearTimeout(room.actionTimer);
+        if (room.botTimer) clearTimeout(room.botTimer);
         rooms.delete(roomCode);
         return;
       }
