@@ -12,9 +12,9 @@
   --green: #3ec97a;
   --accent: #4a8cff;
   /* 카드 크기 (반응형). 데스크톱 기본 = 기존의 약 2배 */
-  --cc-w: 92px;  --cc-h: 128px;  /* 커뮤니티 카드 */
-  --hc-w: 64px;  --hc-h: 90px;   /* 홀 카드 */
-  --seat-w: 152px;
+  --cc-w: 90px;  --cc-h: 126px;  /* 커뮤니티 카드 (크게 유지) */
+  --hc-w: 52px;  --hc-h: 73px;   /* 홀 카드 (좌석용, 약간 축소) */
+  --seat-w: 138px;
 }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
@@ -128,6 +128,48 @@ button { font-family: inherit; }
 /* 관전 배지 */
 .spectate-badge { color: var(--accent); border-color: var(--accent); }
 
+/* 로비 체크박스 */
+.check-row { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text); font-size: 14px; margin-top: 14px; }
+.check-row input { width: auto; }
+
+/* 쇼다운 승리 카드 하이라이트 */
+.card.win { box-shadow: 0 0 0 3px var(--gold), 0 0 18px rgba(232,196,102,.9); animation: winPulse .8s ease-in-out infinite; z-index: 4; }
+@keyframes winPulse { 0%,100% { box-shadow: 0 0 0 3px var(--gold), 0 0 14px rgba(232,196,102,.7); } 50% { box-shadow: 0 0 0 3px var(--gold), 0 0 26px rgba(232,196,102,1); } }
+.card.muck:not(.win) { opacity: .55; }
+
+/* 연결 끊김 */
+.tag.off { background: var(--red); color: #fff; }
+.seat.disconnected .seat-inner { opacity: .55; filter: grayscale(.5); }
+
+/* 이모지 리액션 바 */
+.emoji-bar { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 2px 0; position: relative; z-index: 30; }
+.emoji-btn {
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid #33404f;
+  background: var(--panel); font-size: 20px; cursor: pointer; line-height: 1;
+  transition: transform .08s, background .12s;
+}
+.emoji-btn:hover { background: var(--panel-light); transform: translateY(-2px); }
+.emoji-btn:active { transform: scale(.9); }
+
+/* 좌석 위로 떠오르는 리액션 */
+.reaction-float {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  font-size: 34px; pointer-events: none; z-index: 50;
+  animation: reactFloat 1.7s ease-out forwards;
+}
+@keyframes reactFloat {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(.4); }
+  15% { opacity: 1; transform: translate(-50%, -4px) scale(1.2); }
+  40% { transform: translate(-50%, -24px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -64px) scale(.9); }
+}
+
+/* 설정 패널 */
+.settings-card { background: var(--panel); border: 1px solid #3a4756; border-radius: 18px; padding: 24px 28px; min-width: 280px; max-width: 90vw; }
+.settings-card h3 { color: var(--gold); margin-bottom: 16px; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid #2a3340; color: var(--text); font-size: 15px; cursor: pointer; }
+.toggle-row input { width: 20px; height: 20px; }
+
 /* ---------- 게임 ---------- */
 #game { display: flex; flex-direction: column; height: 100vh; padding: 10px; gap: 8px; }
 .topbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -150,11 +192,11 @@ button { font-family: inherit; }
   box-shadow: inset 0 0 60px rgba(0,0,0,.5), 0 18px 40px rgba(0,0,0,.5);
 }
 .community {
-  position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%);
+  position: absolute; top: 37%; left: 50%; transform: translate(-50%,-50%);
   display: flex; gap: 8px; max-width: 96%;
 }
 .pot-display {
-  position: absolute; top: 58%; left: 50%; transform: translateX(-50%);
+  position: absolute; top: 63%; left: 50%; transform: translateX(-50%);
   color: var(--gold); font-weight: 800; font-size: 19px;
   background: rgba(0,0,0,.4); padding: 5px 18px; border-radius: 14px;
   z-index: 3;
@@ -163,7 +205,7 @@ button { font-family: inherit; }
 
 /* 중앙 팟 칩 더미 (팟 크기만큼 위로 쌓임) */
 .pot-stack {
-  position: absolute; left: 50%; top: 56%; transform: translate(-50%, -100%);
+  position: absolute; left: 50%; top: 61%; transform: translate(-50%, -100%);
   display: flex; align-items: flex-end; justify-content: center; gap: 7px;
   z-index: 2; pointer-events: none;
 }
@@ -429,17 +471,17 @@ button { font-family: inherit; }
 /* ---------- 반응형: 화면이 좁아지면 카드 변수만 줄여 자동 축소 ---------- */
 /* 태블릿 / 작은 노트북 */
 @media (max-width: 900px) {
-  :root { --cc-w: 74px; --cc-h: 103px; --hc-w: 54px; --hc-h: 76px; --seat-w: 130px; }
+  :root { --cc-w: 74px; --cc-h: 103px; --hc-w: 46px; --hc-h: 64px; --seat-w: 124px; }
 }
 /* 휴대폰 (가로 폭 기준) */
 @media (max-width: 640px) {
-  :root { --cc-w: 58px; --cc-h: 81px; --hc-w: 46px; --hc-h: 64px; --seat-w: 118px; }
+  :root { --cc-w: 58px; --cc-h: 81px; --hc-w: 42px; --hc-h: 58px; --seat-w: 112px; }
   /* 세로 화면에선 테이블을 정사각형에 가깝게 키워 좌석/팟 공간 확보 */
   .poker-table { width: min(94vw, 56vh); height: auto; aspect-ratio: 1 / 1; border-width: 9px; }
   .table-wrap { padding-bottom: 30px; }
-  .community { gap: 6px; top: 38%; }
-  .pot-stack { top: 54%; }
-  .pot-display { top: 56%; }
+  .community { gap: 6px; top: 33%; }
+  .pot-stack { top: 56%; }
+  .pot-display { top: 58%; }
   .seat .pname { font-size: 13px; }
   .seat-inner { padding: 5px 5px; }
   .sidepanel { height: 86px; }
@@ -455,7 +497,7 @@ button { font-family: inherit; }
 }
 /* 작은 휴대폰 */
 @media (max-width: 400px) {
-  :root { --cc-w: 48px; --cc-h: 67px; --hc-w: 40px; --hc-h: 56px; --seat-w: 104px; }
+  :root { --cc-w: 48px; --cc-h: 67px; --hc-w: 37px; --hc-h: 52px; --seat-w: 102px; }
   .community { gap: 5px; }
   .topbar .badge { font-size: 11px; padding: 5px 9px; }
 }

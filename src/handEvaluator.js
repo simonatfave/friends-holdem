@@ -104,3 +104,20 @@ export function evaluate7(cards) {
 export function handName(score, lang = 'ko') {
   return (lang === 'ko' ? CATEGORY_NAMES_KO : CATEGORY_NAMES)[score[0]];
 }
+
+// 7장에서 최고 점수와 그 점수를 만드는 5장을 함께 반환 (하이라이트용)
+export function evaluate7WithCards(cards) {
+  if (cards.length < 5) throw new Error('카드가 5장 이상 필요합니다');
+  let best = null, bestCards = null;
+  const n = cards.length;
+  for (let a = 0; a < n - 4; a++)
+    for (let b = a + 1; b < n - 3; b++)
+      for (let c = b + 1; c < n - 2; c++)
+        for (let d = c + 1; d < n - 1; d++)
+          for (let e = d + 1; e < n; e++) {
+            const combo = [cards[a], cards[b], cards[c], cards[d], cards[e]];
+            const s = score5(combo);
+            if (!best || compareScore(s, best) > 0) { best = s; bestCards = combo; }
+          }
+  return { score: best, cards: bestCards };
+}

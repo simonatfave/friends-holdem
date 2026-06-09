@@ -1,5 +1,5 @@
 import { makeDeck, shuffle } from './deck.js';
-import { evaluate7, compareScore, handName } from './handEvaluator.js';
+import { evaluate7, compareScore, handName, evaluate7WithCards } from './handEvaluator.js';
 
 // 토너먼트 블라인드 스케줄 생성 (스택 대비 적당히 가파른 곡선)
 export function defaultBlindSchedule() {
@@ -27,6 +27,7 @@ export class Game {
     this.startingChips = opts.startingChips ?? 1500;
     this.handsPerLevel = opts.handsPerLevel ?? 8;
     this.levelDurationSec = opts.levelDurationSec ?? 0; // >0 이면 시간 기반 블라인드 상승
+    this.rebuyEnabled = opts.rebuyEnabled ?? false;
     this.blindSchedule = opts.blindSchedule ?? defaultBlindSchedule();
     this.actionTimeout = opts.actionTimeout ?? 0; // ms, 0=무제한
     this.startedAt = null;
@@ -413,20 +414,33 @@ export class Game {
     return 0;
   }
 
+  // 더 이상 베팅 불가(올인 등) → 런아웃 모드. 카드 공개, 서버가 한 장씩 진행.
   runOutAndShowdown() {
     const h = this.hand;
-    // 남은 커뮤니티 카드 채우기
-    while (h.community.length < 5) {
-      if (h.community.length === 0) {
-        h.deck.pop();
-        h.community.push(h.deck.pop(), h.deck.pop(), h.deck.pop());
-      } else {
-        h.deck.pop();
-        h.community.push(h.deck.pop());
-      }
+    h.runout = true;
+    h.revealAll = true;
+    h.phase = 'runout';
+  }
+
+  // 런아웃 한 단계 진행 (서버가 딜레이를 두고 반복 호출). 끝나면 true.
+  runoutStep() {
+    const h = this.hand;
+    if (!h) return true;
+    if (h.community.length >= 5) {
+      h.phase = 'showdown';
+      this.doShowdown();
+      return true;
     }
-    h.phase = 'showdown';
-    this.doShowdown();
+    if (h.community.length === 0) {
+      h.deck.pop();
+      h.community.push(h.deck.pop(), h.deck.pop(), h.deck.pop());
+      this.pushLog('-- 플랍 (올인) --');
+    } else {
+      h.deck.pop();
+      h.community.push(h.deck.pop());
+      this.pushLog(`-- ${h.community.length === 4 ? '턴' : '리버'} (올인) --`);
+    }
+    return false;
   }
 
   // ---------- 쇼다운 & 사이드팟 ----------
@@ -434,14 +448,20 @@ export class Game {
     const h = this.hand;
     const contenders = h.seats.filter((s) => !h.folded[s.id]);
 
-    // 각 플레이어 패 점수
+    // 각 플레이어 패 점수 + 베스트5(하이라이트용)
     const scores = {};
+    const bests = {};
     for (const s of contenders) {
-      scores[s.id] = evaluate7([...h.holes[s.id], ...h.community]);
+      const r = evaluate7WithCards([...h.holes[s.id], ...h.community]);
+      scores[s.id] = r.score;
+      bests[s.id] = r.cards.map((c) => ({ r: c.r, s: c.s }));
     }
 
     // 사이드팟 분배
     const awards = this.distributePots(contenders, scores);
+
+    const winnerIds = new Set();
+    awards.forEach((a) => a.winners.forEach((w) => winnerIds.add(w.id)));
 
     const reveal = contenders.map((s) => ({
       id: s.id,
@@ -449,6 +469,8 @@ export class Game {
       hole: h.holes[s.id],
       score: scores[s.id],
       handName: handName(scores[s.id], 'ko'),
+      best: bests[s.id],
+      isWinner: winnerIds.has(s.id),
     }));
 
     h.results = { awards, reveal };
@@ -544,6 +566,20 @@ export class Game {
     }
   }
 
+  // 리바이(재충전 재입장): 칩이 0인 플레이어가 다시 시작 스택으로 복귀
+  rebuy(playerId) {
+    if (!this.rebuyEnabled) return { ok: false, error: '리바이가 비활성화됨' };
+    if (this.finished) return { ok: false, error: '이미 종료된 게임' };
+    const p = this.getPlayer(playerId);
+    if (!p) return { ok: false, error: '플레이어 없음' };
+    if (!p.eliminated && p.chips > 0) return { ok: false, error: '아직 칩이 있습니다' };
+    p.chips = this.startingChips;
+    p.eliminated = false;
+    this.results = this.results.filter((r) => r.id !== playerId);
+    this.pushLog(`${p.name} 리바이! (+${this.startingChips})`);
+    return { ok: true };
+  }
+
   // 다음 핸드로 (서버가 딜레이 후 호출)
   nextHand() {
     if (this.finished) return;
@@ -568,7 +604,7 @@ export class Game {
   // ---------- 상태 직렬화 ----------
   legalActions(playerId) {
     const h = this.hand;
-    if (!h || h.phase === 'showdown' || h.phase === 'handComplete') return null;
+    if (!h || h.phase === 'showdown' || h.phase === 'handComplete' || h.phase === 'runout') return null;
     const seat = h.seats[h.toActIndex];
     if (!seat || seat.id !== playerId) return null;
     const p = seat;
@@ -593,7 +629,7 @@ export class Game {
   getStateFor(viewerId) {
     const blinds = this.started && !this.finished ? this.currentBlinds() : (this.hand?.blinds ?? this.currentBlinds());
     const h = this.hand;
-    const toActId = h && (h.phase !== 'showdown' && h.phase !== 'handComplete')
+    const toActId = h && (h.phase !== 'showdown' && h.phase !== 'handComplete' && h.phase !== 'runout')
       ? h.seats[h.toActIndex]?.id
       : null;
 
@@ -602,6 +638,7 @@ export class Game {
       const showHole =
         h && inHand &&
         (p.id === viewerId ||
+          (h.revealAll && !h.folded[p.id]) ||
           (h.phase === 'handComplete' && h.results?.reveal?.some((r) => r.id === p.id)));
       return {
         id: p.id,
@@ -637,6 +674,11 @@ export class Game {
       nextLevelIn: this.handsPerLevel - ((this.handNumber - 1) % this.handsPerLevel) - 1,
       timedBlinds: this.levelDurationSec > 0,
       secondsToNextLevel,
+      rebuyEnabled: this.rebuyEnabled,
+      startingChips: this.startingChips,
+      canRebuy: this.rebuyEnabled && !this.finished &&
+        !!this.players.find((p) => p.id === viewerId && (p.eliminated || p.chips <= 0)),
+      runout: !!h?.runout,
       pot: h?.pot ?? 0,
       community: h?.community ?? [],
       phase: h?.phase ?? null,

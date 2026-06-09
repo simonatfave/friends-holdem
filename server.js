@@ -66,8 +66,28 @@ function scheduleNextHand(code) {
     startActionTimer(code);
     broadcast(code);
     if (game.hand && game.hand.phase === 'handComplete') scheduleNextHand(code);
-    else maybeBotAct(code);
+    else { maybeBotAct(code); driveRunout(code); }
   }, delay);
+}
+
+// 올인 런아웃: 보드를 한 장씩 딜레이를 두고 공개
+function driveRunout(code) {
+  const room = rooms.get(code);
+  if (!room) return;
+  const g = room.game;
+  if (!g.hand || g.hand.phase !== 'runout') return;
+  if (room.runoutTimer) return; // 이미 진행 중
+  const step = () => {
+    room.runoutTimer = null;
+    if (!rooms.has(code)) return;
+    const gg = room.game;
+    if (!gg.hand || gg.hand.phase !== 'runout') { broadcast(code); return; }
+    const done = gg.runoutStep();
+    broadcast(code);
+    if (done) scheduleNextHand(code);
+    else room.runoutTimer = setTimeout(step, 1100);
+  };
+  room.runoutTimer = setTimeout(step, 900);
 }
 
 // 턴 시간 제한: 사람 차례에 마감시간 설정, 초과 시 자동 체크/폴드
@@ -97,6 +117,7 @@ function startActionTimer(code) {
       broadcast(code);
       scheduleNextHand(code);
       maybeBotAct(code);
+      driveRunout(code);
     }
   }, room.actionLimit);
 }
@@ -133,6 +154,7 @@ function maybeBotAct(code) {
       broadcast(code);
       scheduleNextHand(code);
       maybeBotAct(code);
+      driveRunout(code);
     } else {
       broadcast(code);
     }
@@ -149,6 +171,7 @@ io.on('connection', (socket) => {
     const game = new Game({
       startingChips: clampInt(settings?.startingChips, 500, 100000, 1500),
       levelDurationSec: levelMinutes * 60, // 시간 기반 블라인드 상승
+      rebuyEnabled: !!settings?.rebuy,
     });
     game.addPlayer(playerId, name);
     game.getPlayer(playerId).socketId = socket.id;
@@ -199,6 +222,7 @@ io.on('connection', (socket) => {
     broadcast(roomCode);
     scheduleNextHand(roomCode);
     maybeBotAct(roomCode);
+    driveRunout(roomCode);
   });
 
   // 방장이 테스트 봇 수를 직접 설정 (목표 개수에 맞춰 추가/제거)
@@ -240,6 +264,7 @@ io.on('connection', (socket) => {
       broadcast(roomCode);
       scheduleNextHand(roomCode);
       maybeBotAct(roomCode);
+      driveRunout(roomCode);
     }
   });
 
@@ -277,6 +302,25 @@ io.on('connection', (socket) => {
     io.to(socket.id).emit('state', stateFor(room, socket.id));
   });
 
+  // 리바이(재충전 재입장)
+  socket.on('rebuy', (_d, cb) => {
+    const room = rooms.get(roomCode);
+    if (!room) return cb?.({ ok: false, error: '방 없음' });
+    const r = room.game.rebuy(playerId);
+    cb?.(r);
+    if (r.ok) broadcast(roomCode);
+  });
+
+  // 이모지 리액션
+  const ALLOWED_EMOJI = ['😎', '🔥', '😱', '😂', '😭', '👍', '🤔', '🎉'];
+  socket.on('react', ({ emoji }) => {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    const p = room.game.getPlayer(playerId);
+    if (!p || !ALLOWED_EMOJI.includes(emoji)) return;
+    io.to(roomCode).emit('reaction', { id: playerId, emoji });
+  });
+
   socket.on('chat', ({ text }) => {
     const room = rooms.get(roomCode);
     if (!room) return;
@@ -303,9 +347,7 @@ io.on('connection', (socket) => {
         room.hostId = game.players[0].id;
       }
       if (game.players.length === 0) {
-        if (room.timer) clearTimeout(room.timer);
-        if (room.actionTimer) clearTimeout(room.actionTimer);
-        if (room.botTimer) clearTimeout(room.botTimer);
+        clearRoomTimers(room);
         rooms.delete(roomCode);
         return;
       }
@@ -319,6 +361,24 @@ function clampInt(v, min, max, def) {
   if (Number.isNaN(n)) return def;
   return Math.max(min, Math.min(max, n));
 }
+
+function clearRoomTimers(room) {
+  for (const k of ['timer', 'actionTimer', 'botTimer', 'runoutTimer']) {
+    if (room[k]) { clearTimeout(room[k]); room[k] = null; }
+  }
+}
+
+// 빈 방(접속 인원·관전자 없음) 주기적 정리
+setInterval(() => {
+  for (const [code, room] of rooms) {
+    const anyConnected = room.game.players.some((p) => !p.isBot && p.connected);
+    const anySpec = room.spectators && room.spectators.size > 0;
+    if (!anyConnected && !anySpec) {
+      clearRoomTimers(room);
+      rooms.delete(code);
+    }
+  }
+}, 60000);
 
 httpServer.listen(PORT, () => {
   console.log(`🎲 Dice 서버 실행: http://localhost:${PORT}`);

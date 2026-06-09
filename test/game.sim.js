@@ -29,6 +29,12 @@ for (let g = 0; g < totalGames; g++) {
   while (!game.finished && guard++ < 5000) {
     const h = game.hand;
     if (!h) break;
+    if (h.phase === 'runout') {
+      // 올인 런아웃: 끝까지 단계 진행
+      let g2 = 0;
+      while (!game.runoutStep() && g2++ < 10) {}
+      continue;
+    }
     if (h.phase === 'handComplete') {
       // 칩 보존 확인
       const sum = game.players.reduce((a, p) => a + p.chips, 0);
