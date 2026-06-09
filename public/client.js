@@ -75,6 +75,12 @@ $('startBtn').onclick = () => {
   });
 };
 
+$('addBotBtn').onclick = () => {
+  socket.emit('addBot', {}, (res) => {
+    if (!res.ok) alert(res.error);
+  });
+};
+
 // ---------- 상태 수신 ----------
 socket.on('state', (s) => {
   lastState = s;
@@ -97,15 +103,19 @@ function renderWaiting(s) {
   ul.innerHTML = '';
   s.players.forEach((p, i) => {
     const li = document.createElement('li');
-    li.innerHTML = `<span>${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''}</span>` +
+    const tag = p.id === myId ? '<span class="tag you">나</span>' : (p.isBot ? '<span class="tag">봇</span>' : '');
+    li.innerHTML = `<span>${esc(p.name)} ${tag}</span>` +
       (i === 0 ? '<span class="host-tag">방장</span>' : '');
     ul.appendChild(li);
   });
   isHost = s.players[0]?.id === myId;
   $('startBtn').classList.toggle('hidden', !isHost);
-  $('waitHint').textContent = s.players.length < 2
-    ? '최소 2명이 필요합니다.'
-    : (isHost ? '준비되면 게임을 시작하세요.' : '방장이 시작하기를 기다리는 중...');
+  $('addBotBtn').classList.toggle('hidden', !isHost || s.players.length >= 9);
+  $('waitHint').textContent = !isHost
+    ? '방장이 시작하기를 기다리는 중...'
+    : (s.players.length < 2
+      ? '혼자 시작하면 테스트용 봇이 자동으로 들어옵니다. (봇 추가로 더 늘릴 수 있어요)'
+      : '준비되면 게임을 시작하세요.');
 }
 
 // ---------- 게임 렌더 ----------
@@ -152,7 +162,7 @@ function renderSeats(s) {
     seat.innerHTML = `
       <div class="seat-inner">
         ${p.isButton ? '<div class="pbadges"><span class="dealer-btn">D</span></div>' : ''}
-        <div class="pname">${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}</div>
+        <div class="pname">${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}</div>
         <div class="pchips">${p.eliminated ? '탈락' : '💰 ' + p.chips}</div>
         <div class="phole">${renderHole(p)}</div>
         <div class="hand-result">${result ? esc(result.handName) : ''}</div>

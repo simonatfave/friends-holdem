@@ -41,7 +41,7 @@ export class Game {
   }
 
   // ---------- 플레이어 관리 ----------
-  addPlayer(id, name) {
+  addPlayer(id, name, isBot = false) {
     if (this.players.find((p) => p.id === id)) return false;
     this.players.push({
       id,
@@ -50,6 +50,7 @@ export class Game {
       connected: true,
       sittingOut: false,
       eliminated: false,
+      isBot,
     });
     return true;
   }
@@ -85,7 +86,11 @@ export class Game {
   // ---------- 토너먼트 시작 ----------
   start() {
     if (this.started) return { ok: false, error: '이미 시작됨' };
-    if (this.players.length < 2) return { ok: false, error: '최소 2명 필요' };
+    if (this.players.length < 1) return { ok: false, error: '플레이어가 없습니다' };
+    // 혼자면 테스트용 봇 1명을 자동 추가해 헤즈업으로 진행
+    if (this.players.length === 1) {
+      this.addPlayer('bot_' + Date.now(), '🤖 Bot', true);
+    }
     this.started = true;
     this.button = Math.floor(Math.random() * this.players.length);
     this.pushLog(`토너먼트 시작! 시작 스택 ${this.startingChips}`);
@@ -466,8 +471,9 @@ export class Game {
         positive.includes(s)
       );
       if (eligible.length === 0) {
-        // 전원 폴드한 데드머니 → 마지막 팟에 합치기(이론상 드묾)
-        if (awards.length) awards[awards.length - 1].amount += potAmount;
+        // 이 레이어에 자격 있는(폴드 안 한) 기여자가 없음 = 콜되지 않은 베팅(언콜드 벳).
+        // 칩을 잃지 않도록 기여자 본인에게 환급한다. (정상 플레이에선 기여자 1명)
+        for (const s of positive) s.chips += layer;
         continue;
       }
       // 최고 패 찾기
@@ -592,6 +598,7 @@ export class Game {
         chips: p.chips,
         connected: p.connected,
         eliminated: p.eliminated,
+        isBot: p.isBot,
         inHand,
         folded: h ? !!h.folded[p.id] : false,
         allIn: h ? !!h.allIn[p.id] : false,
