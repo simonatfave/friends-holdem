@@ -115,11 +115,16 @@ $('startBtn').onclick = () => {
   });
 };
 
-$('addBotBtn').onclick = () => {
-  socket.emit('addBot', {}, (res) => {
+let currentBotCount = 0;
+let currentHumanCount = 1;
+function setBots(n) {
+  n = Math.max(0, Math.min(n, 9 - currentHumanCount));
+  socket.emit('setBots', { count: n }, (res) => {
     if (!res.ok) alert(res.error);
   });
-};
+}
+$('botMinus').onclick = () => setBots(currentBotCount - 1);
+$('botPlus').onclick = () => setBots(currentBotCount + 1);
 
 // ---------- 상태 수신 ----------
 socket.on('state', (s) => {
@@ -149,12 +154,19 @@ function renderWaiting(s) {
     ul.appendChild(li);
   });
   isHost = s.players[0]?.id === myId;
+  currentBotCount = s.players.filter((p) => p.isBot).length;
+  currentHumanCount = s.players.filter((p) => !p.isBot).length;
   $('startBtn').classList.toggle('hidden', !isHost);
-  $('addBotBtn').classList.toggle('hidden', !isHost || s.players.length >= 9);
+
+  $('botControl').classList.toggle('hidden', !isHost);
+  $('botCount').textContent = currentBotCount;
+  $('botMinus').disabled = currentBotCount <= 0;
+  $('botPlus').disabled = s.players.length >= 9;
+
   $('waitHint').textContent = !isHost
     ? '방장이 시작하기를 기다리는 중...'
     : (s.players.length < 2
-      ? '혼자 시작하면 테스트용 봇이 자동으로 들어옵니다. (봇 추가로 더 늘릴 수 있어요)'
+      ? '봇 수를 정하거나, 혼자 시작하면 테스트 봇이 자동으로 1명 들어옵니다.'
       : '준비되면 게임을 시작하세요.');
 }
 
@@ -428,21 +440,24 @@ function renderFinal(s) {
   show('finalScreen');
 }
 
-// ---------- 카드 렌더 ----------
+// ---------- 카드 렌더 (실제 트럼프 카드 레이아웃) ----------
+function faceMarkup(c) {
+  const sym = SUIT_SYM[c.s];
+  const rl = rankLabel(c.r);
+  return `<div class="corner tl"><span class="r">${rl}</span><span class="s">${sym}</span></div>` +
+    `<div class="pip">${sym}</div>` +
+    `<div class="corner br"><span class="r">${rl}</span><span class="s">${sym}</span></div>`;
+}
 function cardHtml(c, back, muck, extra = '', style = '') {
   if (back || !c) return `<div class="card sm back ${extra}" ${style}></div>`;
   const red = isRedSuit(c.s);
-  return `<div class="card sm ${red ? 'red' : 'black'} ${muck ? 'muck' : ''} ${extra}" ${style}>
-    <span class="rank">${rankLabel(c.r)}</span><span class="suit">${SUIT_SYM[c.s]}</span>
-  </div>`;
+  return `<div class="card sm ${red ? 'red' : 'black'} ${muck ? 'muck' : ''} ${extra}" ${style}>${faceMarkup(c)}</div>`;
 }
-
-// 커뮤니티 카드는 큰 사이즈
+// 커뮤니티 카드 (큰 사이즈)
 function cardEl(c) {
   const tmp = document.createElement('div');
   const red = isRedSuit(c.s);
-  tmp.innerHTML = `<div class="card ${red ? 'red' : 'black'}">
-    <span class="rank">${rankLabel(c.r)}</span><span class="suit">${SUIT_SYM[c.s]}</span></div>`;
+  tmp.innerHTML = `<div class="card ${red ? 'red' : 'black'}">${faceMarkup(c)}</div>`;
   return tmp.firstElementChild;
 }
 

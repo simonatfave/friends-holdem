@@ -153,15 +153,32 @@ io.on('connection', (socket) => {
     maybeBotAct(roomCode);
   });
 
-  socket.on('addBot', (_d, cb) => {
+  // 방장이 테스트 봇 수를 직접 설정 (목표 개수에 맞춰 추가/제거)
+  socket.on('setBots', ({ count } = {}, cb) => {
     const room = rooms.get(roomCode);
     if (!room) return cb?.({ ok: false, error: '방 없음' });
-    if (room.hostId !== playerId) return cb?.({ ok: false, error: '방장만 추가할 수 있습니다' });
-    if (room.game.started) return cb?.({ ok: false, error: '이미 시작됨' });
-    if (room.game.players.length >= 9) return cb?.({ ok: false, error: '가득 찼습니다' });
-    const n = room.game.players.filter((p) => p.isBot).length + 1;
-    room.game.addPlayer('bot_' + Date.now() + '_' + n, `🤖 Bot ${n}`, true);
-    cb?.({ ok: true });
+    if (room.hostId !== playerId) return cb?.({ ok: false, error: '방장만 설정할 수 있습니다' });
+    const g = room.game;
+    if (g.started) return cb?.({ ok: false, error: '이미 시작됨' });
+    const humans = g.players.filter((p) => !p.isBot).length;
+    let target = parseInt(count, 10);
+    if (Number.isNaN(target)) target = 0;
+    target = Math.max(0, Math.min(target, 9 - humans)); // 전체 최대 9명
+    // 초과 봇 제거
+    let bots = g.players.filter((p) => p.isBot);
+    while (bots.length > target) {
+      const b = bots.pop();
+      g.players = g.players.filter((p) => p.id !== b.id);
+    }
+    // 부족분 추가
+    let i = 0;
+    while (g.players.filter((p) => p.isBot).length < target) {
+      i++;
+      g.addPlayer('bot_' + Date.now() + '_' + i, '🤖 Bot', true);
+    }
+    // 봇 번호 정리
+    g.players.filter((p) => p.isBot).forEach((b, idx) => { b.name = `🤖 Bot ${idx + 1}`; });
+    cb?.({ ok: true, count: target });
     broadcast(roomCode);
   });
 

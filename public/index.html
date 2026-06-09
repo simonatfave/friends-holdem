@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>🎲 Dice — 친구들과 포커</title>
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=7" />
 </head>
 <body>
   <!-- 로비 화면 -->
@@ -62,7 +62,12 @@
       <p>방 코드: <span id="roomCode" class="code"></span> <button id="copyCode" class="ghost">복사</button></p>
       <p class="sub">친구들에게 이 코드를 공유하세요. (최대 9명)</p>
       <ul id="waitingPlayers" class="player-list"></ul>
-      <button id="addBotBtn" class="ghost hidden" style="width:100%;margin-bottom:8px;padding:10px">🤖 테스트 봇 추가</button>
+      <div id="botControl" class="bot-control hidden">
+        <span class="bot-label">🤖 테스트 봇</span>
+        <button id="botMinus" class="step-btn">−</button>
+        <span id="botCount">0</span>
+        <button id="botPlus" class="step-btn">+</button>
+      </div>
       <button id="startBtn" class="primary hidden">게임 시작</button>
       <p id="waitHint" class="sub"></p>
     </div>
@@ -121,6 +126,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=5"></script>
+  <script src="client.js?v=7"></script>
 </body>
 </html>
