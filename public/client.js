@@ -601,6 +601,9 @@ function renderActions(s) {
   const checkAct = s.legal.find((a) => a.type === 'check');
   const raiseAct = s.legal.find((a) => a.type === 'raise' || a.type === 'bet');
 
+  // 사이징 행은 항상 만들어 공간을 유지(레이즈 불가 시 빈 채로 자리만 차지)
+  const raiseRow = document.createElement('div');
+  raiseRow.className = 'action-raise';
   const mainRow = document.createElement('div');
   mainRow.className = 'action-main';
 
@@ -613,8 +616,6 @@ function renderActions(s) {
 
   // 레이즈/벳 — 사이징 행(슬라이더·퀵벳) 위, 메인 버튼 아래
   if (raiseAct) {
-    const raiseRow = document.createElement('div');
-    raiseRow.className = 'action-raise';
     const min = raiseAct.min, max = raiseAct.max;
     const label = raiseAct.type === 'bet' ? '벳' : '레이즈';
 
@@ -642,11 +643,12 @@ function renderActions(s) {
     raiseRow.appendChild(quick);
     raiseRow.appendChild(slider);
     raiseRow.appendChild(amt);
-    bar.appendChild(raiseRow);
-
     mainRow.appendChild(goBtn);
+  } else {
+    raiseRow.classList.add('empty'); // 공간만 유지
   }
 
+  bar.appendChild(raiseRow);
   bar.appendChild(mainRow);
 }
 

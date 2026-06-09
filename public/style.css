@@ -379,11 +379,13 @@ button { font-family: inherit; }
 }
 
 /* 액션바 — 위: 베팅 사이징 / 아래: 메인 액션 버튼 */
-.actionbar { display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; min-height: 64px; padding: 8px 0; position: relative; z-index: 30; background: #0e1219; border-radius: 14px; }
+.actionbar { display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; height: 132px; padding: 8px 0; position: relative; z-index: 30; background: #0e1219; border-radius: 14px; }
 .action-timer { position: relative; z-index: 30; }
 .sidepanel { position: relative; z-index: 30; }
 .action-main { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; }
-.action-raise { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; flex-wrap: wrap; }
+.action-main button { min-width: 112px; }
+.action-raise { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; flex-wrap: wrap; min-height: 54px; }
+.action-raise.empty { visibility: hidden; } /* 레이즈 불가 시에도 공간 유지 */
 .actionbar button {
   padding: 16px 30px; border-radius: 14px; border: none; font-size: 19px; font-weight: 800; cursor: pointer;
   letter-spacing: .3px; box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 6px 14px rgba(0,0,0,.35);
