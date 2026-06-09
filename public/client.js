@@ -170,12 +170,15 @@ function renderWaiting(s) {
       : '준비되면 게임을 시작하세요.');
 }
 
+let _potChipsFrom = 0;
+
 // ---------- 게임 렌더 ----------
 function renderGame(s) {
   // 직전 상태와 비교해 애니메이션/사운드 트리거 계산
   const prev = prevSnap;
   _dealNewHand = !prev || prev.handNumber !== s.handNumber;
   _newCommFrom = (prev && prev.handNumber === s.handNumber) ? prev.commCount : 0;
+  _potChipsFrom = (prev && prev.handNumber === s.handNumber) ? potChipCount(prev.pot) : 0;
 
   $('handBadge').textContent = `핸드 #${s.handNumber}`;
   $('blindBadge').textContent = `블라인드 ${s.blinds.sb}/${s.blinds.bb}${s.blinds.ante ? ` (앤티 ${s.blinds.ante})` : ''}`;
@@ -194,8 +197,10 @@ function renderGame(s) {
     comm.appendChild(el);
   });
   $('potDisplay').textContent = s.pot > 0 ? `팟: ${s.pot}` : '';
+  renderPotStack(s);
 
   renderSeats(s);
+  animateChips(s, prev ? prev.chips : null);
   renderActions(s);
   renderLog(s);
   renderWinner(s);
@@ -207,9 +212,76 @@ function renderGame(s) {
     phase: s.phase,
     pot: s.pot,
     toActId: s.toActId,
+    chips: chipMap(s),
   };
 
   if (s.finished && s.finalResults) renderFinal(s);
+}
+
+function chipMap(s) {
+  const m = {};
+  s.players.forEach((p) => (m[p.id] = p.chips));
+  return m;
+}
+
+// 팟 칩 더미: 팟 크기에 비례해 칩 개수 계산 후 컬럼으로 쌓기
+const CHIP_COLORS = ['#e25555', '#3ec97a', '#4a8cff', '#2b2f36', '#e8c466', '#9b59b6'];
+function potChipCount(pot) {
+  if (pot <= 0) return 0;
+  return Math.min(30, Math.max(1, Math.round(pot / 25)));
+}
+function renderPotStack(s) {
+  const el = $('potStack');
+  el.innerHTML = '';
+  const count = potChipCount(s.pot);
+  if (!count) return;
+  const perCol = 6;
+  const cols = Math.ceil(count / perCol);
+  let idx = 0;
+  for (let c = 0; c < cols; c++) {
+    const col = document.createElement('div');
+    col.className = 'chip-col';
+    const n = Math.min(perCol, count - c * perCol);
+    col.style.height = (n * 6 + 13) + 'px';
+    for (let r = 0; r < n; r++) {
+      const chip = document.createElement('div');
+      chip.className = 'chip-s';
+      chip.style.bottom = (r * 6) + 'px';
+      chip.style.setProperty('--cc', CHIP_COLORS[(idx) % CHIP_COLORS.length]);
+      chip.style.zIndex = r;
+      if (idx >= _potChipsFrom) {
+        chip.classList.add('drop');
+        chip.style.animationDelay = ((idx - _potChipsFrom) * 0.04) + 's';
+      }
+      col.appendChild(chip);
+      idx++;
+    }
+    el.appendChild(col);
+  }
+}
+
+// 보유 칩 숫자 롤링 애니메이션
+function animateChips(s, prevChips) {
+  if (!prevChips) return;
+  s.players.forEach((p) => {
+    if (p.eliminated) return;
+    const from = prevChips[p.id];
+    if (from === undefined || from === p.chips) return;
+    const seat = document.querySelector(`.seat[data-pid="${cssEsc(p.id)}"] .pchips .amt`);
+    if (seat) rollNumber(seat, from, p.chips);
+  });
+}
+function rollNumber(el, from, to, dur = 600) {
+  const start = performance.now();
+  const diff = to - from;
+  function step(t) {
+    const k = Math.min(1, (t - start) / dur);
+    const eased = 1 - Math.pow(1 - k, 3);
+    el.textContent = Math.round(from + diff * eased);
+    if (k < 1) requestAnimationFrame(step);
+    else el.textContent = to;
+  }
+  requestAnimationFrame(step);
 }
 
 // 사운드 + 효과 트리거
@@ -301,7 +373,7 @@ function renderSeats(s) {
       <div class="seat-inner">
         ${p.isButton ? '<div class="pbadges"><span class="dealer-btn">D</span></div>' : ''}
         <div class="pname">${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}</div>
-        <div class="pchips">${p.eliminated ? '탈락' : '💰 ' + p.chips}</div>
+        <div class="pchips">${p.eliminated ? '탈락' : `<span class="chip-mini"></span><span class="amt">${p.chips}</span>`}</div>
         <div class="phole">${renderHole(p, i)}</div>
         <div class="hand-result">${result ? esc(result.handName) : ''}</div>
         ${p.bet > 0 ? `<div class="bet-chip">${p.bet}</div>` : ''}
