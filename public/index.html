@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>♠ Friends Hold'em</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 로비 화면 -->
+  <div id="lobby" class="screen">
+    <div class="lobby-card">
+      <h1>♠ Friends Hold'em</h1>
+      <p class="sub">친구들과 즐기는 실시간 텍사스 홀덤 · 토너먼트</p>
+
+      <label>닉네임</label>
+      <input id="nameInput" maxlength="16" placeholder="이름을 입력하세요" />
+
+      <div class="tabs">
+        <button class="tab active" data-tab="create">방 만들기</button>
+        <button class="tab" data-tab="join">방 참여</button>
+      </div>
+
+      <div id="createPane" class="pane">
+        <div class="row">
+          <div>
+            <label>시작 스택</label>
+            <input id="startingChips" type="number" value="1500" min="500" step="100" />
+          </div>
+          <div>
+            <label>레벨당 핸드 수</label>
+            <input id="handsPerLevel" type="number" value="8" min="2" max="50" />
+          </div>
+        </div>
+        <button id="createBtn" class="primary">방 만들기</button>
+      </div>
+
+      <div id="joinPane" class="pane hidden">
+        <label>방 코드</label>
+        <input id="codeInput" maxlength="4" placeholder="ABCD" style="text-transform:uppercase" />
+        <button id="joinBtn" class="primary">참여하기</button>
+      </div>
+
+      <p id="lobbyError" class="error"></p>
+    </div>
+  </div>
+
+  <!-- 대기실 -->
+  <div id="waiting" class="screen hidden">
+    <div class="lobby-card">
+      <h2>대기실</h2>
+      <p>방 코드: <span id="roomCode" class="code"></span> <button id="copyCode" class="ghost">복사</button></p>
+      <p class="sub">친구들에게 이 코드를 공유하세요. (최대 9명)</p>
+      <ul id="waitingPlayers" class="player-list"></ul>
+      <button id="startBtn" class="primary hidden">게임 시작</button>
+      <p id="waitHint" class="sub"></p>
+    </div>
+  </div>
+
+  <!-- 게임 테이블 -->
+  <div id="game" class="screen hidden">
+    <div class="topbar">
+      <span class="badge" id="handBadge">핸드 #0</span>
+      <span class="badge" id="blindBadge">블라인드 –</span>
+      <span class="badge" id="levelBadge">레벨 1</span>
+      <span class="badge" id="potBadge">팟 0</span>
+    </div>
+
+    <div class="table-wrap">
+      <div class="poker-table">
+        <div class="community" id="community"></div>
+        <div class="pot-display" id="potDisplay"></div>
+        <div id="seats"></div>
+        <div class="winner-banner hidden" id="winnerBanner"></div>
+      </div>
+    </div>
+
+    <div class="actionbar" id="actionbar"></div>
+
+    <div class="sidepanel">
+      <div class="log" id="log"></div>
+      <div class="chatbox">
+        <div id="chatMessages" class="chat-messages"></div>
+        <div class="chat-input">
+          <input id="chatInput" maxlength="200" placeholder="메시지..." />
+          <button id="chatSend" class="ghost">전송</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="finalScreen" class="overlay hidden">
+      <div class="final-card">
+        <h2>🏆 토너먼트 종료</h2>
+        <ol id="finalRanks"></ol>
+        <button onclick="location.reload()" class="primary">새 게임</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
