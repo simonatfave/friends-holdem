@@ -318,13 +318,14 @@ io.on('connection', (socket) => {
     if (!room) return cb?.({ ok: false, error: '방을 찾을 수 없습니다' });
     const { game } = room;
     if (game.started) {
-      // 재접속 처리: 같은 이름이 끊겨있으면 자리 인수
-      const seat = game.players.find((p) => p.name === name && !p.connected && !p.eliminated);
+      // 재접속 처리: 같은 이름이 끊겨있으면 자리 인수(탈락자도 자기 자리로 복귀해 관전)
+      const seat = game.players.find((p) => p.name === name && !p.connected);
       if (seat) {
         seat.connected = true;
         seat.socketId = socket.id;
         playerId = seat.id;
         roomCode = code;
+        if (room.spectators) room.spectators.delete(socket.id);
         socket.join(code);
         cb?.({ ok: true, code, youId: playerId });
         broadcast(code);
@@ -334,12 +335,17 @@ io.on('connection', (socket) => {
       }
       // 게임 진행 중 신규 합류 → 다음 핸드부터 참여
       if (game.finished) return cb?.({ ok: false, error: '이미 종료된 게임입니다' });
+      // 같은 이름이 이미 있으면(탈락 포함) 신규 참여 불가 → 재바이인 방지
+      if (game.players.some((p) => p.name === name)) {
+        return cb?.({ ok: false, error: '이미 참여 중이거나 탈락한 이름입니다. 다른 닉네임을 쓰세요' });
+      }
       if (game.players.length >= 9) return cb?.({ ok: false, error: '방이 가득 찼습니다 (최대 9명)' });
       const btnId = game.players[game.button]?.id; // 좌석 정렬로 버튼 인덱스가 밀리지 않게 보존
       game.addPlayer(playerId, name);
       if (btnId != null) game.button = game.players.findIndex((p) => p.id === btnId);
       game.getPlayer(playerId).socketId = socket.id;
       roomCode = code;
+      if (room.spectators) room.spectators.delete(socket.id); // 관전 → 참여 전환
       socket.join(code);
       game.pushLog(`${name} 님이 참여했습니다 (다음 핸드부터)`);
       cb?.({ ok: true, code, youId: playerId, lateJoin: true });

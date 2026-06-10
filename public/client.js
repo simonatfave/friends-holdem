@@ -31,8 +31,16 @@ const hide = (id) => $(id).classList.add('hidden');
 
 // ---------- 효과음 (Web Audio, 에셋 없이 생성) + 설정 ----------
 function loadSound() {
-  try { return Object.assign({ master: true, turn: true, fx: true }, JSON.parse(localStorage.getItem('dice_sound') || '{}')); }
-  catch (e) { return { master: true, turn: true, fx: true }; }
+  try { return Object.assign({ master: true, turn: true, fx: true, bbUnits: false }, JSON.parse(localStorage.getItem('dice_sound') || '{}')); }
+  catch (e) { return { master: true, turn: true, fx: true, bbUnits: false }; }
+}
+// 금액 표기: BB 단위 토글에 따라 칩 수 또는 'NBB'
+function fmtAmt(n) {
+  if (!soundSettings.bbUnits) return String(n);
+  const bb = (lastState && lastState.blinds && lastState.blinds.bb) || 0;
+  if (!bb) return String(n);
+  const r = Math.round((n / bb) * 10) / 10;
+  return (Number.isInteger(r) ? r : r.toFixed(1)) + 'BB';
 }
 function saveSound() { try { localStorage.setItem('dice_sound', JSON.stringify(soundSettings)); } catch (e) {} }
 const soundSettings = loadSound();
@@ -62,6 +70,23 @@ const sfxChip = () => { if (!soundSettings.fx) return; tone(900, 0.05, 'square',
 const sfxWin = () => { if (!soundSettings.fx) return; [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.26, 'triangle', 0.13, i * 0.09)); };
 const sfxAllIn = () => { if (!soundSettings.fx) return; [180, 280, 400, 560, 820].forEach((f, i) => tone(f, 0.16, 'sawtooth', 0.11, i * 0.05)); tone(90, 0.55, 'sine', 0.2, 0.04); };
 const sfxBust = () => { if (!soundSettings.fx) return; [540, 410, 300, 200, 130].forEach((f, i) => tone(f, 0.2, 'triangle', 0.12, i * 0.08)); };
+// 베팅 칩이 쏟아지는 '차르르' — 금액(BB 단위)이 클수록 더 길게(약 0.3~1초)
+const sfxChipRiffle = (amount) => {
+  if (!soundSettings.fx) return;
+  const bb = (lastState && lastState.blinds && lastState.blinds.bb) || 2;
+  const units = Math.max(0, amount) / bb;
+  // 칩 개수↔길이: 약 0.4초(작은 베팅)~1초(큰 베팅)
+  const n = Math.max(7, Math.min(18, Math.round(7 + units * 1.0)));
+  for (let i = 0; i < n; i++) tone(820 + Math.random() * 520, 0.05, 'square', 0.05, i * 0.055);
+};
+// 핸드 종료 팟 수집 '차르륵' — 팟 크기 3단계(작음/중간/큼)로 길이 차등
+const sfxPotCollect = (amount) => {
+  if (!soundSettings.fx) return;
+  const bb = (lastState && lastState.blinds && lastState.blinds.bb) || 2;
+  const units = Math.max(0, amount) / bb;
+  const n = units < 8 ? 6 : units < 24 ? 11 : 18;
+  for (let i = 0; i < n; i++) tone(780 + Math.random() * 560, 0.05, 'square', 0.058, i * 0.05);
+};
 const sfxFanfare = () => {
   if (!soundSettings.fx) return;
   const seq = [523, 659, 784, 1046, 988, 1046, 1318];
@@ -91,6 +116,8 @@ $('settingsClose').onclick = () => hide('settingsPanel');
 $('optMaster').onchange = (e) => { soundSettings.master = e.target.checked; saveSound(); syncMuteIcon(); };
 $('optTurn').onchange = (e) => { soundSettings.turn = e.target.checked; saveSound(); };
 $('optFx').onchange = (e) => { soundSettings.fx = e.target.checked; saveSound(); };
+$('optBBUnits').checked = !!soundSettings.bbUnits;
+$('optBBUnits').onchange = (e) => { soundSettings.bbUnits = e.target.checked; saveSound(); if (lastState) renderGame(lastState); };
 $('optSitOut').onchange = (e) => {
   socket.emit('sitOut', { out: e.target.checked }, (r) => {
     if (!r || !r.ok) { e.target.checked = !e.target.checked; if (r && r.error) alert(r.error); }
@@ -196,22 +223,28 @@ function refreshRooms() {
       const statusCls = r.started ? (r.finished ? '' : 'play') : 'wait';
       const statusTxt = r.finished ? '종료' : (r.started ? '진행중' : '대기중');
       const info = r.started
-        ? `${r.humans}명 · 핸드 #${r.handNumber}${r.blinds ? ` · 블라인드 ${r.blinds.sb}/${r.blinds.bb}` : ''}`
-        : `${r.humans}명 대기 · 방장 ${esc(r.hostName)}`;
+        ? `방장 ${esc(r.hostName)} · ${r.humans}명 · 핸드 #${r.handNumber}${r.blinds ? ` · 블라인드 ${r.blinds.sb}/${r.blinds.bb}` : ''}`
+        : `방장 ${esc(r.hostName)} · ${r.humans}명 대기`;
       row.innerHTML =
         `<span class="rc">${r.code}</span>` +
         `<span class="rinfo"><span class="rstat ${statusCls}">${statusTxt}</span><br>${info}</span>`;
       const btnWrap = document.createElement('div');
-      if (!r.started) {
-        const b = document.createElement('button');
-        b.className = 'join-btn'; b.textContent = '참여';
-        b.onclick = () => joinRoom(r.code);
-        btnWrap.appendChild(b);
-      } else if (!r.finished) {
-        const b = document.createElement('button');
-        b.className = 'spec-btn'; b.textContent = '관전';
-        b.onclick = () => spectateRoom(r.code);
-        btnWrap.appendChild(b);
+      btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+      if (!r.finished) {
+        // 대기·진행 모두 자리가 있으면 참여 가능(진행 중이면 다음 핸드부터)
+        if (r.total < 9) {
+          const j = document.createElement('button');
+          j.className = 'join-btn'; j.textContent = '참여';
+          j.onclick = () => joinRoom(r.code);
+          btnWrap.appendChild(j);
+        }
+        // 진행 중인 방은 관전도 가능
+        if (r.started) {
+          const sp = document.createElement('button');
+          sp.className = 'spec-btn'; sp.textContent = '관전';
+          sp.onclick = () => spectateRoom(r.code);
+          btnWrap.appendChild(sp);
+        }
       }
       row.appendChild(btnWrap);
       box.appendChild(row);
@@ -230,7 +263,7 @@ function joinRoom(code) {
 function spectateRoom(code) {
   socket.emit('spectate', { code }, (res) => {
     if (!res.ok) return ($('lobbyError').textContent = res.error);
-    myId = res.youId; isSpectator = true;
+    myId = res.youId; isSpectator = true; myRoomCode = code; // 참여 전환에 방코드 필요
     hide('lobby');
   });
 }
@@ -298,15 +331,30 @@ $('wbCopy').onclick = () => {
   $('wbCopy').textContent = '복사됨!';
   setTimeout(() => ($('wbCopy').textContent = '복사'), 1500);
 };
-$('wbLeave').onclick = () => {
-  if (!confirm('대기 중인 방에서 나갈까요?')) return;
+function doLeaveToLobby(confirmMsg) {
+  if (confirmMsg && !confirm(confirmMsg)) return;
   socket.emit('leave', {}, () => {
     document.body.classList.remove('waiting-mode');
     $('waitBanner').classList.add('hidden');
+    if (typeof clearTimeAlert === 'function') clearTimeAlert();
     lastState = null; prevSnap = null; myRoomCode = ''; isHost = false; isSpectator = false;
     _seatSig = ''; _commSig = ''; _seenPlayerIds = new Set(); _playersInit = false;
     _recentJoiners.clear(); _recentAllIn.clear(); _recentBust.clear();
+    $('leaveBtn').classList.add('hidden');
     hide('game'); hide('waiting'); show('lobby');
+  });
+}
+$('wbLeave').onclick = () => doLeaveToLobby('대기 중인 방에서 나갈까요?');
+$('leaveBtn').onclick = () => doLeaveToLobby(isSpectator ? '관전을 종료할까요?' : '방에서 나갈까요?');
+// 관전 중 게임 참여
+$('specJoinBtn').onclick = () => {
+  let name = myName || ($('nameInput') ? $('nameInput').value.trim() : '');
+  if (!name) name = (prompt('참여할 닉네임을 입력하세요') || '').trim();
+  if (!name) return;
+  myName = name;
+  socket.emit('join', { code: myRoomCode, name }, (res) => {
+    if (!res || !res.ok) { alert(res ? res.error : '참여 실패'); return; }
+    myId = res.youId; isSpectator = false; // 다음 state부터 플레이어로 렌더
   });
 };
 
@@ -326,7 +374,7 @@ let blindDeadline = null;
 socket.on('state', (s) => {
   lastState = s;
   myId = s.youId;
-  if (s.spectator) isSpectator = true;
+  isSpectator = !!s.spectator; // 서버 기준(관전→참여 전환 시 false로 갱신)
   // 블라인드 상승 타이머 기준시각
   blindDeadline = (s.timedBlinds && s.secondsToNextLevel != null)
     ? Date.now() + s.secondsToNextLevel * 1000 : null;
@@ -337,6 +385,10 @@ socket.on('state', (s) => {
   $('versionBadge').classList.add('hidden'); // 게임 중엔 숨김(시작 화면에만 표시)
   renderGame(s);
   const meNow = s.players.find((p) => p.id === myId);
+  const amBusted = !!(meNow && meNow.eliminated);
+  // 관전자 또는 탈락자에게 나가기 버튼 / 관전자에게만 참여 버튼
+  $('leaveBtn').classList.toggle('hidden', !(isSpectator || amBusted));
+  $('specJoinBtn').classList.toggle('hidden', !(isSpectator && !s.finished));
   if (meNow) $('optSitOut').checked = !!meNow.sittingOut; // 자리 비움 토글 상태 반영
 });
 
@@ -475,7 +527,7 @@ function renderGame(s) {
   $('levelBadge').textContent = s.timedBlinds
     ? `레벨 ${s.level}`
     : `레벨 ${s.level} · 다음까지 ${s.nextLevelIn + 1}핸드`;
-  $('potBadge').textContent = `팟 ${s.pot}`;
+  $('potBadge').textContent = `팟 ${fmtAmt(s.pot)}`;
 
   // 커뮤니티 카드 (새로 깔린 카드는 플립 인 애니). 변화 없을 땐 DOM 유지 → 클릭마다 깜빡임 방지
   const comm = $('community');
@@ -492,7 +544,7 @@ function renderGame(s) {
       comm.appendChild(el);
     });
   }
-  $('potDisplay').textContent = s.pot > 0 ? `팟: ${s.pot}` : '';
+  $('potDisplay').textContent = s.pot > 0 ? `팟: ${fmtAmt(s.pot)}` : '';
   renderPotStack(s);
 
   renderSeats(s);
@@ -584,9 +636,9 @@ function rollNumber(el, from, to, dur = 600) {
   function step(t) {
     const k = Math.min(1, (t - start) / dur);
     const eased = 1 - Math.pow(1 - k, 3);
-    el.textContent = Math.round(from + diff * eased);
+    el.textContent = fmtAmt(Math.round(from + diff * eased));
     if (k < 1) requestAnimationFrame(step);
-    else el.textContent = to;
+    else el.textContent = fmtAmt(to);
   }
   requestAnimationFrame(step);
 }
@@ -601,17 +653,19 @@ function handleFx(s, prev) {
   if (s.pot > prev.pot && !newHand) {
     bump($('potBadge'));
     bump($('potDisplay'));
-    sfxChip();
+    sfxChipRiffle(s.pot - prev.pot); // 베팅 금액 비례 칩 차르르
   }
   if (s.toActId === myId && prev.toActId !== myId) { sfxTurn(); notifyMyTurn(); }
   if (s.toActId !== myId) stopTitleBlink();
 
   if (s.phase === 'handComplete' && prev.phase !== 'handComplete' && s.results) {
     sfxWin();
+    const potTotal = (s.results.awards || []).reduce((a, x) => a + (x.amount || 0), 0);
+    setTimeout(() => sfxPotCollect(potTotal), 280); // 팟 크기 비례 차르륵(승리음과 살짝 텀)
     flyPotToWinners(s);
     // 직전 핸드 요약 저장 → 다음 핸드 시작 시 토스트로 표시
     _lastHandRecap = (s.results.awards || []).map((a) =>
-      `${a.winners.map((w) => esc(w.name)).join(', ')} +${a.amount}${a.handName ? ' · ' + esc(a.handName) : ''}`
+      `${a.winners.map((w) => esc(w.name)).join(', ')} +${fmtAmt(a.amount)}${a.handName ? ' · ' + esc(a.handName) : ''}`
     ).join(' / ');
   }
 
@@ -828,12 +882,12 @@ function renderSeats(s) {
         <div class="seat-inner">
           ${p.isButton ? '<div class="pbadges"><span class="dealer-btn">D</span></div>' : ''}
           <div class="pname">${seatNameTags(p)}</div>
-          <div class="pchips">${p.eliminated ? '탈락' : `<span class="chip-mini"></span><span class="amt">${p.chips}</span>`}</div>
+          <div class="pchips">${p.eliminated ? '탈락' : `<span class="chip-mini"></span><span class="amt">${fmtAmt(p.chips)}</span>`}</div>
           ${p.isToAct ? '<div class="seat-timerbar"><div class="seat-timerbar-fill"></div></div>' : ''}
           <div class="phole">${renderHole(p, i)}</div>
           <div class="hand-result">${result ? esc(result.handName) : ''}</div>
           ${seatEquityHtml(s, p)}
-          ${p.bet > 0 ? `<div class="bet-chip">${p.bet}</div>` : ''}
+          ${p.bet > 0 ? `<div class="bet-chip">${fmtAmt(p.bet)}</div>` : ''}
         </div>`;
       seatsEl.appendChild(seat);
     } else {
@@ -897,8 +951,9 @@ function updateSeatInPlace(seat, p, s) {
   // 베팅 칩: 값이 바뀔 때만 갱신(매 렌더 chipPop 재생 방지)
   let chip = inner.querySelector('.bet-chip');
   if (p.bet > 0) {
-    if (!chip) { chip = document.createElement('div'); chip.className = 'bet-chip'; chip.textContent = p.bet; inner.appendChild(chip); }
-    else if (chip.textContent !== String(p.bet)) chip.textContent = p.bet;
+    const txt = fmtAmt(p.bet);
+    if (!chip) { chip = document.createElement('div'); chip.className = 'bet-chip'; chip.textContent = txt; inner.appendChild(chip); }
+    else if (chip.textContent !== txt) chip.textContent = txt;
   } else if (chip) {
     chip.remove();
   }
@@ -970,7 +1025,7 @@ function renderActions(s) {
 
   // 체크 / 콜
   if (checkAct) mainRow.appendChild(btn('btn-check', '체크', () => act('check')));
-  else if (callAct) mainRow.appendChild(btn('btn-call', `콜 ${callAct.amount}`, () => act('call')));
+  else if (callAct) mainRow.appendChild(btn('btn-call', `콜 ${fmtAmt(callAct.amount)}`, () => act('call')));
 
   // 레이즈/벳 — 사이징 행(슬라이더·퀵벳) 위, 메인 버튼 아래
   if (raiseAct) {
@@ -982,12 +1037,12 @@ function renderActions(s) {
     slider.min = min; slider.max = max; slider.value = min; slider.step = Math.max(1, s.blinds.sb);
     const amt = document.createElement('span');
     amt.className = 'raise-amount';
-    amt.textContent = min;
+    amt.textContent = fmtAmt(min);
 
-    const goBtn = btn('btn-raise', `${label} ${min}`, () => act('raise', parseInt(slider.value, 10)));
+    const goBtn = btn('btn-raise', `${label} ${fmtAmt(min)}`, () => act('raise', parseInt(slider.value, 10)));
     const setVal = (v) => {
       v = Math.max(min, Math.min(max, Math.floor(v)));
-      slider.value = v; amt.textContent = v; goBtn.textContent = `${label} ${v}`;
+      slider.value = v; amt.textContent = fmtAmt(v); goBtn.textContent = `${label} ${fmtAmt(v)}`;
     };
     slider.oninput = () => setVal(slider.value);
 
@@ -1042,7 +1097,7 @@ function renderWinner(s) {
   const banner = $('winnerBanner');
   if (s.results && s.phase === 'handComplete') {
     const lines = s.results.awards.map((a) =>
-      `${a.winners.map((w) => esc(w.name)).join(', ')} +${a.amount}${a.handName ? ' · ' + esc(a.handName) : ''}`
+      `${a.winners.map((w) => esc(w.name)).join(', ')} +${fmtAmt(a.amount)}${a.handName ? ' · ' + esc(a.handName) : ''}`
     );
     banner.innerHTML = lines.join('<br>');
     banner.classList.remove('hidden');

@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=46" />
+  <link rel="stylesheet" href="style.css?v=49" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -123,6 +123,8 @@
       <span class="badge" id="potBadge">팟 0</span>
       <button class="badge" id="muteBtn" title="소리 켜기/끄기" style="cursor:pointer">🔊</button>
       <button class="badge" id="settingsBtn" title="설정" style="cursor:pointer">⚙️</button>
+      <button class="badge hidden" id="specJoinBtn" title="게임 참여" style="cursor:pointer">➕ 참여</button>
+      <button class="badge hidden" id="leaveBtn" title="나가기" style="cursor:pointer">🚪 나가기</button>
     </div>
 
     <!-- 대기 모드 배너: 방을 만들면 테이블이 보이는 채로 대기 시작 -->
@@ -181,6 +183,7 @@
         <label class="toggle-row"><span>내 차례 알림음</span><input type="checkbox" id="optTurn" checked /></label>
         <label class="toggle-row"><span>효과음(카드·칩·승리)</span><input type="checkbox" id="optFx" checked /></label>
         <label class="toggle-row"><span>자리 비움 (핸드 쉬기)</span><input type="checkbox" id="optSitOut" /></label>
+        <label class="toggle-row"><span>금액 BB 단위로 표시</span><input type="checkbox" id="optBBUnits" /></label>
         <button id="settingsClose" class="primary">닫기</button>
       </div>
     </div>
@@ -199,6 +202,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=46"></script>
+  <script src="client.js?v=49"></script>
 </body>
 </html>
