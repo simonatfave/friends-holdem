@@ -2,21 +2,20 @@ import { makeDeck, shuffle } from './deck.js';
 import { evaluate7, compareScore, handName, evaluate7WithCards } from './handEvaluator.js';
 
 // 토너먼트 블라인드 스케줄 생성 (스택 대비 적당히 가파른 곡선)
+// 시작 스택 320 (블랙20·레드20·그린20) 기준의 가벼운 블라인드 곡선
 export function defaultBlindSchedule() {
   return [
+    { sb: 1, bb: 2, ante: 0 },
+    { sb: 2, bb: 4, ante: 0 },
+    { sb: 3, bb: 6, ante: 0 },
+    { sb: 5, bb: 10, ante: 0 },
+    { sb: 8, bb: 16, ante: 0 },
     { sb: 10, bb: 20, ante: 0 },
     { sb: 15, bb: 30, ante: 0 },
-    { sb: 20, bb: 40, ante: 0 },
-    { sb: 30, bb: 60, ante: 0 },
-    { sb: 50, bb: 100, ante: 10 },
-    { sb: 75, bb: 150, ante: 15 },
-    { sb: 100, bb: 200, ante: 25 },
-    { sb: 150, bb: 300, ante: 25 },
-    { sb: 200, bb: 400, ante: 50 },
-    { sb: 300, bb: 600, ante: 75 },
-    { sb: 500, bb: 1000, ante: 100 },
-    { sb: 750, bb: 1500, ante: 150 },
-    { sb: 1000, bb: 2000, ante: 200 },
+    { sb: 25, bb: 50, ante: 0 },
+    { sb: 40, bb: 80, ante: 0 },
+    { sb: 60, bb: 120, ante: 0 },
+    { sb: 100, bb: 200, ante: 0 },
   ];
 }
 
@@ -24,10 +23,9 @@ const PHASES = ['preflop', 'flop', 'turn', 'river', 'showdown'];
 
 export class Game {
   constructor(opts = {}) {
-    this.startingChips = opts.startingChips ?? 1500;
+    this.startingChips = opts.startingChips ?? 320; // 블랙20·레드20·그린20
     this.handsPerLevel = opts.handsPerLevel ?? 8;
     this.levelDurationSec = opts.levelDurationSec ?? 0; // >0 이면 시간 기반 블라인드 상승
-    this.rebuyEnabled = opts.rebuyEnabled ?? false;
     this.blindSchedule = opts.blindSchedule ?? defaultBlindSchedule();
     this.actionTimeout = opts.actionTimeout ?? 0; // ms, 0=무제한
     this.startedAt = null;
@@ -566,20 +564,6 @@ export class Game {
     }
   }
 
-  // 리바이(재충전 재입장): 칩이 0인 플레이어가 다시 시작 스택으로 복귀
-  rebuy(playerId) {
-    if (!this.rebuyEnabled) return { ok: false, error: '리바이가 비활성화됨' };
-    if (this.finished) return { ok: false, error: '이미 종료된 게임' };
-    const p = this.getPlayer(playerId);
-    if (!p) return { ok: false, error: '플레이어 없음' };
-    if (!p.eliminated && p.chips > 0) return { ok: false, error: '아직 칩이 있습니다' };
-    p.chips = this.startingChips;
-    p.eliminated = false;
-    this.results = this.results.filter((r) => r.id !== playerId);
-    this.pushLog(`${p.name} 리바이! (+${this.startingChips})`);
-    return { ok: true };
-  }
-
   // 다음 핸드로 (서버가 딜레이 후 호출)
   nextHand() {
     if (this.finished) return;
@@ -674,10 +658,6 @@ export class Game {
       nextLevelIn: this.handsPerLevel - ((this.handNumber - 1) % this.handsPerLevel) - 1,
       timedBlinds: this.levelDurationSec > 0,
       secondsToNextLevel,
-      rebuyEnabled: this.rebuyEnabled,
-      startingChips: this.startingChips,
-      canRebuy: this.rebuyEnabled && !this.finished &&
-        !!this.players.find((p) => p.id === viewerId && (p.eliminated || p.chips <= 0)),
       runout: !!h?.runout,
       pot: h?.pot ?? 0,
       community: h?.community ?? [],

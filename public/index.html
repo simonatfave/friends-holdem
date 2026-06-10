@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=22" />
+  <link rel="stylesheet" href="style.css?v=23" />
 </head>
 <body>
   <!-- 로비 화면 -->
@@ -42,17 +42,15 @@
       <div id="createPane" class="pane">
         <div class="row">
           <div>
-            <label>시작 스택</label>
-            <input id="startingChips" type="number" value="1500" min="500" step="100" />
-          </div>
-          <div>
             <label>블라인드 상승(분)</label>
             <input id="levelMinutes" type="number" value="3" min="1" max="60" />
           </div>
+          <div>
+            <label>행동 제한(초, 0=무제한)</label>
+            <input id="actionSeconds" type="number" value="25" min="0" max="120" />
+          </div>
         </div>
-        <label>행동 제한시간(초, 0=무제한)</label>
-        <input id="actionSeconds" type="number" value="25" min="0" max="120" />
-        <label class="check-row"><input type="checkbox" id="rebuyOpt" /> 탈락 시 리바이(재입장) 허용</label>
+        <p class="stack-info">시작 칩 ⚫20 · 🔴20 · 🟢20 <b>= 320</b></p>
         <button id="createBtn" class="primary">방 만들기</button>
       </div>
 
@@ -163,6 +161,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=22"></script>
+  <script src="client.js?v=23"></script>
 </body>
 </html>

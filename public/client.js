@@ -185,10 +185,8 @@ $('createBtn').onclick = () => {
   socket.emit('create', {
     name,
     settings: {
-      startingChips: $('startingChips').value,
       levelMinutes: $('levelMinutes').value,
       actionSeconds: $('actionSeconds').value,
-      rebuy: $('rebuyOpt').checked,
     },
   }, (res) => {
     if (!res.ok) return ($('lobbyError').textContent = res.error);
@@ -591,12 +589,7 @@ function renderActions(s) {
   if (s.finished) return;
   const me = s.players.find((p) => p.id === myId);
   if (!me || me.eliminated || me.chips <= 0) {
-    bar.innerHTML = '';
-    if (s.canRebuy) {
-      bar.appendChild(btn('btn-call', `🔄 리바이 +${s.startingChips}`, doRebuy));
-    } else {
-      bar.innerHTML = '<span class="waiting-turn">관전 중...</span>';
-    }
+    bar.innerHTML = '<span class="waiting-turn">관전 중...</span>';
     return;
   }
 
@@ -681,9 +674,6 @@ function act(type, amount) {
   socket.emit('action', { type, amount }, (res) => {
     if (!res.ok) flashError(res.error);
   });
-}
-function doRebuy() {
-  socket.emit('rebuy', {}, (res) => { if (!res.ok) flashError(res.error); });
 }
 
 function renderLog(s) {

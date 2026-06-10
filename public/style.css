@@ -130,9 +130,9 @@ button { font-family: inherit; }
 /* 관전 배지 */
 .spectate-badge { color: var(--accent); border-color: var(--accent); }
 
-/* 로비 체크박스 */
-.check-row { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text); font-size: 14px; margin-top: 14px; }
-.check-row input { width: auto; }
+/* 시작 칩 안내 */
+.stack-info { margin-top: 14px; text-align: center; color: var(--text); font-size: 14px; background: #161c25; border: 1px solid #3a4756; border-radius: 10px; padding: 10px; }
+.stack-info b { color: var(--gold); }
 
 /* 쇼다운 승리 카드 하이라이트 */
 .card.win { box-shadow: 0 0 0 3px var(--gold), 0 0 18px rgba(232,196,102,.9); animation: winPulse .8s ease-in-out infinite; z-index: 4; }

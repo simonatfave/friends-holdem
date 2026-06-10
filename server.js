@@ -169,9 +169,8 @@ io.on('connection', (socket) => {
     const code = makeRoomCode();
     const levelMinutes = clampInt(settings?.levelMinutes, 1, 60, 3);
     const game = new Game({
-      startingChips: clampInt(settings?.startingChips, 500, 100000, 1500),
+      startingChips: 320, // 친목용: 블랙20·레드20·그린20 고정
       levelDurationSec: levelMinutes * 60, // 시간 기반 블라인드 상승
-      rebuyEnabled: !!settings?.rebuy,
     });
     game.addPlayer(playerId, name);
     game.getPlayer(playerId).socketId = socket.id;
@@ -300,15 +299,6 @@ io.on('connection', (socket) => {
     socket.join(code);
     cb?.({ ok: true, code, youId: socket.id, spectator: true });
     io.to(socket.id).emit('state', stateFor(room, socket.id));
-  });
-
-  // 리바이(재충전 재입장)
-  socket.on('rebuy', (_d, cb) => {
-    const room = rooms.get(roomCode);
-    if (!room) return cb?.({ ok: false, error: '방 없음' });
-    const r = room.game.rebuy(playerId);
-    cb?.(r);
-    if (r.ok) broadcast(roomCode);
   });
 
   // 이모지 리액션
