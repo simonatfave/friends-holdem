@@ -42,8 +42,12 @@ export class Game {
   }
 
   // ---------- 플레이어 관리 ----------
-  addPlayer(id, name, isBot = false) {
+  addPlayer(id, name, isBot = false, chair = null) {
     if (this.players.find((p) => p.id === id)) return false;
+    // 좌석(chair) 0~8 배정: 지정 자리가 비어있으면 그 자리, 아니면 가장 낮은 빈 자리
+    const used = new Set(this.players.map((p) => p.chair));
+    let c = (typeof chair === 'number' && chair >= 0 && chair < 9 && !used.has(chair)) ? chair : null;
+    if (c == null) { c = 0; while (used.has(c)) c++; }
     this.players.push({
       id,
       name: name?.slice(0, 16) || 'Player',
@@ -52,7 +56,10 @@ export class Game {
       sittingOut: false,
       eliminated: false,
       isBot,
+      chair: c,
     });
+    // 좌석 순서대로 정렬(시계방향 진행 순서 유지)
+    this.players.sort((a, b) => a.chair - b.chair);
     return true;
   }
 
@@ -628,6 +635,7 @@ export class Game {
         id: p.id,
         name: p.name,
         chips: p.chips,
+        chair: p.chair,
         connected: p.connected,
         eliminated: p.eliminated,
         isBot: p.isBot,

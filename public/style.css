@@ -604,7 +604,15 @@ body.waiting-mode #waitBanner { display: block; }
 .wait-banner .wb-code { font-size: 15px; color: var(--text); }
 .wait-banner .wb-code b { color: var(--gold); letter-spacing: 2px; font-size: 18px; margin-left: 4px; }
 .wait-banner .wb-hint { margin: 8px 0 10px; font-size: 13px; color: #9fb0c2; line-height: 1.5; }
-.wait-banner #wbStart { width: 100%; }
+.wait-banner .wb-actions { display: flex; gap: 8px; justify-content: center; }
+.wait-banner #wbStart { flex: 1; margin-top: 0; }
+.wait-banner .wb-leave {
+  flex: 0 0 auto; padding: 12px 18px; border-radius: 12px;
+  border: 1px solid #5b3a3a; background: rgba(226,85,85,.14); color: #f0a0a0;
+  font-weight: 700; font-size: 15px; cursor: pointer;
+}
+.wait-banner .wb-leave:hover { background: rgba(226,85,85,.24); }
+.wait-banner .wb-leave:active { transform: translateY(1px); }
 
 /* 빈 좌석의 + 버튼 (방장만) */
 .wait-seat.empty .seat-add {

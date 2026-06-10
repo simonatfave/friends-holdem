@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=36" />
+  <link rel="stylesheet" href="style.css?v=37" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -132,7 +132,10 @@
         <button id="wbCopy" class="ghost">복사</button>
       </div>
       <p id="wbHint" class="wb-hint"></p>
-      <button id="wbStart" class="primary hidden">게임 시작</button>
+      <div class="wb-actions">
+        <button id="wbStart" class="primary hidden">게임 시작</button>
+        <button id="wbLeave" class="wb-leave">나가기</button>
+      </div>
     </div>
 
     <div class="table-wrap">
@@ -195,6 +198,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=36"></script>
+  <script src="client.js?v=37"></script>
 </body>
 </html>

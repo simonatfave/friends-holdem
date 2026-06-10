@@ -38,6 +38,7 @@ function stateFor(room, viewerId) {
   st.actionDeadline = room.actionDeadline || null;
   st.actionLimit = room.actionLimit || null;
   st.spectator = room.spectators ? room.spectators.has(viewerId) : false;
+  st.isHost = room.hostId === viewerId;
   return st;
 }
 function broadcast(code) {
@@ -267,15 +268,16 @@ io.on('connection', (socket) => {
     broadcast(roomCode);
   });
 
-  // 대기 테이블에서 빈 자리(+) 클릭 → 봇 1명 추가
-  socket.on('addBot', (_d, cb) => {
+  // 대기 테이블에서 빈 자리(+) 클릭 → 그 자리(chair)에 봇 1명 추가
+  socket.on('addBot', ({ seat } = {}, cb) => {
     const room = rooms.get(roomCode);
     if (!room) return cb?.({ ok: false, error: '방 없음' });
     if (room.hostId !== playerId) return cb?.({ ok: false, error: '방장만 추가할 수 있습니다' });
     const g = room.game;
     if (g.started) return cb?.({ ok: false, error: '이미 시작됨' });
     if (g.players.length >= 9) return cb?.({ ok: false, error: '자리가 가득 찼습니다 (최대 9명)' });
-    g.addPlayer('bot_' + Date.now() + '_' + Math.floor(Math.random() * 1000), '🤖 Bot', true);
+    const chair = (typeof seat === 'number') ? seat : null;
+    g.addPlayer('bot_' + Date.now() + '_' + Math.floor(Math.random() * 1000), '🤖 Bot', true, chair);
     g.players.filter((p) => p.isBot).forEach((b, idx) => { b.name = `🤖 Bot ${idx + 1}`; });
     cb?.({ ok: true });
     broadcast(roomCode);
@@ -360,6 +362,32 @@ io.on('connection', (socket) => {
     const p = room.game.getPlayer(playerId);
     if (!p || !text) return;
     io.to(roomCode).emit('chat', { name: p.name, text: String(text).slice(0, 200), t: Date.now() });
+  });
+
+  // 대기/게임방에서 직접 나가기
+  socket.on('leave', (_d, cb) => {
+    const room = rooms.get(roomCode);
+    if (!room) { roomCode = null; return cb?.({ ok: true }); }
+    const { game } = room;
+    if (room.spectators) room.spectators.delete(socket.id);
+    if (!game.started) {
+      game.removePlayer(playerId);
+      if (room.hostId === playerId && game.players.length) room.hostId = game.players[0].id;
+      if (game.players.filter((p) => !p.isBot).length === 0) {
+        // 사람이 모두 나가면 방 정리
+        clearRoomTimers(room);
+        rooms.delete(roomCode);
+      } else {
+        broadcast(roomCode);
+      }
+    } else {
+      const p = game.getPlayer(playerId);
+      if (p) p.connected = false;
+      broadcast(roomCode);
+    }
+    socket.leave(roomCode);
+    roomCode = null;
+    cb?.({ ok: true });
   });
 
   socket.on('disconnect', () => {

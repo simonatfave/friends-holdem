@@ -261,6 +261,15 @@ $('wbCopy').onclick = () => {
   $('wbCopy').textContent = '복사됨!';
   setTimeout(() => ($('wbCopy').textContent = '복사'), 1500);
 };
+$('wbLeave').onclick = () => {
+  if (!confirm('대기 중인 방에서 나갈까요?')) return;
+  socket.emit('leave', {}, () => {
+    document.body.classList.remove('waiting-mode');
+    $('waitBanner').classList.add('hidden');
+    lastState = null; prevSnap = null; myRoomCode = ''; isHost = false; isSpectator = false;
+    hide('game'); hide('waiting'); show('lobby');
+  });
+};
 
 let currentBotCount = 0;
 let currentHumanCount = 1;
@@ -284,6 +293,7 @@ socket.on('state', (s) => {
     ? Date.now() + s.secondsToNextLevel * 1000 : null;
   if (!s.started) { renderWaitingTable(s); return; }
   document.body.classList.remove('waiting-mode');
+  $('waitBanner').classList.add('hidden');
   hide('lobby'); hide('waiting'); show('game');
   $('versionBadge').classList.add('hidden'); // 게임 중엔 숨김(시작 화면에만 표시)
   renderGame(s);
@@ -339,7 +349,8 @@ function renderWaitingTable(s) {
   document.body.classList.add('waiting-mode');
   hide('lobby'); hide('waiting'); show('game');
   $('versionBadge').classList.remove('hidden');
-  isHost = s.players[0]?.id === myId;
+  $('waitBanner').classList.remove('hidden'); // 배너(방코드/시작/나가기) 표시
+  isHost = !!s.isHost;
   const n = s.players.length;
   // 상단 배너: 방 코드 / 시작 버튼 / 안내
   $('wbCode').textContent = myRoomCode || '----';
@@ -356,18 +367,21 @@ function renderWaitingSeats(s) {
   seatsEl.innerHTML = '';
   const TOTAL = 9; // 9-max 좌석을 모두 표시
   seatsEl.style.setProperty('--seat-scale', '0.72');
-  const players = s.players;
-  const n = players.length;
-  const meIdx = Math.max(0, players.findIndex((p) => p.id === myId));
   const positions = ovalPositions(TOTAL);
-  for (let i = 0; i < TOTAL; i++) {
-    const pos = positions[i];
+  const me = s.players.find((p) => p.id === myId);
+  const mySeat = me ? me.chair : 0;
+  const bySeat = {};
+  s.players.forEach((p) => { bySeat[p.chair] = p; });
+  for (let seatIdx = 0; seatIdx < TOTAL; seatIdx++) {
+    // 내 자리를 항상 화면 아래 중앙(visual 0)에 오도록 회전
+    const visual = (seatIdx - mySeat + TOTAL) % TOTAL;
+    const pos = positions[visual];
     const seat = document.createElement('div');
     seat.className = 'seat wait-seat';
     seat.style.left = pos.x + '%';
     seat.style.top = pos.y + '%';
-    if (i < n) {
-      const p = players[(meIdx + i) % n];
+    const p = bySeat[seatIdx];
+    if (p) {
       const isMe = p.id === myId;
       seat.innerHTML = `
         <div class="seat-inner">
@@ -378,13 +392,13 @@ function renderWaitingSeats(s) {
     } else {
       seat.classList.add('empty');
       seat.innerHTML = isHost
-        ? '<button class="seat-add" title="봇 추가">+</button>'
+        ? `<button class="seat-add" data-seat="${seatIdx}" title="봇 추가">+</button>`
         : '<div class="seat-empty-ph">빈 자리</div>';
     }
     seatsEl.appendChild(seat);
   }
   seatsEl.querySelectorAll('.seat-add').forEach((b) => {
-    b.onclick = () => socket.emit('addBot', {}, (r) => { if (!r.ok) alert(r.error); });
+    b.onclick = () => socket.emit('addBot', { seat: Number(b.dataset.seat) }, (r) => { if (!r.ok) alert(r.error); });
   });
   seatsEl.querySelectorAll('.bot-x').forEach((b) => {
     b.onclick = () => socket.emit('removeBot', { id: b.dataset.bot }, (r) => { if (!r.ok) alert(r.error); });
