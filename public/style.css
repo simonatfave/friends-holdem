@@ -193,8 +193,9 @@ button { font-family: inherit; }
 .poker-table {
   position: relative;
   /* 화면 높이에 맞춰 크기 제한 → 좌석이 액션 영역을 침범하지 않음 */
-  width: auto;
+  /* 가로·세로 모두 명시 계산(사파리 호환: aspect-ratio 미지원 시에도 안 무너짐) */
   height: min(56vh, 52vw, 520px);
+  width: calc(min(56vh, 52vw, 520px) * 16 / 9);
   aspect-ratio: 16 / 9;
   background: radial-gradient(ellipse at center, var(--felt), var(--felt-dark));
   border: 12px solid #5a3a22;
@@ -272,8 +273,8 @@ button { font-family: inherit; }
 
 /* 카드 — 실제 트럼프 카드 레이아웃 (모서리 인덱스 + 중앙 핍). 크기는 :root 변수로 반응형 */
 .card {
-  /* 실제 포커 카드 비율(5:7 ≈ 0.714)로 고정. 높이만 정하고 가로는 비율로 자동 + 찌그러짐 방지 */
-  height: var(--cc-h); width: auto; aspect-ratio: 5 / 7; flex-shrink: 0;
+  /* 실제 포커 카드 비율(5:7). 가로·세로 모두 명시 계산 → 사파리 등 모든 브라우저에서 비율 고정 */
+  height: var(--cc-h); width: calc(var(--cc-h) * 5 / 7); aspect-ratio: 5 / 7; flex-shrink: 0;
   box-sizing: border-box;
   border-radius: 9px;
   background: linear-gradient(150deg, #ffffff 0%, #f3f1ea 100%);
@@ -281,7 +282,7 @@ button { font-family: inherit; }
   box-shadow: 0 4px 9px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.6);
   position: relative; overflow: hidden; font-weight: 800;
 }
-.card.sm { height: var(--hc-h); width: auto; border-radius: 7px; }
+.card.sm { height: var(--hc-h); width: calc(var(--hc-h) * 5 / 7); border-radius: 7px; }
 .card .corner {
   position: absolute; display: flex; flex-direction: column; align-items: center;
   line-height: .92; font-weight: 800;
@@ -520,15 +521,18 @@ button { font-family: inherit; }
 /* 휴대폰 (가로 폭 기준) */
 @media (max-width: 640px) {
   /* 세로 화면에선 테이블을 세로로 긴 형태로 */
-  .poker-table { width: min(94vw, 44vh); height: auto; aspect-ratio: 5 / 7; border-width: 9px; }
+  .poker-table { width: min(94vw, 44vh); height: calc(min(94vw, 44vh) * 7 / 5); aspect-ratio: 5 / 7; border-width: 9px; }
   .table-wrap { padding-bottom: 44px; }
   .community { gap: 5px; top: 40%; }
   .pot-display { top: 60%; }
   .seat-inner { padding: 4px 5px; }
-  /* 모바일은 간결하게: 채팅/로그·이모지 바·칩 더미·칩 애니메이션 숨김 */
+  /* 모바일은 간결하게: 채팅/로그·칩 더미·칩 애니메이션 숨김 */
   .sidepanel { display: none; }
-  .emoji-bar { display: none; }
   .pot-stack { display: none; }
+  /* 이모지 바는 모바일에서도 보이게(컴팩트). 한 줄 가로 스크롤 */
+  .emoji-bar { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 5px; padding: 2px 6px 4px; -webkit-overflow-scrolling: touch; }
+  .emoji-bar::-webkit-scrollbar { display: none; }
+  .emoji-btn { width: 38px; height: 38px; font-size: 19px; flex: 0 0 auto; }
   .fly-chip { display: none !important; }
   .bet-chip, .chip-s { animation: none !important; }
   /* 내 카드는 모바일에서도 크게(다른 좌석보다), 컴팩트하게 */
@@ -598,7 +602,8 @@ body.waiting-mode #waitBanner { display: block; }
 .wait-banner {
   text-align: center; margin: 10px auto 2px; padding: 12px 18px;
   background: rgba(20,26,34,.82); border: 1px solid #2a3442; border-radius: 14px;
-  max-width: 460px; width: calc(100% - 24px); backdrop-filter: blur(4px); z-index: 5;
+  max-width: 460px; width: calc(100% - 24px);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); z-index: 5;
 }
 .wait-banner .wb-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .wait-banner .wb-code { font-size: 15px; color: var(--text); }
@@ -613,6 +618,100 @@ body.waiting-mode #waitBanner { display: block; }
 }
 .wait-banner .wb-leave:hover { background: rgba(226,85,85,.24); }
 .wait-banner .wb-leave:active { transform: translateY(1px); }
+
+/* ---------- 이모지 감정 연출: 큰 이모지 팝업 + 좌석 반응 ---------- */
+.emoji-pop {
+  position: absolute; top: -16px; left: 50%; z-index: 60; pointer-events: none;
+  font-size: clamp(34px, calc(var(--hc-h) * 0.7), 50px); line-height: 1;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.55));
+  animation: emojiPop 2s cubic-bezier(.2,.8,.3,1) forwards;
+}
+@keyframes emojiPop {
+  0%   { opacity: 0; transform: translate(-50%, 10px) scale(.3); }
+  14%  { opacity: 1; transform: translate(-50%, -8px) scale(1.35); }
+  28%  { transform: translate(-50%, -14px) scale(1); }
+  72%  { opacity: 1; transform: translate(-50%, -22px) scale(1.04); }
+  100% { opacity: 0; transform: translate(-50%, -44px) scale(.9); }
+}
+
+/* 감정별 좌석(패널) 반응 — .seat.active 펄스보다 뒤에 정의되어 우선 적용 */
+.seat-inner.fx-shock { animation: fxShake .5s ease 2; }
+.seat-inner.fx-cry   { animation: fxCry 1s ease; }
+.seat-inner.fx-laugh { animation: fxBounce .45s ease 2; }
+.seat-inner.fx-think { animation: fxTilt 1.2s ease; }
+.seat-inner.fx-fire  { animation: fxBounce .45s ease 1, fxGlowFire 1.4s ease; }
+.seat-inner.fx-cool  { animation: fxGlowCool 1.3s ease; }
+.seat-inner.fx-good  { animation: fxBounce .45s ease 1, fxGlowGood 1.3s ease; }
+.seat-inner.fx-party { animation: fxBounce .45s ease 2, fxGlowParty 1.4s ease; }
+
+@keyframes fxShake {
+  0%,100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-6px) rotate(-2.5deg); }
+  40% { transform: translateX(6px) rotate(2.5deg); }
+  60% { transform: translateX(-5px) rotate(-1.5deg); }
+  80% { transform: translateX(4px) rotate(1.5deg); }
+}
+@keyframes fxCry {
+  0%,100% { transform: translateY(0) rotate(0); }
+  25% { transform: translateY(2px) rotate(-2deg); }
+  50% { transform: translateY(3px) rotate(2deg); }
+  75% { transform: translateY(2px) rotate(-1deg); }
+}
+@keyframes fxBounce {
+  0%,100% { transform: translateY(0); }
+  35% { transform: translateY(-9px); }
+  70% { transform: translateY(0); }
+}
+@keyframes fxTilt {
+  0%,100% { transform: rotate(0); }
+  25% { transform: rotate(-5deg); }
+  75% { transform: rotate(5deg); }
+}
+@keyframes fxGlowFire {
+  0%,100% { box-shadow: 0 0 0 rgba(0,0,0,0); }
+  45% { box-shadow: 0 0 26px 4px rgba(255,120,40,.9); border-color: #ff7a28; }
+}
+@keyframes fxGlowCool {
+  0%,100% { box-shadow: 0 0 0 rgba(0,0,0,0); }
+  45% { box-shadow: 0 0 24px 3px rgba(80,150,255,.85); border-color: #5a9bff; }
+}
+@keyframes fxGlowGood {
+  0%,100% { box-shadow: 0 0 0 rgba(0,0,0,0); }
+  45% { box-shadow: 0 0 24px 3px rgba(62,201,122,.85); border-color: #3ec97a; }
+}
+@keyframes fxGlowParty {
+  0%,100% { box-shadow: 0 0 0 rgba(0,0,0,0); }
+  45% { box-shadow: 0 0 28px 5px rgba(232,196,102,.95); border-color: #e8c466; }
+}
+
+/* ---------- 내 카드 크게 보기(피크) ---------- */
+.card-peek-overlay {
+  position: fixed; inset: 0; z-index: 150; display: none;
+  flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: rgba(0,0,0,.84); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  animation: peekFade .15s ease;
+}
+.card-peek-overlay.show { display: flex; }
+@keyframes peekFade { from { opacity: 0; } to { opacity: 1; } }
+.card-peek-cards { --cc-h: min(48vh, 60vw, 360px); display: flex; gap: 18px; }
+.card-peek-cards .card { animation: peekPop .25s cubic-bezier(.2,.8,.3,1.3); }
+@keyframes peekPop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.card-peek-hint { color: #9fb0c2; font-size: 14px; letter-spacing: .5px; }
+
+/* ---------- 지난 핸드 요약 토스트 ---------- */
+.recap-toast {
+  position: fixed; top: 52px; left: 50%; transform: translateX(-50%) translateY(-10px);
+  z-index: 90; background: rgba(20,26,34,.92); border: 1px solid #33404f;
+  color: var(--text); font-size: 13px; padding: 7px 14px; border-radius: 20px;
+  white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+}
+.recap-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.recap-toast .recap-label { color: var(--gold); font-weight: 700; margin-right: 6px; }
+
+/* ---------- 자리 비움 ---------- */
+.tag.sitout { background: #4a5a6d; color: #cfe0f0; }
+.seat.sitting-out .seat-inner { opacity: .5; filter: grayscale(.4); }
 
 /* 빈 좌석의 + 버튼 (방장만) */
 .wait-seat.empty .seat-add {

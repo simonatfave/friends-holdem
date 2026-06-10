@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { Game, defaultBlindSchedule } from './src/game.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +34,96 @@ function makeRoomCode() {
   return code;
 }
 
+// ---------- 상태 영속화 (재시작/재배포에도 진행 중 게임 복구) ----------
+const SAVE_FILE = process.env.SAVE_FILE || join(__dirname, 'rooms.json');
+
+// 칩 보존: 베팅 진행 중이면 chips+committed(핸드 전 스택), 정산 후면 chips 그대로
+function settledChips(g, p) {
+  if (g.hand && g.hand.phase !== 'handComplete') {
+    return p.chips + ((g.hand.committed && g.hand.committed[p.id]) || 0);
+  }
+  return p.chips;
+}
+function serializeRooms() {
+  const out = [];
+  for (const [code, room] of rooms) {
+    const g = room.game;
+    if (g.finished) continue; // 끝난 게임은 저장 안 함
+    out.push({
+      code,
+      hostId: room.hostId,
+      actionLimit: room.actionLimit,
+      game: {
+        startingChips: g.startingChips,
+        levelDurationSec: g.levelDurationSec,
+        handsPerLevel: g.handsPerLevel,
+        blindSchedule: g.blindSchedule,
+        started: g.started,
+        button: g.button,
+        level: g.level,
+        handNumber: g.handNumber,
+        startedAt: g.startedAt,
+        results: g.results,
+        players: g.players.map((p) => ({
+          id: p.id, name: p.name, chips: settledChips(g, p), chair: p.chair,
+          isBot: p.isBot, eliminated: p.eliminated, sittingOut: p.sittingOut,
+        })),
+      },
+    });
+  }
+  return out;
+}
+let _saveTimer = null;
+function saveRoomsSoon() {
+  if (_saveTimer) return;
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    try { writeFileSync(SAVE_FILE, JSON.stringify(serializeRooms())); }
+    catch (e) { console.error('상태 저장 실패:', e.message); }
+  }, 1500);
+}
+function loadRooms() {
+  try {
+    if (!existsSync(SAVE_FILE)) return;
+    const data = JSON.parse(readFileSync(SAVE_FILE, 'utf8'));
+    for (const r of data) {
+      const rg = r.game;
+      const g = new Game({
+        startingChips: rg.startingChips,
+        levelDurationSec: rg.levelDurationSec,
+        handsPerLevel: rg.handsPerLevel,
+        blindSchedule: rg.blindSchedule,
+      });
+      g.players = rg.players.map((p) => ({
+        ...p, connected: false, socketId: null,
+      }));
+      g.button = rg.button ?? -1;
+      g.level = rg.level ?? 0;
+      g.handNumber = rg.handNumber ?? 0;
+      g.startedAt = rg.startedAt ?? null;
+      g.started = !!rg.started;
+      g.finished = false;
+      g.results = rg.results || [];
+      const room = { game: g, hostId: r.hostId, actionLimit: r.actionLimit, restoredAt: Date.now() };
+      rooms.set(r.code, room);
+      // 진행 중이었으면 새 핸드로 재개(중단된 핸드는 버림, 칩은 핸드 전 스택으로 보존)
+      if (g.started) {
+        const playable = g.players.filter((p) => !p.eliminated && p.chips > 0 && !p.sittingOut);
+        if (playable.length >= 2) {
+          g.startHand();
+          startActionTimer(r.code); // 끊긴 플레이어는 타이머가 자동 폴드하지 않음(대기)
+          scheduleNextHand(r.code);
+          maybeBotAct(r.code);
+          driveRunout(r.code);
+        } else {
+          g.paused = true;
+        }
+      }
+    }
+    if (rooms.size) console.log(`이전 상태 복구: ${rooms.size}개 방`);
+  } catch (e) { console.error('상태 복구 실패:', e.message); }
+}
+
 function stateFor(room, viewerId) {
   const st = room.game.getStateFor(viewerId);
   st.actionDeadline = room.actionDeadline || null;
@@ -50,6 +141,26 @@ function broadcast(code) {
   }
   if (room.spectators) {
     for (const sid of room.spectators) io.to(sid).emit('state', stateFor(room, sid));
+  }
+  saveRoomsSoon(); // 상태 변화 시 디스크에 스냅샷(디바운스)
+}
+
+// 자리 비움/합류 후 진행 인원이 다시 충분해지면 일시정지 해제하고 새 핸드 시작
+function resumePausedGame(code) {
+  const room = rooms.get(code);
+  if (!room) return;
+  const g = room.game;
+  if (!g.started || g.finished || !g.paused) { broadcast(code); return; }
+  const playable = g.players.filter((p) => !p.eliminated && p.chips > 0 && !p.sittingOut);
+  if (playable.length >= 2) {
+    g.startHand();
+    startActionTimer(code);
+    broadcast(code);
+    scheduleNextHand(code);
+    maybeBotAct(code);
+    driveRunout(code);
+  } else {
+    broadcast(code);
   }
 }
 
@@ -106,9 +217,12 @@ function startActionTimer(code) {
   if (!seat) return;
   const p = g.getPlayer(seat.id);
   if (!p || p.isBot) return; // 봇은 maybeBotAct가 처리
+  if (!p.connected) return; // 끊긴/복구 직후 플레이어는 자동 폴드하지 않고 대기
   room.actionDeadline = Date.now() + room.actionLimit;
   room.actionTimer = setTimeout(() => {
     if (!rooms.has(code)) return;
+    const pp = g.getPlayer(seat.id);
+    if (!pp || !pp.connected) return; // 그 사이 끊겼으면 자동 행동 안 함
     const legal = g.legalActions(seat.id);
     if (!legal) return;
     const check = legal.find((a) => a.type === 'check');
@@ -213,9 +327,24 @@ io.on('connection', (socket) => {
         socket.join(code);
         cb?.({ ok: true, code, youId: playerId });
         broadcast(code);
+        startActionTimer(code); // 복귀 시 본인 차례면 타이머 재가동
+        maybeBotAct(code);
         return;
       }
-      return cb?.({ ok: false, error: '이미 시작된 게임입니다' });
+      // 게임 진행 중 신규 합류 → 다음 핸드부터 참여
+      if (game.finished) return cb?.({ ok: false, error: '이미 종료된 게임입니다' });
+      if (game.players.length >= 9) return cb?.({ ok: false, error: '방이 가득 찼습니다 (최대 9명)' });
+      const btnId = game.players[game.button]?.id; // 좌석 정렬로 버튼 인덱스가 밀리지 않게 보존
+      game.addPlayer(playerId, name);
+      if (btnId != null) game.button = game.players.findIndex((p) => p.id === btnId);
+      game.getPlayer(playerId).socketId = socket.id;
+      roomCode = code;
+      socket.join(code);
+      game.pushLog(`${name} 님이 참여했습니다 (다음 핸드부터)`);
+      cb?.({ ok: true, code, youId: playerId, lateJoin: true });
+      if (game.paused) resumePausedGame(code); // 자리 비움으로 멈춰있었다면 재개
+      else broadcast(code);
+      return;
     }
     if (game.players.length >= 9) return cb?.({ ok: false, error: '방이 가득 찼습니다 (최대 9명)' });
     game.addPlayer(playerId, name);
@@ -364,6 +493,21 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('chat', { name: p.name, text: String(text).slice(0, 200), t: Date.now() });
   });
 
+  // 자리 비움 / 복귀 (게임 중 나가지 않고 핸드 쉬기)
+  socket.on('sitOut', ({ out } = {}, cb) => {
+    const room = rooms.get(roomCode);
+    if (!room) return cb?.({ ok: false, error: '방 없음' });
+    const g = room.game;
+    const p = g.getPlayer(playerId);
+    if (!p) return cb?.({ ok: false, error: '플레이어 없음' });
+    p.sittingOut = !!out;
+    g.pushLog(`${p.name} 님이 ${p.sittingOut ? '자리를 비웠습니다' : '돌아왔습니다'}`);
+    cb?.({ ok: true, sittingOut: p.sittingOut });
+    // 복귀로 인원이 충분해지면 재개
+    if (!p.sittingOut && g.started && !g.finished && g.paused) resumePausedGame(roomCode);
+    else broadcast(roomCode);
+  });
+
   // 대기/게임방에서 직접 나가기
   socket.on('leave', (_d, cb) => {
     const room = rooms.get(roomCode);
@@ -434,13 +578,17 @@ setInterval(() => {
   for (const [code, room] of rooms) {
     const anyConnected = room.game.players.some((p) => !p.isBot && p.connected);
     const anySpec = room.spectators && room.spectators.size > 0;
-    if (!anyConnected && !anySpec) {
+    // 복구 직후 방은 재접속 유예(5분) — 새로고침/재접속 시간을 줌
+    const inGrace = room.restoredAt && (Date.now() - room.restoredAt < 5 * 60 * 1000);
+    if (!anyConnected && !anySpec && !inGrace) {
       clearRoomTimers(room);
       rooms.delete(code);
+      saveRoomsSoon();
     }
   }
 }, 60000);
 
+loadRooms(); // 이전 상태 복구
 httpServer.listen(PORT, () => {
   console.log(`🎲 Dice 서버 실행: http://localhost:${PORT}`);
 });

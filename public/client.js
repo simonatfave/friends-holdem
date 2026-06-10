@@ -8,6 +8,15 @@ let prevSnap = null;        // 직전 상태 스냅샷 (애니메이션/사운�
 let _dealNewHand = false;   // 이번 렌더에서 홀카드 딜링 애니 적용?
 let _newCommFrom = 99;      // 이 인덱스부터의 커뮤니티 카드는 새 카드(플립 애니)
 
+// 서버 재시작/네트워크 끊김 후 자동 재접속 시, 진행 중이던 방에 다시 합류
+socket.on('connect', () => {
+  if (myRoomCode && myName) {
+    socket.emit('join', { code: myRoomCode, name: myName }, (res) => {
+      if (res && res.ok) myId = res.youId;
+    });
+  }
+});
+
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
@@ -80,6 +89,11 @@ $('settingsClose').onclick = () => hide('settingsPanel');
 $('optMaster').onchange = (e) => { soundSettings.master = e.target.checked; saveSound(); syncMuteIcon(); };
 $('optTurn').onchange = (e) => { soundSettings.turn = e.target.checked; saveSound(); };
 $('optFx').onchange = (e) => { soundSettings.fx = e.target.checked; saveSound(); };
+$('optSitOut').onchange = (e) => {
+  socket.emit('sitOut', { out: e.target.checked }, (r) => {
+    if (!r || !r.ok) { e.target.checked = !e.target.checked; if (r && r.error) alert(r.error); }
+  });
+};
 
 // PWA 서비스워커 등록
 if ('serviceWorker' in navigator) {
@@ -87,6 +101,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ---------- 이모지 리액션 ----------
+let _reactCooldownUntil = 0; // 이모지 연타 도배 방지
 const EMOJIS = ['😎', '🔥', '😱', '😂', '😭', '👍', '🤔', '🎉'];
 (function buildEmojiBar() {
   const bar = $('emojiBar');
@@ -94,18 +109,38 @@ const EMOJIS = ['😎', '🔥', '😱', '😂', '😭', '👍', '🤔', '🎉'];
   EMOJIS.forEach((e) => {
     const b = document.createElement('button');
     b.className = 'emoji-btn'; b.textContent = e;
-    b.onclick = () => { if (!isSpectator) socket.emit('react', { emoji: e }); };
+    b.onclick = () => {
+      if (isSpectator) return;
+      const now = Date.now();
+      if (now < _reactCooldownUntil) return; // 연타 도배 방지(0.8초)
+      _reactCooldownUntil = now + 800;
+      socket.emit('react', { emoji: e });
+    };
     bar.appendChild(b);
   });
 })();
+// 이모지 → 감정별 좌석 반응 효과(흔들림·글로우 등)
+const EMOTION_FX = {
+  '😎': 'fx-cool', '🔥': 'fx-fire', '😱': 'fx-shock', '😂': 'fx-laugh',
+  '😭': 'fx-cry', '👍': 'fx-good', '🤔': 'fx-think', '🎉': 'fx-party',
+};
+const FX_CLASSES = Object.values(EMOTION_FX);
 socket.on('reaction', ({ id, emoji }) => {
   const seat = document.querySelector(`.seat[data-pid="${cssEsc(id)}"]`);
   if (!seat) return;
+  const inner = seat.querySelector('.seat-inner') || seat;
+  // 1) 캐릭터 위로 큰 이모지 팝업
   const el = document.createElement('div');
-  el.className = 'reaction-float';
+  el.className = 'emoji-pop';
   el.textContent = emoji;
   seat.appendChild(el);
-  setTimeout(() => el.remove(), 1700);
+  setTimeout(() => el.remove(), 2000);
+  // 2) 좌석 감정 반응(흔들림·글로우)
+  const fx = EMOTION_FX[emoji] || 'fx-good';
+  inner.classList.remove(...FX_CLASSES);
+  void inner.offsetWidth; // 리플로우 → 같은 이모지 연타해도 애니메이션 재시작
+  inner.classList.add(fx);
+  setTimeout(() => inner.classList.remove(fx), 1500);
   sfxEmoji();
 });
 
@@ -267,6 +302,7 @@ $('wbLeave').onclick = () => {
     document.body.classList.remove('waiting-mode');
     $('waitBanner').classList.add('hidden');
     lastState = null; prevSnap = null; myRoomCode = ''; isHost = false; isSpectator = false;
+    _seatSig = ''; _commSig = '';
     hide('game'); hide('waiting'); show('lobby');
   });
 };
@@ -297,6 +333,8 @@ socket.on('state', (s) => {
   hide('lobby'); hide('waiting'); show('game');
   $('versionBadge').classList.add('hidden'); // 게임 중엔 숨김(시작 화면에만 표시)
   renderGame(s);
+  const meNow = s.players.find((p) => p.id === myId);
+  if (meNow) $('optSitOut').checked = !!meNow.sittingOut; // 자리 비움 토글 상태 반영
 });
 
 // 타이머 틱 (액션 제한 바 + 블라인드 카운트다운)
@@ -429,17 +467,21 @@ function renderGame(s) {
     : `레벨 ${s.level} · 다음까지 ${s.nextLevelIn + 1}핸드`;
   $('potBadge').textContent = `팟 ${s.pot}`;
 
-  // 커뮤니티 카드 (새로 깔린 카드는 플립 인 애니)
+  // 커뮤니티 카드 (새로 깔린 카드는 플립 인 애니). 변화 없을 땐 DOM 유지 → 클릭마다 깜빡임 방지
   const comm = $('community');
-  comm.innerHTML = '';
-  s.community.forEach((c, idx) => {
-    const el = cardEl(c);
-    if (idx >= _newCommFrom) {
-      el.classList.add('flip-in');
-      el.style.animationDelay = ((idx - _newCommFrom) * 0.12) + 's';
-    }
-    comm.appendChild(el);
-  });
+  const commSig = s.handNumber + '|' + s.community.map((c) => c.r + '-' + c.s).join(',');
+  if (commSig !== _commSig) {
+    _commSig = commSig;
+    comm.innerHTML = '';
+    s.community.forEach((c, idx) => {
+      const el = cardEl(c);
+      if (idx >= _newCommFrom) {
+        el.classList.add('flip-in');
+        el.style.animationDelay = ((idx - _newCommFrom) * 0.12) + 's';
+      }
+      comm.appendChild(el);
+    });
+  }
   $('potDisplay').textContent = s.pot > 0 ? `팟: ${s.pot}` : '';
   renderPotStack(s);
 
@@ -541,7 +583,7 @@ function rollNumber(el, from, to, dur = 600) {
 function handleFx(s, prev) {
   if (!prev) return; // 첫 렌더는 조용히
   const newHand = s.handNumber !== prev.handNumber;
-  if (newHand) sfxDeal();
+  if (newHand) { sfxDeal(); if (_lastHandRecap) showRecapToast(_lastHandRecap); }
   else if (s.community.length > prev.commCount) sfxDeal();
 
   if (s.pot > prev.pot && !newHand) {
@@ -549,13 +591,56 @@ function handleFx(s, prev) {
     bump($('potDisplay'));
     sfxChip();
   }
-  if (s.toActId === myId && prev.toActId !== myId) sfxTurn();
+  if (s.toActId === myId && prev.toActId !== myId) { sfxTurn(); notifyMyTurn(); }
+  if (s.toActId !== myId) stopTitleBlink();
 
   if (s.phase === 'handComplete' && prev.phase !== 'handComplete' && s.results) {
     sfxWin();
     flyPotToWinners(s);
+    // 직전 핸드 요약 저장 → 다음 핸드 시작 시 토스트로 표시
+    _lastHandRecap = (s.results.awards || []).map((a) =>
+      `${a.winners.map((w) => esc(w.name)).join(', ')} +${a.amount}${a.handName ? ' · ' + esc(a.handName) : ''}`
+    ).join(' / ');
   }
 }
+
+// 지난 핸드 요약 토스트
+let _lastHandRecap = '';
+let _recapTimer = null;
+function showRecapToast(text) {
+  let t = document.getElementById('recapToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'recapToast';
+    t.className = 'recap-toast';
+    document.body.appendChild(t);
+  }
+  t.innerHTML = `<span class="recap-label">지난 핸드</span> ${text}`;
+  t.classList.add('show');
+  clearTimeout(_recapTimer);
+  _recapTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// 내 차례 알림: 모바일 진동 + (백그라운드 탭일 때) 제목 깜빡임
+let _titleBlink = null;
+const TITLE_DEFAULT = '🎲 Dice — 친구들과 포커';
+function notifyMyTurn() {
+  if (navigator.vibrate) { try { navigator.vibrate([120, 60, 120]); } catch (e) {} }
+  if (document.hidden) startTitleBlink();
+}
+function startTitleBlink() {
+  if (_titleBlink) return;
+  let on = false;
+  _titleBlink = setInterval(() => {
+    document.title = on ? '🔔 당신 차례입니다!' : '🎲 Dice';
+    on = !on;
+  }, 900);
+}
+function stopTitleBlink() {
+  if (_titleBlink) { clearInterval(_titleBlink); _titleBlink = null; }
+  document.title = TITLE_DEFAULT;
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) stopTitleBlink(); });
 
 function bump(el) {
   if (!el) return;
@@ -598,9 +683,10 @@ function cssEsc(s) {
   return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&');
 }
 
+let _seatSig = '';
+let _commSig = '';
 function renderSeats(s) {
   const seatsEl = $('seats');
-  seatsEl.innerHTML = '';
   const players = s.players;
   const n = players.length;
   // 인원이 많을수록 좌석을 축소해 겹침 방지
@@ -608,39 +694,85 @@ function renderSeats(s) {
   // 나를 맨 아래(6시 방향)에 배치
   const meIdx = Math.max(0, players.findIndex((p) => p.id === myId));
   const positions = ovalPositions(n);
+  // 카드/구조가 바뀌는 경우(인원·핸드·페이즈·쇼다운)에만 전체 재생성 → 베팅 중 클릭마다 깜빡임 방지
+  const order = [];
+  for (let i = 0; i < n; i++) order.push(players[(meIdx + i) % n].id);
+  const sig = order.join(',') + '|' + n + '|' + s.handNumber + '|' + s.phase + '|' + (s.results ? '1' : '0');
+  const full = sig !== _seatSig || _dealNewHand;
+  if (full) { _seatSig = sig; seatsEl.innerHTML = ''; }
+
   for (let i = 0; i < n; i++) {
     const p = players[(meIdx + i) % n];
-    const pos = positions[i];
     const isMe = p.id === myId;
-    const seat = document.createElement('div');
-    seat.className = 'seat';
-    seat.dataset.pid = p.id;
-    if (p.isToAct) seat.classList.add('active');
-    if (p.isToAct && isMe) seat.classList.add('myturn');
-    if (isMe) seat.classList.add('me-seat'); // 내 카드 크게 표시
-    if (p.folded) seat.classList.add('folded');
-    if (p.eliminated) seat.classList.add('eliminated');
-    if (!p.connected && !p.isBot && !p.eliminated) seat.classList.add('disconnected');
-    const isWinner = s.results && s.phase === 'handComplete' &&
-      s.results.awards?.some((a) => a.winners.some((w) => w.id === p.id));
-    if (isWinner) seat.classList.add('winner');
-    // 내 좌석은 더 아래에 배치(큰 카드가 팟을 침범하지 않게)
-    seat.style.left = (isMe ? 50 : pos.x) + '%';
-    seat.style.top = (isMe ? 88 : pos.y) + '%';
-
-    const result = s.results?.reveal?.find((r) => r.id === p.id);
-    seat.innerHTML = `
-      <div class="seat-inner">
-        ${p.isButton ? '<div class="pbadges"><span class="dealer-btn">D</span></div>' : ''}
-        <div class="pname">${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${(!p.connected && !p.isBot) ? '<span class="tag off">끊김</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}</div>
-        <div class="pchips">${p.eliminated ? '탈락' : `<span class="chip-mini"></span><span class="amt">${p.chips}</span>`}</div>
-        ${p.isToAct ? '<div class="seat-timerbar"><div class="seat-timerbar-fill"></div></div>' : ''}
-        <div class="phole">${renderHole(p, i)}</div>
-        <div class="hand-result">${result ? esc(result.handName) : ''}</div>
-        ${p.bet > 0 ? `<div class="bet-chip">${p.bet}</div>` : ''}
-      </div>`;
-    seatsEl.appendChild(seat);
+    let seat = full ? null : seatsEl.querySelector(`.seat[data-pid="${cssEsc(p.id)}"]`);
+    if (!seat) {
+      // 신규 생성(전체 재생성 또는 새 좌석)
+      seat = document.createElement('div');
+      seat.dataset.pid = p.id;
+      const pos = positions[i];
+      seat.style.left = (isMe ? 50 : pos.x) + '%';
+      seat.style.top = (isMe ? 88 : pos.y) + '%';
+      const result = s.results?.reveal?.find((r) => r.id === p.id);
+      seat.innerHTML = `
+        <div class="seat-inner">
+          ${p.isButton ? '<div class="pbadges"><span class="dealer-btn">D</span></div>' : ''}
+          <div class="pname">${seatNameTags(p)}</div>
+          <div class="pchips">${p.eliminated ? '탈락' : `<span class="chip-mini"></span><span class="amt">${p.chips}</span>`}</div>
+          ${p.isToAct ? '<div class="seat-timerbar"><div class="seat-timerbar-fill"></div></div>' : ''}
+          <div class="phole">${renderHole(p, i)}</div>
+          <div class="hand-result">${result ? esc(result.handName) : ''}</div>
+          ${p.bet > 0 ? `<div class="bet-chip">${p.bet}</div>` : ''}
+        </div>`;
+      seatsEl.appendChild(seat);
+    } else {
+      // 같은 핸드 내 베팅 갱신: DOM을 헐지 않고 변한 부분만 갱신(애니메이션 재생 방지)
+      updateSeatInPlace(seat, p);
+    }
+    seat.className = seatClasses(s, p, isMe);
   }
+}
+
+function seatNameTags(p) {
+  return `${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${(!p.connected && !p.isBot) ? '<span class="tag off">끊김</span>' : ''} ${(p.sittingOut && !p.eliminated) ? '<span class="tag sitout">자리비움</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}`;
+}
+function seatClasses(s, p, isMe) {
+  const isWinner = s.results && s.phase === 'handComplete' &&
+    s.results.awards?.some((a) => a.winners.some((w) => w.id === p.id));
+  return 'seat'
+    + (p.isToAct ? ' active' : '')
+    + (p.isToAct && isMe ? ' myturn' : '')
+    + (isMe ? ' me-seat' : '')
+    + (p.folded ? ' folded' : '')
+    + (p.eliminated ? ' eliminated' : '')
+    + ((!p.connected && !p.isBot && !p.eliminated) ? ' disconnected' : '')
+    + ((p.sittingOut && !p.eliminated) ? ' sitting-out' : '')
+    + (isWinner ? ' winner' : '');
+}
+function updateSeatInPlace(seat, p) {
+  const inner = seat.querySelector('.seat-inner');
+  if (!inner) return;
+  // 이름/태그(올인·끊김) — 애니메이션 없음
+  const pname = inner.querySelector('.pname');
+  if (pname) pname.innerHTML = seatNameTags(p);
+  // 타임바: 차례일 때만 표시
+  let tb = inner.querySelector('.seat-timerbar');
+  if (p.isToAct && !tb) {
+    tb = document.createElement('div');
+    tb.className = 'seat-timerbar';
+    tb.innerHTML = '<div class="seat-timerbar-fill"></div>';
+    inner.querySelector('.phole').before(tb);
+  } else if (!p.isToAct && tb) {
+    tb.remove();
+  }
+  // 베팅 칩: 값이 바뀔 때만 갱신(매 렌더 chipPop 재생 방지)
+  let chip = inner.querySelector('.bet-chip');
+  if (p.bet > 0) {
+    if (!chip) { chip = document.createElement('div'); chip.className = 'bet-chip'; chip.textContent = p.bet; inner.appendChild(chip); }
+    else if (chip.textContent !== String(p.bet)) chip.textContent = p.bet;
+  } else if (chip) {
+    chip.remove();
+  }
+  // 칩 수량은 animateChips()가 롤링 처리
 }
 
 function renderHole(p, seatIdx = 0) {
@@ -677,6 +809,10 @@ function renderActions(s) {
   const bar = $('actionbar');
   bar.innerHTML = '';
   if (s.finished) return;
+  if (s.paused) {
+    bar.innerHTML = '<span class="waiting-turn">자리 비움으로 대기 중 — 인원이 모이면 자동 재개됩니다</span>';
+    return;
+  }
   const me = s.players.find((p) => p.id === myId);
   if (!me || me.eliminated || me.chips <= 0) {
     bar.innerHTML = '<span class="waiting-turn">관전 중...</span>';
@@ -856,6 +992,30 @@ function cardEl(c) {
   tmp.innerHTML = `<div class="card ${red ? 'red' : 'black'} ${win}">${faceMarkup(c)}</div>`;
   return tmp.firstElementChild;
 }
+
+// ---------- 내 카드 크게 보기(피크): 내 카드 탭하면 확대 ----------
+function peekCardBig(c) {
+  const red = isRedSuit(c.s);
+  return `<div class="card ${red ? 'red' : 'black'}">${faceMarkup(c)}</div>`;
+}
+function showCardPeek() {
+  const me = lastState?.players.find((p) => p.id === myId);
+  if (!me || !me.hole || me.hole.some((c) => c.hidden)) return; // 공개된 내 카드일 때만
+  let ov = document.getElementById('cardPeek');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'cardPeek';
+    ov.className = 'card-peek-overlay';
+    ov.onclick = () => ov.classList.remove('show');
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = `<div class="card-peek-cards">${me.hole.map(peekCardBig).join('')}</div><div class="card-peek-hint">탭하여 닫기</div>`;
+  ov.classList.add('show');
+}
+$('seats').addEventListener('click', (e) => {
+  const seat = e.target.closest('.seat.me-seat');
+  if (seat && e.target.closest('.phole')) showCardPeek();
+});
 
 // ---------- 채팅 ----------
 $('chatSend').onclick = sendChat;

@@ -33,6 +33,7 @@ export class Game {
     this.players = []; // { id, name, chips, connected, sittingOut }
     this.started = false;
     this.finished = false;
+    this.paused = false; // 자리 비움 등으로 진행 인원이 1명 이하일 때 일시정지
     this.button = -1;
     this.level = 0;
     this.handNumber = 0;
@@ -119,6 +120,14 @@ export class Game {
       this.finishTournament();
       return;
     }
+    // 자리 비움 제외 후 진행 가능 인원이 1명 이하면 일시정지(토너먼트 종료 아님)
+    const playable = alive.filter((p) => !p.sittingOut);
+    if (playable.length <= 1) {
+      this.paused = true;
+      this.hand = null;
+      return;
+    }
+    this.paused = false;
     this.handNumber++;
     // 레벨 업: 시간 기반(levelDurationSec>0) 또는 핸드 기반
     if (this.levelDurationSec > 0 && this.startedAt) {
@@ -144,7 +153,7 @@ export class Game {
     // 핸드에 참여하는 플레이어(칩 보유)
     const seats = order
       .map((i) => this.players[i])
-      .filter((p) => !p.eliminated && p.chips > 0);
+      .filter((p) => !p.eliminated && p.chips > 0 && !p.sittingOut);
 
     const hand = {
       blinds,
@@ -231,7 +240,7 @@ export class Game {
     for (let k = 1; k <= n; k++) {
       const i = (from + k) % n;
       const p = this.players[i];
-      if (!p.eliminated && p.chips > 0) return i;
+      if (!p.eliminated && p.chips > 0 && !p.sittingOut) return i;
     }
     return from;
   }
@@ -638,6 +647,7 @@ export class Game {
         chair: p.chair,
         connected: p.connected,
         eliminated: p.eliminated,
+        sittingOut: p.sittingOut,
         isBot: p.isBot,
         inHand,
         folded: h ? !!h.folded[p.id] : false,
@@ -660,6 +670,7 @@ export class Game {
     return {
       started: this.started,
       finished: this.finished,
+      paused: this.paused,
       handNumber: this.handNumber,
       level: this.level + 1,
       blinds,
