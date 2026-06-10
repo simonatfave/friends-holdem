@@ -587,8 +587,10 @@ button { font-family: inherit; }
 }
 
 /* ---------- 대기 모드: 게임 테이블이 보이는 채로 대기 ---------- */
-/* 대기 중엔 그리드 해제하고 배너+테이블만 세로로 */
-body.waiting-mode #game { display: flex; flex-direction: column; align-items: center; }
+/* 대기 중엔 그리드 해제하고 배너+테이블만 세로로.
+   align-items는 stretch(기본) 유지 — center로 두면 사파리에서 table-wrap 너비가 0으로 무너짐.
+   배너는 자체 margin auto로, 테이블은 table-wrap 내부 정렬로 가운데 배치 */
+body.waiting-mode #game { display: flex; flex-direction: column; }
 body.waiting-mode .topbar,
 body.waiting-mode .actionbar,
 body.waiting-mode .action-timer,
