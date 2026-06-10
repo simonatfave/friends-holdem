@@ -302,7 +302,7 @@ $('wbLeave').onclick = () => {
     document.body.classList.remove('waiting-mode');
     $('waitBanner').classList.add('hidden');
     lastState = null; prevSnap = null; myRoomCode = ''; isHost = false; isSpectator = false;
-    _seatSig = ''; _commSig = '';
+    _seatSig = ''; _commSig = ''; _seenPlayerIds = new Set(); _playersInit = false; _recentJoiners.clear();
     hide('game'); hide('waiting'); show('lobby');
   });
 };
@@ -345,7 +345,7 @@ function fmtTime(sec) {
 function tickTimers() {
   const s = lastState;
   const at = $('actionTimer');
-  if (!s || !s.started || s.finished) { if (at) at.classList.add('hidden'); return; }
+  if (!s || !s.started || s.finished) { if (at) at.classList.add('hidden'); clearTimeAlert(); return; }
   // 블라인드 상승 카운트다운
   if (s.timedBlinds && blindDeadline) {
     $('levelBadge').textContent = `레벨 ${s.level} · 블라인드↑ ${fmtTime((blindDeadline - Date.now()) / 1000)}`;
@@ -360,16 +360,23 @@ function tickTimers() {
       bar.style.width = (frac * 100) + '%';
       bar.classList.toggle('warn', frac < 0.34);
     }
-    // 내 차례 마지막 구간 째깍 소리 (음소거 토글로 끌 수 있음)
+    // 내 차례 마지막 구간 째깍 소리 + 전체 화면 빨간 경고
     if (s.toActId === myId && rem > 0) {
       const sec = Math.ceil(rem / 1000);
       if (sec <= 5 && sec !== lastTickSec) { lastTickSec = sec; sfxTick(sec <= 2); }
+      document.body.classList.toggle('time-critical', frac < 0.34);
+      document.body.classList.toggle('time-critical-strong', frac < 0.15);
     } else {
       lastTickSec = null;
+      clearTimeAlert();
     }
   } else {
     lastTickSec = null;
+    clearTimeAlert();
   }
+}
+function clearTimeAlert() {
+  document.body.classList.remove('time-critical', 'time-critical-strong');
 }
 let lastTickSec = null;
 setInterval(tickTimers, 250);
@@ -621,6 +628,22 @@ function showRecapToast(text) {
   _recapTimer = setTimeout(() => t.classList.remove('show'), 4000);
 }
 
+// 게임 중 새 플레이어 합류 토스트
+let _joinTimer = null;
+function showJoinToast(name) {
+  let t = document.getElementById('joinToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'joinToast';
+    t.className = 'recap-toast join-toast';
+    document.body.appendChild(t);
+  }
+  t.innerHTML = `<span class="join-label">🎉 참가</span> ${esc(name)} 님이 합류했어요!`;
+  t.classList.add('show');
+  clearTimeout(_joinTimer);
+  _joinTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
 // 내 차례 알림: 모바일 진동 + (백그라운드 탭일 때) 제목 깜빡임
 let _titleBlink = null;
 const TITLE_DEFAULT = '🎲 Dice — 친구들과 포커';
@@ -685,6 +708,9 @@ function cssEsc(s) {
 
 let _seatSig = '';
 let _commSig = '';
+let _seenPlayerIds = new Set();
+let _playersInit = false;
+const _recentJoiners = new Map(); // id -> 애니 만료시각
 function renderSeats(s) {
   const seatsEl = $('seats');
   const players = s.players;
@@ -694,6 +720,19 @@ function renderSeats(s) {
   // 나를 맨 아래(6시 방향)에 배치
   const meIdx = Math.max(0, players.findIndex((p) => p.id === myId));
   const positions = ovalPositions(n);
+  // 게임 도중 새로 합류한 플레이어 감지 → 등장 애니 + 토스트
+  const currentIds = players.map((p) => p.id);
+  if (_playersInit) {
+    currentIds.forEach((id) => {
+      if (!_seenPlayerIds.has(id)) {
+        _recentJoiners.set(id, Date.now() + 1500);
+        const jp = players.find((p) => p.id === id);
+        if (jp && id !== myId) showJoinToast(jp.name);
+      }
+    });
+  }
+  currentIds.forEach((id) => _seenPlayerIds.add(id));
+  _playersInit = true;
   // 카드/구조가 바뀌는 경우(인원·핸드·페이즈·쇼다운)에만 전체 재생성 → 베팅 중 클릭마다 깜빡임 방지
   const order = [];
   for (let i = 0; i < n; i++) order.push(players[(meIdx + i) % n].id);
@@ -733,7 +772,7 @@ function renderSeats(s) {
 }
 
 function seatNameTags(p) {
-  return `${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${(!p.connected && !p.isBot) ? '<span class="tag off">끊김</span>' : ''} ${(p.sittingOut && !p.eliminated) ? '<span class="tag sitout">자리비움</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}`;
+  return `${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${(!p.connected && !p.isBot) ? '<span class="tag off">끊김</span>' : ''} ${(p.sittingOut && !p.eliminated) ? '<span class="tag sitout">자리비움</span>' : ''} ${(p.penaltyShort && !p.eliminated) ? '<span class="tag short">⏱단축</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}`;
 }
 function seatClasses(s, p, isMe) {
   const isWinner = s.results && s.phase === 'handComplete' &&
@@ -746,6 +785,7 @@ function seatClasses(s, p, isMe) {
     + (p.eliminated ? ' eliminated' : '')
     + ((!p.connected && !p.isBot && !p.eliminated) ? ' disconnected' : '')
     + ((p.sittingOut && !p.eliminated) ? ' sitting-out' : '')
+    + ((_recentJoiners.get(p.id) || 0) > Date.now() ? ' seat-joining' : '')
     + (isWinner ? ' winner' : '');
 }
 function updateSeatInPlace(seat, p) {

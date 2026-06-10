@@ -58,6 +58,7 @@ export class Game {
       eliminated: false,
       isBot,
       chair: c,
+      penaltyShort: false, // 직전 무액션 타임아웃 → 다음 차례 시간 1/3
     });
     // 좌석 순서대로 정렬(시계방향 진행 순서 유지)
     this.players.sort((a, b) => a.chair - b.chair);
@@ -648,6 +649,7 @@ export class Game {
         connected: p.connected,
         eliminated: p.eliminated,
         sittingOut: p.sittingOut,
+        penaltyShort: p.penaltyShort,
         isBot: p.isBot,
         inHand,
         folded: h ? !!h.folded[p.id] : false,

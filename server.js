@@ -127,7 +127,7 @@ function loadRooms() {
 function stateFor(room, viewerId) {
   const st = room.game.getStateFor(viewerId);
   st.actionDeadline = room.actionDeadline || null;
-  st.actionLimit = room.actionLimit || null;
+  st.actionLimit = room.actionLimitEffective || room.actionLimit || null;
   st.spectator = room.spectators ? room.spectators.has(viewerId) : false;
   st.isHost = room.hostId === viewerId;
   return st;
@@ -218,7 +218,10 @@ function startActionTimer(code) {
   const p = g.getPlayer(seat.id);
   if (!p || p.isBot) return; // 봇은 maybeBotAct가 처리
   if (!p.connected) return; // 끊긴/복구 직후 플레이어는 자동 폴드하지 않고 대기
-  room.actionDeadline = Date.now() + room.actionLimit;
+  // 직전에 무액션 타임아웃한 플레이어는 이번 차례 시간 1/3(최소 3초)
+  const limit = p.penaltyShort ? Math.max(3000, Math.round(room.actionLimit / 3)) : room.actionLimit;
+  room.actionLimitEffective = limit;
+  room.actionDeadline = Date.now() + limit;
   room.actionTimer = setTimeout(() => {
     if (!rooms.has(code)) return;
     const pp = g.getPlayer(seat.id);
@@ -228,13 +231,14 @@ function startActionTimer(code) {
     const check = legal.find((a) => a.type === 'check');
     const res = g.handleAction(seat.id, check ? 'check' : 'fold');
     if (res.ok) {
+      pp.penaltyShort = true; // 무액션 타임아웃 → 다음 차례 시간 단축
       startActionTimer(code);
       broadcast(code);
       scheduleNextHand(code);
       maybeBotAct(code);
       driveRunout(code);
     }
-  }, room.actionLimit);
+  }, limit);
 }
 
 // 봇 차례면 잠시 뒤 자동으로 행동 (테스트용 간단 정책: 콜링 스테이션 + 가끔 레이즈)
@@ -430,9 +434,11 @@ io.on('connection', (socket) => {
   socket.on('action', ({ type, amount }, cb) => {
     const room = rooms.get(roomCode);
     if (!room) return cb?.({ ok: false, error: '방 없음' });
+    const actor = room.game.getPlayer(playerId);
     const r = room.game.handleAction(playerId, type, amount);
     cb?.(r);
     if (r.ok) {
+      if (actor) actor.penaltyShort = false; // 자발적 액션 → 시간 단축 패널티 해제
       startActionTimer(roomCode);
       broadcast(roomCode);
       scheduleNextHand(roomCode);

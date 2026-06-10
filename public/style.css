@@ -715,6 +715,42 @@ body.waiting-mode #waitBanner { display: block; }
 .tag.sitout { background: #4a5a6d; color: #cfe0f0; }
 .seat.sitting-out .seat-inner { opacity: .5; filter: grayscale(.4); }
 
+/* ---------- 타임아웃 임박 전체 화면 빨간 경고 (클릭은 통과) ---------- */
+body.time-critical::after {
+  content: ''; position: fixed; inset: 0; z-index: 120; pointer-events: none;
+  background: rgba(226,40,40,.18);
+  box-shadow: inset 0 0 110px 26px rgba(226,40,40,.6);
+  animation: timeAlertPulse 1s ease-in-out infinite;
+}
+body.time-critical-strong::after {
+  background: rgba(226,40,40,.28);
+  box-shadow: inset 0 0 150px 44px rgba(226,40,40,.85);
+  animation-duration: .5s;
+}
+@keyframes timeAlertPulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+
+/* 시간 단축 패널티 태그 */
+.tag.short { background: #b5462b; color: #ffe1d6; }
+
+/* ---------- 게임 중 합류: 좌석 등장 애니 + 토스트 ---------- */
+.seat.seat-joining { animation: seatJoinIn .6s cubic-bezier(.2,.8,.3,1.5); z-index: 7; }
+@keyframes seatJoinIn {
+  0%   { transform: translate(-50%,-50%) scale(0); opacity: 0; }
+  55%  { transform: translate(-50%,-50%) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+}
+.seat.seat-joining .seat-inner {
+  border-color: var(--green) !important;
+  box-shadow: 0 0 26px 5px rgba(62,201,122,.9);
+  animation: joinGlow 1.2s ease 2;
+}
+@keyframes joinGlow {
+  0%,100% { box-shadow: 0 0 10px 1px rgba(62,201,122,.5); }
+  50% { box-shadow: 0 0 30px 7px rgba(62,201,122,1); }
+}
+.join-toast { top: 92px; border-color: #2f6f4a; }
+.join-toast .join-label { color: var(--green); font-weight: 700; margin-right: 6px; }
+
 /* 빈 좌석의 + 버튼 (방장만) */
 .wait-seat.empty .seat-add {
   margin: 0 auto; width: 46px; height: 46px; border-radius: 50%;
