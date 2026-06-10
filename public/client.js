@@ -387,38 +387,47 @@ function chipMap(s) {
   return m;
 }
 
-// 팟 칩 더미: 팟 크기에 비례해 칩 개수 계산 후 컬럼으로 쌓기
-const CHIP_COLORS = ['#e25555', '#3ec97a', '#4a8cff', '#2b2f36', '#e8c466', '#9b59b6'];
-function potChipCount(pot) {
-  if (pot <= 0) return 0;
-  return Math.min(30, Math.max(1, Math.round(pot / 25)));
+// 팟 칩 더미: 가치별 칩으로 분해 (검정 10, 빨강 5, 녹색 1)
+const POT_DENOM = [[10, '#23262d'], [5, '#e25555'], [1, '#3ec97a']];
+const DENOM_CAP = 12; // 가치별 시각적 칩 상한
+function potChips(pot) {
+  const chips = [];
+  let amt = pot;
+  for (const [v, color] of POT_DENOM) {
+    let c = Math.floor(amt / v);
+    amt -= c * v;
+    c = Math.min(c, DENOM_CAP);
+    for (let i = 0; i < c; i++) chips.push(color);
+  }
+  return chips;
 }
+function potChipCount(pot) { return pot > 0 ? potChips(pot).length : 0; }
 function renderPotStack(s) {
   const el = $('potStack');
   el.innerHTML = '';
-  const count = potChipCount(s.pot);
-  if (!count) return;
-  const perCol = 6;
-  const cols = Math.ceil(count / perCol);
-  let idx = 0;
-  for (let c = 0; c < cols; c++) {
+  const chips = potChips(s.pot);
+  if (!chips.length) return;
+  let idx = 0, i = 0;
+  while (i < chips.length) {
+    const color = chips[i];
     const col = document.createElement('div');
     col.className = 'chip-col';
-    const n = Math.min(perCol, count - c * perCol);
-    col.style.height = (n * 6 + 13) + 'px';
-    for (let r = 0; r < n; r++) {
+    let r = 0;
+    while (i < chips.length && chips[i] === color && r < 6) {
       const chip = document.createElement('div');
       chip.className = 'chip-s';
-      chip.style.bottom = (r * 6) + 'px';
-      chip.style.setProperty('--cc', CHIP_COLORS[(idx) % CHIP_COLORS.length]);
+      chip.style.bottom = (r * 5) + 'px';
+      chip.style.setProperty('--cc', color);
       chip.style.zIndex = r;
       if (idx >= _potChipsFrom) {
         chip.classList.add('drop');
         chip.style.animationDelay = ((idx - _potChipsFrom) * 0.04) + 's';
       }
       col.appendChild(chip);
-      idx++;
+      r++; i++; idx++;
     }
+    if (col.lastChild) col.lastChild.classList.add('top');
+    col.style.height = (r * 5 + 16) + 'px';
     el.appendChild(col);
   }
 }
