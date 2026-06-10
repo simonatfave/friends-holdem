@@ -572,7 +572,7 @@ function renderHole(p, seatIdx = 0) {
 function ovalPositions(n) {
   // 타원 둘레에 좌석 배치. index0 = 6시(아래 중앙)
   const out = [];
-  const cx = 50, cy = 49, rx = 46, ry = 37;
+  const cx = 50, cy = 49, rx = 48, ry = 37;
   for (let i = 0; i < n; i++) {
     const angle = Math.PI / 2 + (2 * Math.PI * i) / n; // 90도(아래)에서 시작
     out.push({

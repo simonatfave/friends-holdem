@@ -186,8 +186,8 @@ button { font-family: inherit; }
   position: relative;
   /* 화면 높이에 맞춰 크기 제한 → 좌석이 액션 영역을 침범하지 않음 */
   width: auto;
-  height: min(56vh, 58vw, 540px);
-  aspect-ratio: 16 / 10;
+  height: min(56vh, 52vw, 520px);
+  aspect-ratio: 16 / 9;
   background: radial-gradient(ellipse at center, var(--felt), var(--felt-dark));
   border: 12px solid #5a3a22;
   border-radius: 50% / 38%;
@@ -195,7 +195,7 @@ button { font-family: inherit; }
 }
 .community {
   position: absolute; top: 31%; left: 50%; transform: translate(-50%,-50%);
-  display: flex; gap: 8px; max-width: 96%;
+  display: flex; gap: clamp(8px, calc(var(--cc-w) * 0.22), 18px); max-width: 97%;
 }
 .pot-display {
   position: absolute; top: 58%; left: 50%; transform: translateX(-50%);
