@@ -317,8 +317,8 @@ button { font-family: inherit; }
 }
 /* 내 좌석: 카드 크게(다른 좌석보다), 가로를 더 넓혀 비율 보정 */
 .seat.me-seat {
-  --hc-h: min(98px, 13vh, 15vw);
-  --hc-w: calc(var(--hc-h) * 0.84);
+  --hc-h: min(96px, 12.5vh, 15vw);
+  --hc-w: calc(var(--hc-h) * 0.92);
   transform: translate(-50%,-50%) scale(1);
   z-index: 6;
 }
