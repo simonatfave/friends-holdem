@@ -521,3 +521,30 @@ button { font-family: inherit; }
   .sidepanel { height: 64px; }
   .poker-table { aspect-ratio: 16 / 8.5; }
 }
+
+/* ---------- 데스크톱: 로그·채팅을 오른쪽 사이드바로 (게임 영역 확대) ---------- */
+@media (min-width: 860px) {
+  #game {
+    display: grid;
+    grid-template-columns: 1fr clamp(260px, 23vw, 360px);
+    grid-template-rows: auto 1fr auto auto;
+    grid-template-areas:
+      "topbar    side"
+      "table     side"
+      "actionbar side"
+      "emoji     side";
+    column-gap: 12px;
+  }
+  .topbar { grid-area: topbar; }
+  .table-wrap { grid-area: table; }
+  .actionbar { grid-area: actionbar; }
+  .emoji-bar { grid-area: emoji; }
+  .sidepanel {
+    grid-area: side; flex-direction: column; height: auto; min-height: 0; gap: 8px;
+  }
+  .sidepanel .log { flex: 1 1 35%; }
+  .sidepanel .chatbox { flex: 1 1 65%; }
+  /* 사이드바로 옮겨 확보된 세로 공간을 테이블이 채움 */
+  .poker-table { height: 100%; max-height: 600px; width: auto; max-width: 100%; }
+  .table-wrap { padding-bottom: 56px; }
+}
