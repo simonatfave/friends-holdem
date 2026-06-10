@@ -546,19 +546,22 @@ function renderSeats(s) {
   for (let i = 0; i < n; i++) {
     const p = players[(meIdx + i) % n];
     const pos = positions[i];
+    const isMe = p.id === myId;
     const seat = document.createElement('div');
     seat.className = 'seat';
     seat.dataset.pid = p.id;
     if (p.isToAct) seat.classList.add('active');
-    if (p.isToAct && p.id === myId) seat.classList.add('myturn');
+    if (p.isToAct && isMe) seat.classList.add('myturn');
+    if (isMe) seat.classList.add('me-seat'); // 내 카드 크게 표시
     if (p.folded) seat.classList.add('folded');
     if (p.eliminated) seat.classList.add('eliminated');
     if (!p.connected && !p.isBot && !p.eliminated) seat.classList.add('disconnected');
     const isWinner = s.results && s.phase === 'handComplete' &&
       s.results.awards?.some((a) => a.winners.some((w) => w.id === p.id));
     if (isWinner) seat.classList.add('winner');
-    seat.style.left = pos.x + '%';
-    seat.style.top = pos.y + '%';
+    // 내 좌석은 더 아래에 배치(큰 카드가 팟을 침범하지 않게)
+    seat.style.left = (isMe ? 50 : pos.x) + '%';
+    seat.style.top = (isMe ? 88 : pos.y) + '%';
 
     const result = s.results?.reveal?.find((r) => r.id === p.id);
     seat.innerHTML = `
