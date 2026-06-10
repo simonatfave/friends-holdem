@@ -189,6 +189,11 @@ function driveRunout(code) {
   const g = room.game;
   if (!g.hand || g.hand.phase !== 'runout') return;
   if (room.runoutTimer) return; // 이미 진행 중
+  // 헤드업(2인) 올인이면 카드 공개를 훨씬 느리게 → 긴장감
+  const contenders = g.hand.seats.filter((s) => !g.hand.folded[s.id]).length;
+  const headsUp = contenders === 2;
+  const firstDelay = headsUp ? 1800 : 900;
+  const stepDelay = headsUp ? 2700 : 1100;
   const step = () => {
     room.runoutTimer = null;
     if (!rooms.has(code)) return;
@@ -197,9 +202,9 @@ function driveRunout(code) {
     const done = gg.runoutStep();
     broadcast(code);
     if (done) scheduleNextHand(code);
-    else room.runoutTimer = setTimeout(step, 1100);
+    else room.runoutTimer = setTimeout(step, stepDelay);
   };
-  room.runoutTimer = setTimeout(step, 900);
+  room.runoutTimer = setTimeout(step, firstDelay);
 }
 
 // 턴 시간 제한: 사람 차례에 마감시간 설정, 초과 시 자동 체크/폴드

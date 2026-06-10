@@ -826,14 +826,57 @@ body.time-critical-strong::after {
 
 /* ---------- 올인 승률(에쿼티) 배지 ---------- */
 .eq-badge {
-  position: absolute; top: -10px; right: -10px; z-index: 5;
-  background: #1b2330; border: 1.5px solid #4a5a6d; color: #cfe0f0;
-  font-size: 12px; font-weight: 800; padding: 2px 7px; border-radius: 11px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.45); min-width: 30px; text-align: center;
-  animation: eqPop .25s ease;
+  position: absolute; top: -16px; right: -14px; z-index: 9;
+  background: #1b2330; border: 2px solid #4a5a6d; color: #eaf2fb;
+  font-size: clamp(16px, calc(var(--hc-h) * 0.42), 28px); font-weight: 900;
+  padding: 3px 12px; border-radius: 15px; letter-spacing: .5px;
+  box-shadow: 0 3px 10px rgba(0,0,0,.55); min-width: 46px; text-align: center;
+  animation: eqPop .3s cubic-bezier(.2,.8,.3,1.4);
 }
-.eq-badge.lead { background: #14532b; border-color: var(--green); color: #b8ffd0; }
-@keyframes eqPop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.eq-badge.lead {
+  background: linear-gradient(180deg, #1f7d44, #14532b); border-color: var(--green); color: #c7ffdb;
+  box-shadow: 0 0 16px rgba(62,201,122,.7), 0 3px 10px rgba(0,0,0,.55);
+}
+@keyframes eqPop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ---------- 헤드업 올인 VS 배틀 연출 ---------- */
+#battleFx {
+  position: fixed; inset: 0; z-index: 170; display: none;
+  align-items: center; justify-content: center; gap: 3vw; overflow: hidden;
+  background: radial-gradient(circle at center, rgba(40,12,12,.9), rgba(6,8,12,.94));
+}
+#battleFx.show { display: flex; animation: battleFade 2.4s ease forwards; }
+@keyframes battleFade { 0% { opacity: 0; } 8% { opacity: 1; } 86% { opacity: 1; } 100% { opacity: 0; } }
+.battle-side { display: flex; flex-direction: column; align-items: center; gap: 10px; position: relative; z-index: 2; }
+.battle-side.left { animation: battleInL .55s cubic-bezier(.2,.8,.3,1.35); }
+.battle-side.right { animation: battleInR .55s cubic-bezier(.2,.8,.3,1.35); }
+.battle-cards { --cc-h: min(24vh, 30vw, 160px); display: flex; gap: 8px; }
+.battle-name { font-size: clamp(18px, 4.6vw, 32px); font-weight: 800; color: #fff; text-shadow: 0 2px 10px #000; }
+.battle-vs {
+  position: relative; z-index: 3;
+  font-size: clamp(56px, 16vw, 140px); font-weight: 900; color: #ffe9a8; letter-spacing: 4px;
+  text-shadow: 0 0 22px #e25555, 0 0 48px #e8c466, 0 6px 14px rgba(0,0,0,.7);
+  animation: vsClash 2.4s cubic-bezier(.2,.8,.3,1.5);
+}
+.battle-flash {
+  position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(circle at center, rgba(255,255,255,.55), transparent 42%);
+  opacity: 0; animation: battleFlash 2.4s ease;
+}
+@keyframes battleInL { from { transform: translateX(-75vw) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes battleInR { from { transform: translateX(75vw) rotate(12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes vsClash {
+  0% { transform: scale(0) rotate(-25deg); opacity: 0; }
+  28% { transform: scale(1.55) rotate(7deg); opacity: 1; }
+  44% { transform: scale(1) rotate(0); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+@keyframes battleFlash { 0%,100% { opacity: 0; } 30% { opacity: 1; } 52% { opacity: 0; } }
+@media (max-width: 640px) {
+  #battleFx { flex-direction: column; gap: 1.5vh; }
+  .battle-cards { --cc-h: min(17vh, 28vw, 130px); }
+}
 
 /* 빈 좌석의 + 버튼 (방장만) */
 .wait-seat.empty .seat-add {

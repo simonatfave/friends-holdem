@@ -633,6 +633,12 @@ function handleFx(s, prev) {
       sfxBust();
     }
   });
+
+  // 헤드업(2인) 올인 성립 → 아주 특별한 VS 배틀 연출
+  if (s.phase === 'runout' && prev.phase !== 'runout') {
+    const conts = s.players.filter((p) => s.equity && s.equity[p.id] != null);
+    if (conts.length === 2) showHeadsUpBattle(conts[0], conts[1]);
+  }
 }
 
 // 올인 전체화면 연출
@@ -654,6 +660,22 @@ function showBustToast(name) {
   t.classList.add('show');
   clearTimeout(_bustTimer);
   _bustTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// 헤드업 올인 VS 배틀 전체화면 연출
+let _battleTimer = null;
+function showHeadsUpBattle(a, b) {
+  let ov = document.getElementById('battleFx');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'battleFx'; document.body.appendChild(ov); }
+  const side = (p, cls) => `<div class="battle-side ${cls}">
+      <div class="battle-name">${esc(p.name)}</div>
+      <div class="battle-cards">${(p.hole || []).filter((c) => !c.hidden).map(peekCardBig).join('')}</div>
+    </div>`;
+  ov.innerHTML = `${side(a, 'left')}<div class="battle-vs">VS</div>${side(b, 'right')}<div class="battle-flash"></div>`;
+  ov.classList.remove('show'); void ov.offsetWidth; ov.classList.add('show');
+  sfxAllIn();
+  clearTimeout(_battleTimer);
+  _battleTimer = setTimeout(() => ov.classList.remove('show'), 2400);
 }
 
 // 지난 핸드 요약 토스트
