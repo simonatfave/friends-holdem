@@ -644,8 +644,11 @@ function handleFx(s, prev) {
 // 올인 전체화면 연출
 let _allinTimer = null;
 function showAllInFx(name) {
+  // 화면 전체가 아니라 '게임 테이블' 중앙에 표시
+  const host = document.querySelector('.poker-table') || document.body;
   let ov = document.getElementById('allinFx');
-  if (!ov) { ov = document.createElement('div'); ov.id = 'allinFx'; document.body.appendChild(ov); }
+  if (!ov) { ov = document.createElement('div'); ov.id = 'allinFx'; }
+  if (ov.parentElement !== host) host.appendChild(ov);
   ov.innerHTML = `<span class="allin-ring"></span><div class="allin-text"><div class="big">ALL-IN</div><div class="who">${esc(name)}</div></div>`;
   ov.classList.remove('show'); void ov.offsetWidth; ov.classList.add('show');
   clearTimeout(_allinTimer);

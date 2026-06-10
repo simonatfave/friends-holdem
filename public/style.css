@@ -753,8 +753,9 @@ body.time-critical-strong::after {
 
 /* ---------- 올인 강렬 연출 (전체화면 충격파 + 텍스트) ---------- */
 #allinFx {
-  position: fixed; inset: 0; z-index: 160; pointer-events: none;
-  display: none; align-items: center; justify-content: center; overflow: hidden;
+  /* 게임 테이블(.poker-table) 안에 들어가 테이블 중앙에 표시 */
+  position: absolute; inset: 0; z-index: 40; pointer-events: none;
+  display: none; align-items: center; justify-content: center; overflow: visible;
 }
 #allinFx.show { display: flex; }
 #allinFx::before { /* 화면 플래시 */
