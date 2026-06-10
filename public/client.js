@@ -12,6 +12,14 @@ const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
 
+// 배포 버전 표시 (client.js?v=NN 에서 자동 추출)
+(function showVersion() {
+  const s = document.querySelector('script[src*="client.js"]');
+  const m = s && s.src.match(/[?&]v=(\d+)/);
+  const el = $('versionBadge');
+  if (el) el.textContent = 'v.' + (m ? m[1] : '?');
+})();
+
 // ---------- 효과음 (Web Audio, 에셋 없이 생성) + 설정 ----------
 function loadSound() {
   try { return Object.assign({ master: true, turn: true, fx: true }, JSON.parse(localStorage.getItem('dice_sound') || '{}')); }
@@ -263,8 +271,9 @@ socket.on('state', (s) => {
   // 블라인드 상승 타이머 기준시각
   blindDeadline = (s.timedBlinds && s.secondsToNextLevel != null)
     ? Date.now() + s.secondsToNextLevel * 1000 : null;
-  if (!s.started) { renderWaiting(s); return; }
+  if (!s.started) { renderWaiting(s); $('versionBadge').classList.remove('hidden'); return; }
   hide('lobby'); hide('waiting'); show('game');
+  $('versionBadge').classList.add('hidden'); // 게임 중엔 숨김(시작 화면에만 표시)
   renderGame(s);
 });
 
