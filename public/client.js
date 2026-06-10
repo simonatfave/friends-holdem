@@ -520,6 +520,8 @@ function renderSeats(s) {
   seatsEl.innerHTML = '';
   const players = s.players;
   const n = players.length;
+  // 인원이 많을수록 좌석을 축소해 겹침 방지
+  seatsEl.style.setProperty('--seat-scale', n <= 4 ? '1' : n <= 6 ? '0.86' : '0.74');
   // 나를 맨 아래(6시 방향)에 배치
   const meIdx = Math.max(0, players.findIndex((p) => p.id === myId));
   const positions = ovalPositions(n);

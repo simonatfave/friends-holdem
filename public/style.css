@@ -194,11 +194,11 @@ button { font-family: inherit; }
   box-shadow: inset 0 0 60px rgba(0,0,0,.5), 0 18px 40px rgba(0,0,0,.5);
 }
 .community {
-  position: absolute; top: 31%; left: 50%; transform: translate(-50%,-50%);
+  position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%);
   display: flex; gap: clamp(8px, calc(var(--cc-w) * 0.22), 18px); max-width: 97%;
 }
 .pot-display {
-  position: absolute; top: 58%; left: 50%; transform: translateX(-50%);
+  position: absolute; top: 64%; left: 50%; transform: translateX(-50%);
   color: var(--gold); font-weight: 800; font-size: clamp(14px, calc(var(--hc-h) * 0.3), 19px);
   background: rgba(0,0,0,.4); padding: 4px clamp(12px, calc(var(--hc-h) * 0.28), 18px); border-radius: 14px; white-space: nowrap;
   z-index: 3;
@@ -207,7 +207,7 @@ button { font-family: inherit; }
 
 /* 중앙 팟 칩 더미 (팟 크기만큼 위로 쌓임) */
 .pot-stack {
-  position: absolute; left: 50%; top: 56%; transform: translate(-50%, -100%);
+  position: absolute; left: 50%; top: 62%; transform: translate(-50%, -100%);
   display: flex; align-items: flex-end; justify-content: center; gap: 7px;
   z-index: 2; pointer-events: none;
 }
@@ -302,8 +302,9 @@ button { font-family: inherit; }
 .card.muck { opacity: .35; }
 
 /* 좌석 */
+#seats { --seat-scale: 1; }
 .seat {
-  position: absolute; transform: translate(-50%,-50%);
+  position: absolute; transform: translate(-50%,-50%) scale(var(--seat-scale, 1));
   width: var(--seat-w); text-align: center;
 }
 .seat-inner {
