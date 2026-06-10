@@ -60,6 +60,8 @@ function tone(freq, dur, type = 'sine', vol = 0.15, when = 0) {
 const sfxDeal = () => { if (!soundSettings.fx) return; tone(520, 0.08, 'triangle', 0.12); tone(360, 0.08, 'triangle', 0.1, 0.04); };
 const sfxChip = () => { if (!soundSettings.fx) return; tone(900, 0.05, 'square', 0.07); tone(1250, 0.05, 'square', 0.05, 0.03); };
 const sfxWin = () => { if (!soundSettings.fx) return; [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.26, 'triangle', 0.13, i * 0.09)); };
+const sfxAllIn = () => { if (!soundSettings.fx) return; [180, 280, 400, 560, 820].forEach((f, i) => tone(f, 0.16, 'sawtooth', 0.11, i * 0.05)); tone(90, 0.55, 'sine', 0.2, 0.04); };
+const sfxBust = () => { if (!soundSettings.fx) return; [540, 410, 300, 200, 130].forEach((f, i) => tone(f, 0.2, 'triangle', 0.12, i * 0.08)); };
 const sfxFanfare = () => {
   if (!soundSettings.fx) return;
   const seq = [523, 659, 784, 1046, 988, 1046, 1318];
@@ -302,7 +304,8 @@ $('wbLeave').onclick = () => {
     document.body.classList.remove('waiting-mode');
     $('waitBanner').classList.add('hidden');
     lastState = null; prevSnap = null; myRoomCode = ''; isHost = false; isSpectator = false;
-    _seatSig = ''; _commSig = ''; _seenPlayerIds = new Set(); _playersInit = false; _recentJoiners.clear();
+    _seatSig = ''; _commSig = ''; _seenPlayerIds = new Set(); _playersInit = false;
+    _recentJoiners.clear(); _recentAllIn.clear(); _recentBust.clear();
     hide('game'); hide('waiting'); show('lobby');
   });
 };
@@ -506,6 +509,8 @@ function renderGame(s) {
     pot: s.pot,
     toActId: s.toActId,
     chips: chipMap(s),
+    allInIds: s.players.filter((p) => p.allIn).map((p) => p.id),
+    bustIds: s.players.filter((p) => p.eliminated).map((p) => p.id),
   };
 
   if (s.finished && s.finalResults) renderFinal(s);
@@ -609,6 +614,46 @@ function handleFx(s, prev) {
       `${a.winners.map((w) => esc(w.name)).join(', ')} +${a.amount}${a.handName ? ' · ' + esc(a.handName) : ''}`
     ).join(' / ');
   }
+
+  // 올인 전환 감지 → 강렬 연출
+  const prevAllIn = new Set(prev.allInIds || []);
+  s.players.forEach((p) => {
+    if (p.allIn && !prevAllIn.has(p.id)) {
+      _recentAllIn.set(p.id, Date.now() + 1500);
+      showAllInFx(p.name);
+      sfxAllIn();
+    }
+  });
+  // 칩 소진(탈락) 전환 감지 → 탈락 연출
+  const prevBust = new Set(prev.bustIds || []);
+  s.players.forEach((p) => {
+    if (p.eliminated && !prevBust.has(p.id)) {
+      _recentBust.set(p.id, Date.now() + 2000);
+      showBustToast(p.name);
+      sfxBust();
+    }
+  });
+}
+
+// 올인 전체화면 연출
+let _allinTimer = null;
+function showAllInFx(name) {
+  let ov = document.getElementById('allinFx');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'allinFx'; document.body.appendChild(ov); }
+  ov.innerHTML = `<span class="allin-ring"></span><div class="allin-text"><div class="big">ALL-IN</div><div class="who">${esc(name)}</div></div>`;
+  ov.classList.remove('show'); void ov.offsetWidth; ov.classList.add('show');
+  clearTimeout(_allinTimer);
+  _allinTimer = setTimeout(() => ov.classList.remove('show'), 1700);
+}
+// 탈락 토스트
+let _bustTimer = null;
+function showBustToast(name) {
+  let t = document.getElementById('bustToast');
+  if (!t) { t = document.createElement('div'); t.id = 'bustToast'; t.className = 'recap-toast bust-toast'; document.body.appendChild(t); }
+  t.innerHTML = `<span class="bust-label">💀 탈락</span> ${esc(name)} 님이 칩을 모두 잃었습니다`;
+  t.classList.add('show');
+  clearTimeout(_bustTimer);
+  _bustTimer = setTimeout(() => t.classList.remove('show'), 3500);
 }
 
 // 지난 핸드 요약 토스트
@@ -711,6 +756,8 @@ let _commSig = '';
 let _seenPlayerIds = new Set();
 let _playersInit = false;
 const _recentJoiners = new Map(); // id -> 애니 만료시각
+const _recentAllIn = new Map();   // id -> 올인 연출 만료시각
+const _recentBust = new Map();    // id -> 탈락 연출 만료시각
 function renderSeats(s) {
   const seatsEl = $('seats');
   const players = s.players;
@@ -786,6 +833,8 @@ function seatClasses(s, p, isMe) {
     + ((!p.connected && !p.isBot && !p.eliminated) ? ' disconnected' : '')
     + ((p.sittingOut && !p.eliminated) ? ' sitting-out' : '')
     + ((_recentJoiners.get(p.id) || 0) > Date.now() ? ' seat-joining' : '')
+    + ((_recentAllIn.get(p.id) || 0) > Date.now() ? ' allin-fx' : '')
+    + ((_recentBust.get(p.id) || 0) > Date.now() ? ' bust-fx' : '')
     + (isWinner ? ' winner' : '');
 }
 function updateSeatInPlace(seat, p) {

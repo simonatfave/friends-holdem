@@ -751,6 +751,79 @@ body.time-critical-strong::after {
 .join-toast { top: 92px; border-color: #2f6f4a; }
 .join-toast .join-label { color: var(--green); font-weight: 700; margin-right: 6px; }
 
+/* ---------- 올인 강렬 연출 (전체화면 충격파 + 텍스트) ---------- */
+#allinFx {
+  position: fixed; inset: 0; z-index: 160; pointer-events: none;
+  display: none; align-items: center; justify-content: center; overflow: hidden;
+}
+#allinFx.show { display: flex; }
+#allinFx::before { /* 화면 플래시 */
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at center, rgba(232,196,102,.4), rgba(226,40,40,.15) 45%, transparent 65%);
+  animation: allinFlash 1.7s ease forwards;
+}
+#allinFx .allin-ring {
+  position: absolute; width: 40px; height: 40px; border-radius: 50%;
+  border: 8px solid #e8c466; box-shadow: 0 0 40px #e25555;
+  animation: allinRing 1s cubic-bezier(.1,.7,.3,1) forwards;
+}
+#allinFx .allin-text { position: relative; text-align: center; }
+#allinFx .allin-text .big {
+  font-size: clamp(56px, 17vw, 150px); font-weight: 900; letter-spacing: 6px;
+  color: #ffe9a8; text-shadow: 0 0 18px #e25555, 0 0 42px #e8c466, 0 5px 12px rgba(0,0,0,.7);
+  animation: allinPunch 1.7s cubic-bezier(.2,.8,.3,1.5) forwards;
+}
+#allinFx .allin-text .who {
+  font-size: clamp(16px, 4.4vw, 28px); font-weight: 800; color: #fff;
+  margin-top: 4px; text-shadow: 0 2px 8px #000; opacity: 0;
+  animation: allinPunch 1.6s ease .1s forwards;
+}
+@keyframes allinPunch {
+  0%   { transform: scale(.2) rotate(-10deg); opacity: 0; }
+  22%  { transform: scale(1.3) rotate(4deg); opacity: 1; }
+  40%  { transform: scale(1) rotate(0); }
+  78%  { opacity: 1; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+@keyframes allinRing {
+  0%   { width: 40px; height: 40px; opacity: .95; border-width: 10px; }
+  100% { width: 150vmax; height: 150vmax; opacity: 0; border-width: 1px; }
+}
+@keyframes allinFlash { 0% { opacity: 0; } 14% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 올인한 좌석 폭발 글로우 */
+.seat.allin-fx { z-index: 8; }
+.seat.allin-fx .seat-inner {
+  border-color: #e25555 !important;
+  box-shadow: 0 0 32px 7px rgba(226,85,85,.95);
+  animation: allinSeat .6s ease 2;
+}
+@keyframes allinSeat {
+  0%,100% { transform: translateX(0) scale(1); }
+  20% { transform: translateX(-5px) scale(1.05); }
+  40% { transform: translateX(5px) scale(1.05); }
+  60% { transform: translateX(-4px) scale(1.02); }
+  80% { transform: translateX(3px) scale(1.02); }
+}
+
+/* ---------- 탈락(칩 소진) 연출 ---------- */
+.seat.bust-fx .seat-inner {
+  animation: bustHit .5s ease, bustFade 1.6s ease .5s forwards;
+  border-color: #e25555 !important;
+}
+@keyframes bustHit {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-6px) rotate(-3deg); }
+  45% { transform: translateX(6px) rotate(3deg); }
+  70% { transform: translateX(-4px) rotate(-1.5deg); }
+}
+@keyframes bustFade {
+  0% { box-shadow: 0 0 26px 5px rgba(226,85,85,.85); filter: none; opacity: 1; }
+  100% { box-shadow: none; filter: grayscale(1); opacity: .35; }
+}
+.bust-toast { top: 92px; border-color: #5b3a3a; }
+.bust-toast .bust-label { color: var(--red); font-weight: 800; margin-right: 6px; }
+
 /* 빈 좌석의 + 버튼 (방장만) */
 .wait-seat.empty .seat-add {
   margin: 0 auto; width: 46px; height: 46px; border-radius: 50%;
