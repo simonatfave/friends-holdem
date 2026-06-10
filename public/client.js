@@ -233,10 +233,11 @@ $('joinBtn').onclick = () => {
   });
 };
 
+let myRoomCode = '';
 function enterWaiting(code) {
+  myRoomCode = code;
   hide('lobby');
-  show('waiting');
-  $('roomCode').textContent = code;
+  // 별도 대기실 화면 대신, 게임 테이블이 '대기 모드'로 표시됨(state 수신 시 렌더)
 }
 
 $('copyCode').onclick = () => {
@@ -249,6 +250,16 @@ $('startBtn').onclick = () => {
   socket.emit('start', {}, (res) => {
     if (!res.ok) alert(res.error);
   });
+};
+
+// 대기 테이블 배너의 시작/복사 버튼
+$('wbStart').onclick = () => {
+  socket.emit('start', {}, (res) => { if (!res.ok) alert(res.error); });
+};
+$('wbCopy').onclick = () => {
+  navigator.clipboard?.writeText(myRoomCode);
+  $('wbCopy').textContent = '복사됨!';
+  setTimeout(() => ($('wbCopy').textContent = '복사'), 1500);
 };
 
 let currentBotCount = 0;
@@ -271,7 +282,8 @@ socket.on('state', (s) => {
   // 블라인드 상승 타이머 기준시각
   blindDeadline = (s.timedBlinds && s.secondsToNextLevel != null)
     ? Date.now() + s.secondsToNextLevel * 1000 : null;
-  if (!s.started) { renderWaiting(s); $('versionBadge').classList.remove('hidden'); return; }
+  if (!s.started) { renderWaitingTable(s); return; }
+  document.body.classList.remove('waiting-mode');
   hide('lobby'); hide('waiting'); show('game');
   $('versionBadge').classList.add('hidden'); // 게임 중엔 숨김(시작 화면에만 표시)
   renderGame(s);
@@ -322,31 +334,61 @@ socket.on('chat', ({ name, text }) => {
   box.scrollTop = box.scrollHeight;
 });
 
-function renderWaiting(s) {
-  const ul = $('waitingPlayers');
-  ul.innerHTML = '';
-  s.players.forEach((p, i) => {
-    const li = document.createElement('li');
-    const tag = p.id === myId ? '<span class="tag you">나</span>' : (p.isBot ? '<span class="tag">봇</span>' : '');
-    li.innerHTML = `<span>${esc(p.name)} ${tag}</span>` +
-      (i === 0 ? '<span class="host-tag">방장</span>' : '');
-    ul.appendChild(li);
-  });
+// ---------- 대기 모드: 게임 테이블을 그대로 띄우고 빈 자리에서 봇 추가 ----------
+function renderWaitingTable(s) {
+  document.body.classList.add('waiting-mode');
+  hide('lobby'); hide('waiting'); show('game');
+  $('versionBadge').classList.remove('hidden');
   isHost = s.players[0]?.id === myId;
-  currentBotCount = s.players.filter((p) => p.isBot).length;
-  currentHumanCount = s.players.filter((p) => !p.isBot).length;
-  $('startBtn').classList.toggle('hidden', !isHost);
+  const n = s.players.length;
+  // 상단 배너: 방 코드 / 시작 버튼 / 안내
+  $('wbCode').textContent = myRoomCode || '----';
+  $('wbStart').classList.toggle('hidden', !isHost);
+  $('wbStart').textContent = n <= 1 ? '혼자 시작 (봇 1명 자동)' : '게임 시작';
+  $('wbHint').textContent = !isHost
+    ? '방장이 게임을 시작하기를 기다리는 중...'
+    : '빈 자리의 +로 봇을 추가하거나, 친구가 방 코드로 참여할 수 있어요. 준비되면 시작하세요.';
+  renderWaitingSeats(s);
+}
 
-  $('botControl').classList.toggle('hidden', !isHost);
-  $('botCount').textContent = currentBotCount;
-  $('botMinus').disabled = currentBotCount <= 0;
-  $('botPlus').disabled = s.players.length >= 9;
-
-  $('waitHint').textContent = !isHost
-    ? '방장이 시작하기를 기다리는 중...'
-    : (s.players.length < 2
-      ? '봇 수를 정하거나, 혼자 시작하면 테스트 봇이 자동으로 1명 들어옵니다.'
-      : '준비되면 게임을 시작하세요.');
+function renderWaitingSeats(s) {
+  const seatsEl = $('seats');
+  seatsEl.innerHTML = '';
+  const TOTAL = 9; // 9-max 좌석을 모두 표시
+  seatsEl.style.setProperty('--seat-scale', '0.72');
+  const players = s.players;
+  const n = players.length;
+  const meIdx = Math.max(0, players.findIndex((p) => p.id === myId));
+  const positions = ovalPositions(TOTAL);
+  for (let i = 0; i < TOTAL; i++) {
+    const pos = positions[i];
+    const seat = document.createElement('div');
+    seat.className = 'seat wait-seat';
+    seat.style.left = pos.x + '%';
+    seat.style.top = pos.y + '%';
+    if (i < n) {
+      const p = players[(meIdx + i) % n];
+      const isMe = p.id === myId;
+      seat.innerHTML = `
+        <div class="seat-inner">
+          <div class="pname">${esc(p.name)} ${isMe ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''}</div>
+          <div class="pchips"><span class="chip-mini"></span><span class="amt">${p.chips}</span></div>
+          ${(isHost && p.isBot) ? `<button class="bot-x" data-bot="${esc(p.id)}" title="봇 제거">×</button>` : ''}
+        </div>`;
+    } else {
+      seat.classList.add('empty');
+      seat.innerHTML = isHost
+        ? '<button class="seat-add" title="봇 추가">+</button>'
+        : '<div class="seat-empty-ph">빈 자리</div>';
+    }
+    seatsEl.appendChild(seat);
+  }
+  seatsEl.querySelectorAll('.seat-add').forEach((b) => {
+    b.onclick = () => socket.emit('addBot', {}, (r) => { if (!r.ok) alert(r.error); });
+  });
+  seatsEl.querySelectorAll('.bot-x').forEach((b) => {
+    b.onclick = () => socket.emit('removeBot', { id: b.dataset.bot }, (r) => { if (!r.ok) alert(r.error); });
+  });
 }
 
 let _potChipsFrom = 0;

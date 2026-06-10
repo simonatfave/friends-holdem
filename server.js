@@ -267,6 +267,35 @@ io.on('connection', (socket) => {
     broadcast(roomCode);
   });
 
+  // 대기 테이블에서 빈 자리(+) 클릭 → 봇 1명 추가
+  socket.on('addBot', (_d, cb) => {
+    const room = rooms.get(roomCode);
+    if (!room) return cb?.({ ok: false, error: '방 없음' });
+    if (room.hostId !== playerId) return cb?.({ ok: false, error: '방장만 추가할 수 있습니다' });
+    const g = room.game;
+    if (g.started) return cb?.({ ok: false, error: '이미 시작됨' });
+    if (g.players.length >= 9) return cb?.({ ok: false, error: '자리가 가득 찼습니다 (최대 9명)' });
+    g.addPlayer('bot_' + Date.now() + '_' + Math.floor(Math.random() * 1000), '🤖 Bot', true);
+    g.players.filter((p) => p.isBot).forEach((b, idx) => { b.name = `🤖 Bot ${idx + 1}`; });
+    cb?.({ ok: true });
+    broadcast(roomCode);
+  });
+
+  // 대기 테이블에서 봇 자리(×) 클릭 → 해당 봇 제거
+  socket.on('removeBot', ({ id } = {}, cb) => {
+    const room = rooms.get(roomCode);
+    if (!room) return cb?.({ ok: false, error: '방 없음' });
+    if (room.hostId !== playerId) return cb?.({ ok: false, error: '방장만 제거할 수 있습니다' });
+    const g = room.game;
+    if (g.started) return cb?.({ ok: false, error: '이미 시작됨' });
+    const target = g.players.find((p) => p.id === id && p.isBot);
+    if (!target) return cb?.({ ok: false, error: '봇을 찾을 수 없습니다' });
+    g.players = g.players.filter((p) => p.id !== id);
+    g.players.filter((p) => p.isBot).forEach((b, idx) => { b.name = `🤖 Bot ${idx + 1}`; });
+    cb?.({ ok: true });
+    broadcast(roomCode);
+  });
+
   socket.on('action', ({ type, amount }, cb) => {
     const room = rooms.get(roomCode);
     if (!room) return cb?.({ ok: false, error: '방 없음' });
