@@ -807,12 +807,13 @@ function renderSeats(s) {
           ${p.isToAct ? '<div class="seat-timerbar"><div class="seat-timerbar-fill"></div></div>' : ''}
           <div class="phole">${renderHole(p, i)}</div>
           <div class="hand-result">${result ? esc(result.handName) : ''}</div>
+          ${seatEquityHtml(s, p)}
           ${p.bet > 0 ? `<div class="bet-chip">${p.bet}</div>` : ''}
         </div>`;
       seatsEl.appendChild(seat);
     } else {
       // 같은 핸드 내 베팅 갱신: DOM을 헐지 않고 변한 부분만 갱신(애니메이션 재생 방지)
-      updateSeatInPlace(seat, p);
+      updateSeatInPlace(seat, p, s);
     }
     seat.className = seatClasses(s, p, isMe);
   }
@@ -837,9 +838,24 @@ function seatClasses(s, p, isMe) {
     + ((_recentBust.get(p.id) || 0) > Date.now() ? ' bust-fx' : '')
     + (isWinner ? ' winner' : '');
 }
-function updateSeatInPlace(seat, p) {
+function seatEquityHtml(s, p) {
+  if (!s.equity || p.folded || s.equity[p.id] == null) return '';
+  const v = s.equity[p.id];
+  return `<div class="eq-badge${v >= 50 ? ' lead' : ''}">${v}%</div>`;
+}
+function updateSeatInPlace(seat, p, s) {
   const inner = seat.querySelector('.seat-inner');
   if (!inner) return;
+  // 올인 승률 배지 갱신(런아웃 중 보드가 바뀌면 값 변경)
+  let eq = inner.querySelector('.eq-badge');
+  const eqVal = (s && s.equity && !p.folded) ? s.equity[p.id] : null;
+  if (eqVal != null) {
+    if (!eq) { eq = document.createElement('div'); eq.className = 'eq-badge'; inner.appendChild(eq); }
+    eq.textContent = eqVal + '%';
+    eq.classList.toggle('lead', eqVal >= 50);
+  } else if (eq) {
+    eq.remove();
+  }
   // 이름/태그(올인·끊김) — 애니메이션 없음
   const pname = inner.querySelector('.pname');
   if (pname) pname.innerHTML = seatNameTags(p);

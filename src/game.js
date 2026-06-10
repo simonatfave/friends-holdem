@@ -435,6 +435,7 @@ export class Game {
     h.runout = true;
     h.revealAll = true;
     h.phase = 'runout';
+    h.equity = this.computeEquity(); // 올인 시점 승률
   }
 
   // 런아웃 한 단계 진행 (서버가 딜레이를 두고 반복 호출). 끝나면 true.
@@ -443,6 +444,7 @@ export class Game {
     if (!h) return true;
     if (h.community.length >= 5) {
       h.phase = 'showdown';
+      h.equity = null;
       this.doShowdown();
       return true;
     }
@@ -455,7 +457,126 @@ export class Game {
       h.community.push(h.deck.pop());
       this.pushLog(`-- ${h.community.length === 4 ? '턴' : '리버'} (올인) --`);
     }
+    h.equity = this.computeEquity(); // 보드가 바뀔 때마다 승률 갱신
     return false;
+  }
+
+  // 올인 런아웃 승률(에쿼티) 계산: 남은 컨텐더들의 승리 확률(%)
+  computeEquity() {
+    const h = this.hand;
+    if (!h) return null;
+    const contenders = h.seats.filter((s) => !h.folded[s.id]);
+    if (contenders.length < 2) return null;
+    const toCome = 5 - h.community.length;
+    const key = (c) => c.r * 4 + c.s;
+    const known = new Set();
+    for (const s of h.seats) for (const c of (h.holes[s.id] || [])) known.add(key(c));
+    for (const c of h.community) known.add(key(c));
+    const pool = [];
+    for (let su = 0; su < 4; su++) for (let r = 2; r <= 14; r++) {
+      if (!known.has(r * 4 + su)) pool.push({ r, s: su });
+    }
+    const wins = {};
+    contenders.forEach((s) => (wins[s.id] = 0));
+    let trials = 0;
+    const evalBoard = (extra) => {
+      const board = h.community.concat(extra);
+      let bestScore = null;
+      let bestIds = [];
+      for (const s of contenders) {
+        const sc = evaluate7(h.holes[s.id].concat(board));
+        const cmp = bestScore ? compareScore(sc, bestScore) : 1;
+        if (cmp > 0) { bestScore = sc; bestIds = [s.id]; }
+        else if (cmp === 0) bestIds.push(s.id);
+      }
+      const share = 1 / bestIds.length;
+      for (const id of bestIds) wins[id] += share;
+      trials++;
+    };
+    if (toCome <= 0) {
+      evalBoard([]);
+    } else {
+      const comb = (n, k) => { let c = 1; for (let i = 0; i < k; i++) c = (c * (n - i)) / (i + 1); return c; };
+      if (comb(pool.length, toCome) <= 2600) {
+        // 완전 탐색 (남은 카드 1~2장)
+        const rec = (start, chosen) => {
+          if (chosen.length === toCome) { evalBoard(chosen); return; }
+          for (let i = start; i < pool.length; i++) { chosen.push(pool[i]); rec(i + 1, chosen); chosen.pop(); }
+        };
+        rec(0, []);
+      } else {
+        // 몬테카를로 샘플링
+        const N = 1800;
+        for (let t = 0; t < N; t++) {
+          const picked = [];
+          const used = new Set();
+          while (picked.length < toCome) {
+            const i = Math.floor(Math.random() * pool.length);
+            if (used.has(i)) continue;
+            used.add(i);
+            picked.push(pool[i]);
+          }
+          evalBoard(picked);
+        }
+      }
+    }
+    const eq = {};
+    for (const s of contenders) eq[s.id] = Math.round((wins[s.id] / trials) * 100);
+    return eq;
+  }
+
+  // ---------- 봇 의사결정 (핸드 강도 + 팟오즈 기반) ----------
+  preflopStrength(hole) {
+    if (!hole || hole.length < 2) return 0.3;
+    const [a, b] = hole;
+    const hi = Math.max(a.r, b.r), lo = Math.min(a.r, b.r);
+    const pair = a.r === b.r, suited = a.s === b.s, gap = hi - lo;
+    let s;
+    if (pair) {
+      s = 0.5 + ((hi - 2) / 12) * 0.5; // 22~AA → 0.5~1.0
+    } else {
+      s = ((hi - 2) / 12) * 0.45 + ((lo - 2) / 12) * 0.2;
+      if (suited) s += 0.08;
+      if (gap === 1) s += 0.06;
+      else if (gap === 2) s += 0.03;
+      else if (gap > 4) s -= 0.05;
+      if (hi === 14) s += 0.05;
+    }
+    return Math.max(0.05, Math.min(1, s));
+  }
+  postflopStrength(hole, community) {
+    const score = evaluate7(hole.concat(community));
+    const base = [0.18, 0.40, 0.55, 0.70, 0.82, 0.90, 0.95, 0.98, 1.0];
+    return base[score[0]] ?? 0.3;
+  }
+  botDecision(id) {
+    const h = this.hand;
+    const legal = this.legalActions(id);
+    if (!legal) return { type: 'fold' };
+    const check = legal.find((a) => a.type === 'check');
+    const call = legal.find((a) => a.type === 'call');
+    const raise = legal.find((a) => a.type === 'raise' || a.type === 'bet');
+    const toCall = call ? call.amount : 0;
+    const pot = Math.max(1, h.pot || 1);
+    const strength = h.community.length === 0
+      ? this.preflopStrength(h.holes[id])
+      : this.postflopStrength(h.holes[id], h.community);
+    const rnd = Math.random();
+    const potOdds = toCall > 0 ? toCall / (pot + toCall) : 0;
+    const clampRaise = (frac) => Math.min(raise.max, Math.max(raise.min, Math.round(pot * frac)));
+    if (check) {
+      // 베팅 없음: 강하면 밸류벳, 가끔 블러프
+      if (raise && (strength > 0.62 || rnd < 0.08)) return { type: 'raise', amount: clampRaise(strength > 0.8 ? 0.75 : 0.5) };
+      return { type: 'check' };
+    }
+    // 베팅에 직면
+    if (raise && strength > 0.8 && rnd < 0.7) return { type: 'raise', amount: clampRaise(0.7) };
+    if (call) {
+      if (strength >= potOdds + 0.08 || (strength > 0.45 && potOdds < 0.3)) return { type: 'call' };
+      if (rnd < 0.1 && potOdds < 0.25) return { type: 'call' }; // 가끔 콜
+      return { type: 'fold' };
+    }
+    return { type: 'fold' };
   }
 
   // ---------- 쇼다운 & 사이드팟 ----------
@@ -680,6 +801,7 @@ export class Game {
       timedBlinds: this.levelDurationSec > 0,
       secondsToNextLevel,
       runout: !!h?.runout,
+      equity: h?.equity ?? null,
       pot: h?.pot ?? 0,
       community: h?.community ?? [],
       phase: h?.phase ?? null,

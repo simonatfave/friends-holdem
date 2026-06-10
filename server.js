@@ -258,15 +258,7 @@ function maybeBotAct(code) {
     if (!rooms.has(code)) return;
     const legal = g.legalActions(seat.id);
     if (!legal) return;
-    const check = legal.find((a) => a.type === 'check');
-    const call = legal.find((a) => a.type === 'call');
-    const raise = legal.find((a) => a.type === 'raise' || a.type === 'bet');
-    const r = Math.random();
-    let action;
-    if (raise && r < 0.12) action = { type: 'raise', amount: raise.min };
-    else if (check) action = { type: 'check' };
-    else if (call) action = { type: 'call' };
-    else action = { type: 'fold' };
+    const action = g.botDecision(seat.id); // 핸드 강도·팟오즈 기반 의사결정
     const res = g.handleAction(seat.id, action.type, action.amount);
     if (res.ok) {
       startActionTimer(code);
