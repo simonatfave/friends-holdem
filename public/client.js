@@ -633,17 +633,24 @@ function renderActions(s) {
     };
     slider.oninput = () => setVal(slider.value);
 
-    const pot = s.pot;
+    // 팟 기준 베팅 금액 계산 (콜 후 팟 대비 비율)
+    const myBet = me.bet || 0;
+    const toCall = callAct ? callAct.amount : 0;
+    const currentBet = myBet + toCall;
+    const potAfterCall = s.pot + toCall;
+    const potBet = (frac) => Math.max(min, Math.min(max, currentBet + Math.round(frac * potAfterCall)));
+
+    // ½팟 / ⅔팟 / 팟 — 누르면 즉시 레이즈
     const quick = document.createElement('div');
     quick.className = 'quick-bets';
-    quick.appendChild(qbtn('½팟', () => setVal(pot * 0.5)));
-    quick.appendChild(qbtn('팟', () => setVal(pot)));
-    quick.appendChild(qbtn('올인', () => setVal(max)));
+    quick.appendChild(qbtn('½팟', () => act('raise', potBet(0.5))));
+    quick.appendChild(qbtn('⅔팟', () => act('raise', potBet(2 / 3))));
+    quick.appendChild(qbtn('팟', () => act('raise', potBet(1))));
 
     raiseRow.appendChild(quick);
     raiseRow.appendChild(slider);
     raiseRow.appendChild(amt);
-    mainRow.appendChild(goBtn);
+    mainRow.appendChild(goBtn); // 레이즈 버튼: 슬라이더로 금액 조절 후 사용
   } else {
     raiseRow.classList.add('empty'); // 공간만 유지
   }
