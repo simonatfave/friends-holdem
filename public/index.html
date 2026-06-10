@@ -11,11 +11,32 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=25" />
+  <link rel="stylesheet" href="style.css?v=27" />
 </head>
 <body>
+  <!-- 입장 비밀번호 게이트 -->
+  <div id="gate" class="screen">
+    <div class="lobby-card">
+      <div class="brand-logo">
+        <svg viewBox="0 0 340 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DICE">
+          <rect x="6" y="14" width="68" height="68" rx="16" fill="#e8c466"/>
+          <circle cx="26" cy="34" r="6.5" fill="#14181f"/>
+          <circle cx="54" cy="34" r="6.5" fill="#14181f"/>
+          <circle cx="40" cy="48" r="6.5" fill="#14181f"/>
+          <circle cx="26" cy="62" r="6.5" fill="#14181f"/>
+          <circle cx="54" cy="62" r="6.5" fill="#14181f"/>
+          <text x="92" y="67" font-family="-apple-system,Segoe UI,sans-serif" font-size="58" font-weight="800" fill="#e8c466" letter-spacing="3">DICE</text>
+        </svg>
+      </div>
+      <p class="sub">입장하려면 비밀번호를 입력하세요</p>
+      <input id="gatePw" type="password" inputmode="numeric" autocomplete="off" placeholder="비밀번호" maxlength="16" />
+      <button id="gateBtn" class="primary">입장</button>
+      <p id="gateError" class="error"></p>
+    </div>
+  </div>
+
   <!-- 로비 화면 -->
-  <div id="lobby" class="screen">
+  <div id="lobby" class="screen hidden">
     <div class="lobby-card">
       <div class="brand-logo">
         <svg viewBox="0 0 340 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DICE">
@@ -42,14 +63,16 @@
       <div id="createPane" class="pane">
         <div class="row">
           <div>
+            <label>시작 블라인드(BB)</label>
+            <input id="startBB" type="number" value="2" min="2" max="100" step="1" />
+          </div>
+          <div>
             <label>블라인드 상승(분)</label>
             <input id="levelMinutes" type="number" value="3" min="1" max="60" />
           </div>
-          <div>
-            <label>행동 제한(초, 0=무제한)</label>
-            <input id="actionSeconds" type="number" value="25" min="0" max="120" />
-          </div>
         </div>
+        <label>턴 제한시간(초, 0=무제한)</label>
+        <input id="actionSeconds" type="number" value="25" min="0" max="120" />
         <p class="stack-info">시작 칩 ⚫20 · 🔴20 · 🟢20 <b>= 320</b></p>
         <button id="createBtn" class="primary">방 만들기</button>
       </div>
@@ -161,6 +184,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=25"></script>
+  <script src="client.js?v=27"></script>
 </body>
 </html>

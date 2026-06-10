@@ -107,6 +107,23 @@ const isRedSuit = (s) => s === 1 || s === 2;
 const RANK_LBL = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A', 10: '10' };
 const rankLabel = (r) => RANK_LBL[r] || String(r);
 
+// ---------- 입장 비밀번호 게이트 ----------
+const GATE_PW = '0110';
+function openLobby() { hide('gate'); show('lobby'); setTimeout(() => $('nameInput') && $('nameInput').focus(), 50); }
+function submitGate() {
+  if ($('gatePw').value.trim() === GATE_PW) {
+    try { sessionStorage.setItem('dice_auth', '1'); } catch (e) {}
+    openLobby();
+  } else {
+    $('gateError').textContent = '비밀번호가 올바르지 않습니다';
+    $('gatePw').value = '';
+    $('gatePw').focus();
+  }
+}
+$('gateBtn').onclick = submitGate;
+$('gatePw').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitGate(); });
+try { if (sessionStorage.getItem('dice_auth') === '1') openLobby(); else $('gatePw').focus(); } catch (e) { $('gatePw').focus(); }
+
 // ---------- 로비 탭 ----------
 document.querySelectorAll('.tab').forEach((t) => {
   t.onclick = () => {
@@ -187,6 +204,7 @@ $('createBtn').onclick = () => {
     settings: {
       levelMinutes: $('levelMinutes').value,
       actionSeconds: $('actionSeconds').value,
+      startBB: $('startBB').value,
     },
   }, (res) => {
     if (!res.ok) return ($('lobbyError').textContent = res.error);

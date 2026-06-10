@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { Game } from './src/game.js';
+import { Game, defaultBlindSchedule } from './src/game.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -168,9 +168,23 @@ io.on('connection', (socket) => {
   socket.on('create', ({ name, settings }, cb) => {
     const code = makeRoomCode();
     const levelMinutes = clampInt(settings?.levelMinutes, 1, 60, 3);
+    // 방장이 정한 시작 빅블라인드로 블라인드 곡선 스케일
+    const startBB = clampInt(settings?.startBB, 2, 1000, 2);
+    const sb1 = Math.max(1, Math.round(startBB / 2));
+    const ratio = startBB / 2; // 기본 곡선 레벨1 BB=2 기준
+    const blindSchedule = defaultBlindSchedule().map((l, i) =>
+      i === 0
+        ? { sb: sb1, bb: startBB, ante: 0 }
+        : {
+            sb: Math.max(1, Math.round(l.sb * ratio)),
+            bb: Math.max(2, Math.round(l.bb * ratio)),
+            ante: Math.round(l.ante * ratio),
+          }
+    );
     const game = new Game({
       startingChips: 320, // 친목용: 블랙20·레드20·그린20 고정
       levelDurationSec: levelMinutes * 60, // 시간 기반 블라인드 상승
+      blindSchedule,
     });
     game.addPlayer(playerId, name);
     game.getPlayer(playerId).socketId = socket.id;
