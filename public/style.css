@@ -15,8 +15,8 @@
   --cc-h: min(118px, 15vh, 17vw);            /* 커뮤니티 카드 높이 */
   --cc-w: calc(var(--cc-h) * 0.71);
   --hc-h: min(64px, 8.4vh, 9.5vw);           /* 홀 카드 높이 */
-  --hc-w: calc(var(--hc-h) * 0.71);
-  --seat-w: calc(var(--hc-w) * 2 + 26px);
+  --hc-w: calc(var(--hc-h) * 0.714);          /* 카드 비율(5:7)과 일치 */
+  --seat-w: calc(var(--hc-w) * 2 + 32px);
 }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
@@ -274,6 +274,7 @@ button { font-family: inherit; }
 .card {
   /* 실제 포커 카드 비율(5:7 ≈ 0.714)로 고정. 높이만 정하고 가로는 비율로 자동 + 찌그러짐 방지 */
   height: var(--cc-h); width: auto; aspect-ratio: 5 / 7; flex-shrink: 0;
+  box-sizing: border-box;
   border-radius: 9px;
   background: linear-gradient(150deg, #ffffff 0%, #f3f1ea 100%);
   border: 1px solid rgba(0,0,0,.18);
@@ -315,7 +316,8 @@ button { font-family: inherit; }
 #seats { --seat-scale: 1; }
 .seat {
   position: absolute; transform: translate(-50%,-50%) scale(var(--seat-scale, 1));
-  width: var(--seat-w); text-align: center;
+  /* 좌석 폭을 각 좌석의 --hc-w로 직접 계산(내 좌석처럼 카드가 커지면 패널도 같이 커짐) */
+  width: calc(var(--hc-w) * 2 + 32px); text-align: center;
 }
 /* 내 좌석: 카드 크게(다른 좌석보다), 가로를 더 넓혀 비율 보정 */
 .seat.me-seat {
