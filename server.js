@@ -57,6 +57,7 @@ async function loadUsers() {
     try {
       const { rows } = await pool.query('SELECT data FROM accounts');
       for (const r of rows) { const a = r.data; users.set(a.nick.toLowerCase(), a); }
+      indexAllTokens();
       console.log(`DB 계정 ${users.size}개 로드`);
       return;
     } catch (e) { console.error('DB 계정 로드 실패:', e.message); }
@@ -65,6 +66,7 @@ async function loadUsers() {
     if (!existsSync(USERS_FILE)) return;
     const data = JSON.parse(readFileSync(USERS_FILE, 'utf8'));
     for (const u of data) users.set(u.nick.toLowerCase(), u);
+    indexAllTokens();
     console.log(`파일 계정 ${users.size}개 로드`);
   } catch (e) { console.error('계정 로드 실패:', e.message); }
 }
@@ -113,6 +115,16 @@ function profileOf(acc) {
 const AVATAR_MAX = 200000; // ~200KB
 function validAvatar(av) {
   return typeof av === 'string' && av.length <= AVATAR_MAX && /^data:image\/(png|jpeg|webp);base64,/.test(av);
+}
+// 로그인 세션 토큰: 재접속(네트워크 끊김·재배포)에도 로그인 유지. 계정에 저장되어 영구 보존
+const tokenIndex = new Map(); // token -> nickLower
+function indexAllTokens() {
+  for (const acc of users.values()) if (acc.loginToken) tokenIndex.set(acc.loginToken, acc.nick.toLowerCase());
+}
+function ensureToken(acc) {
+  if (!acc.loginToken) { acc.loginToken = randomBytes(18).toString('hex'); saveUser(acc); }
+  tokenIndex.set(acc.loginToken, acc.nick.toLowerCase());
+  return acc.loginToken;
 }
 
 // ---------- 방 관리 ----------
@@ -461,7 +473,7 @@ io.on('connection', (socket) => {
     saveUser(acc);
     socket.account = nick;
     userNames.set(socket.id, nick); broadcastOnline();
-    cb?.({ ok: true, profile: profileOf(acc) });
+    cb?.({ ok: true, profile: profileOf(acc), token: ensureToken(acc) });
   });
   socket.on('login', ({ nick, password } = {}, cb) => {
     nick = String(nick || '').trim();
@@ -469,7 +481,16 @@ io.on('connection', (socket) => {
     if (!acc || !verifyPw(acc, password)) return cb?.({ ok: false, error: '닉네임 또는 비밀번호가 올바르지 않습니다' });
     socket.account = acc.nick;
     userNames.set(socket.id, acc.nick); broadcastOnline();
-    cb?.({ ok: true, profile: profileOf(acc) });
+    cb?.({ ok: true, profile: profileOf(acc), token: ensureToken(acc) });
+  });
+  // 재접속 세션 복구: 토큰으로 로그인 상태 회복(비밀번호 재입력 없이)
+  socket.on('resume', ({ token } = {}, cb) => {
+    const nl = token && tokenIndex.get(token);
+    const acc = nl && users.get(nl);
+    if (!acc) return cb?.({ ok: false });
+    socket.account = acc.nick;
+    userNames.set(socket.id, acc.nick); broadcastOnline();
+    cb?.({ ok: true, profile: profileOf(acc), token: acc.loginToken });
   });
   socket.on('getProfile', (_d, cb) => {
     const acc = socket.account && users.get(socket.account.toLowerCase());
@@ -573,13 +594,23 @@ io.on('connection', (socket) => {
       }
       // 게임 진행 중 신규 합류 → 다음 핸드부터 참여
       if (game.finished) return cb?.({ ok: false, error: '이미 종료된 게임입니다' });
-      // 같은 이름이 이미 있으면(탈락 포함) 신규 참여 불가 → 재바이인 방지
-      if (game.players.some((p) => p.name === name)) {
-        return cb?.({ ok: false, error: '이미 참여 중이거나 탈락한 이름입니다. 다른 닉네임을 쓰세요' });
+      // 같은 이름이 살아있으면 중복 방지(탈락한 이름은 재참여 허용)
+      if (game.players.some((p) => p.name === name && !p.eliminated)) {
+        return cb?.({ ok: false, error: '이미 참여 중인 이름입니다. 다른 닉네임을 쓰세요' });
       }
-      if (game.players.length >= cap) return cb?.({ ok: false, error: '방이 가득 찼습니다. 관전만 가능합니다' });
+      // 활성(비탈락) 인원 기준으로 자리 판단 → 탈락으로 빈 자리는 새로 채울 수 있음
+      const activeCount = game.players.filter((p) => !p.eliminated).length;
+      if (activeCount >= cap) return cb?.({ ok: false, error: '활성 좌석이 가득 찼습니다. 관전만 가능합니다' });
       const btnId = game.players[game.button]?.id; // 좌석 정렬로 버튼 인덱스가 밀리지 않게 보존
-      game.addPlayer(playerId, name);
+      // cap 범위 내 빈 의자 확보(없으면 탈락자 1명을 제거해 의자 회수 — 순위는 이미 results에 기록됨)
+      const usedChairs = new Set(game.players.map((p) => p.chair));
+      let freeChair = null;
+      for (let c = 0; c < cap; c++) { if (!usedChairs.has(c)) { freeChair = c; break; } }
+      if (freeChair == null) {
+        const di = game.players.findIndex((p) => p.eliminated);
+        if (di >= 0) { freeChair = game.players[di].chair; game.players.splice(di, 1); }
+      }
+      game.addPlayer(playerId, name, false, freeChair);
       if (btnId != null) game.button = game.players.findIndex((p) => p.id === btnId);
       game.getPlayer(playerId).socketId = socket.id;
       roomCode = code;
@@ -698,12 +729,14 @@ io.on('connection', (socket) => {
       if (room.secret) continue; // 비밀방은 목록에 노출하지 않음(코드로만 입장)
       const g = room.game;
       const cap = room.maxPlayers || 9;
+      // 진행 중이면 탈락자를 제외한 활성 인원으로 자리 계산(탈락으로 빈 자리는 참여 가능)
+      const occupied = g.started ? g.players.filter((p) => !p.eliminated).length : g.players.length;
       list.push({
         code,
         humans: g.players.filter((p) => !p.isBot).length,
-        total: g.players.length,
+        total: occupied,
         maxPlayers: cap,
-        full: g.players.length >= cap,
+        full: occupied >= cap,
         started: g.started,
         finished: g.finished,
         handNumber: g.handNumber,

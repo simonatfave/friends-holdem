@@ -8,14 +8,42 @@ let prevSnap = null;        // 직전 상태 스냅샷 (애니메이션/사운�
 let _dealNewHand = false;   // 이번 렌더에서 홀카드 딜링 애니 적용?
 let _newCommFrom = 99;      // 이 인덱스부터의 커뮤니티 카드는 새 카드(플립 애니)
 
-// 서버 재시작/네트워크 끊김 후 자동 재접속 시, 진행 중이던 방에 다시 합류
+// 로그인 세션 토큰(재접속·새로고침에도 로그인 유지)
+let myToken = null;
+try { myToken = localStorage.getItem('dice_token') || null; } catch (e) {}
+function setToken(t) {
+  myToken = t || null;
+  try { t ? localStorage.setItem('dice_token', t) : localStorage.removeItem('dice_token'); } catch (e) {}
+}
+let _everConnected = false;
+// 접속/재접속 시: 토큰으로 세션 복구 → 진행 중이던 방 재합류
 socket.on('connect', () => {
-  if (myRoomCode && myName) {
-    socket.emit('join', { code: myRoomCode, name: myName }, (res) => {
-      if (res && res.ok) myId = res.youId;
+  if (myToken) {
+    socket.emit('resume', { token: myToken }, (res) => {
+      if (res && res.ok) {
+        setToken(res.token || myToken);
+        const onGate = $('gate') && !$('gate').classList.contains('hidden');
+        if (!myProfile || onGate) { onLoggedIn(res.profile); } // 새로고침/첫 진입 → 자동 로그인
+        else { myProfile = res.profile; updateMeDisplay(); }
+        if (myRoomCode && myName) socket.emit('join', { code: myRoomCode, name: myName }, (r) => { if (r && r.ok) myId = r.youId; });
+      } else {
+        setToken(null);
+        if (_everConnected) sessionLost(); // 복구 불가(첫 로드 제외) → 재로그인 안내
+      }
+      _everConnected = true;
     });
+  } else {
+    if (myRoomCode && myName) socket.emit('join', { code: myRoomCode, name: myName }, (res) => { if (res && res.ok) myId = res.youId; });
+    _everConnected = true;
   }
 });
+// 세션이 끊겨 복구 불가 → 알림 후 로그인 화면으로
+function sessionLost() {
+  setToken(null); myProfile = null; myName = ''; myRoomCode = '';
+  ['accountPanel', 'signupPanel', 'onlinePanel', 'settingsPanel', 'timerPopup', 'finalScreen', 'game', 'waiting', 'lobby'].forEach((id) => { try { hide(id); } catch (e) {} });
+  try { show('gate'); } catch (e) {}
+  alert('서버와의 연결이 끊겨 로그인 세션이 종료되었습니다. 다시 로그인해 주세요.');
+}
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
@@ -269,6 +297,7 @@ function doAuth(kind) {
   $('gateError').textContent = '';
   socket.emit(kind, { nick, password }, (res) => {
     if (!res || !res.ok) { $('gateError').textContent = (res && res.error) || '실패했습니다'; return; }
+    setToken(res.token);
     onLoggedIn(res.profile);
   });
 }
@@ -317,6 +346,7 @@ function submitSignup() {
   $('suError').textContent = '';
   socket.emit('signup', { nick, password: pw, avatar: suAvatar }, (res) => {
     if (!res || !res.ok) { $('suError').textContent = (res && res.error) || '가입에 실패했습니다'; return; }
+    setToken(res.token);
     hide('signupPanel');
     onLoggedIn(res.profile);
   });
@@ -506,10 +536,10 @@ function refreshRooms() {
       const btnWrap = document.createElement('div');
       btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
       if (!r.finished) {
-        if (!r.full) { // 자리 있으면 참여
+        if (!r.full) { // 자리 있으면 참여(진행 중이면 다음 핸드부터 중간 합류)
           const j = document.createElement('button');
-          j.className = 'join-btn'; j.textContent = '참여';
-          j.onclick = () => joinRoom(r.code);
+          j.className = 'join-btn'; j.textContent = r.started ? '중간 참여' : '참여';
+          j.onclick = () => joinRoom(r.code, r.started);
           btnWrap.appendChild(j);
         }
         if (r.started || r.full) { // 진행 중이거나 가득 찬 방은 관전
@@ -524,13 +554,18 @@ function refreshRooms() {
     });
   });
 }
-function joinRoom(code) {
+function joinRoom(code, started) {
   const name = getName(); if (!name) return;
   myName = name;
   socket.emit('join', { code, name }, (res) => {
     if (!res.ok) return ($('lobbyError').textContent = res.error);
     myId = res.youId;
     enterWaiting(code);
+    if (res.lateJoin || started) {
+      isSpectator = false;
+      // 다음 핸드부터 합류된다는 안내(게임 화면은 state 수신 시 자동 표시)
+      setTimeout(() => alert('진행 중인 게임에 합류했습니다. 다음 핸드부터 참여합니다.'), 200);
+    }
   });
 }
 function spectateRoom(code) {
@@ -624,9 +659,13 @@ function doLeaveToLobby(confirmMsg) {
     _seatSig = ''; _commSig = ''; _seenPlayerIds = new Set(); _playersInit = false;
     _recentJoiners.clear(); _recentAllIn.clear(); _recentBust.clear();
     $('leaveBtn').classList.add('hidden');
-    hide('game'); hide('waiting'); show('lobby'); showLobbyPane('home');
+    hide('finalScreen'); hide('game'); hide('waiting'); show('lobby'); showLobbyPane('home');
+    $('versionBadge').classList.remove('hidden');
+    if (myProfile) socket.emit('getProfile', {}, (r) => { if (r && r.ok) { myProfile = r.profile; updateMeDisplay(); } });
   });
 }
+// 최종 화면: '로비로 이동'(로그인 세션 유지, 새로고침 없음)
+$('finalToLobby').onclick = () => doLeaveToLobby();
 $('wbLeave').onclick = () => doLeaveToLobby('대기 중인 방에서 나갈까요?');
 $('leaveBtn').onclick = () => doLeaveToLobby(isSpectator ? '관전을 종료할까요?' : '방에서 나갈까요?');
 // 관전 중 게임 참여
