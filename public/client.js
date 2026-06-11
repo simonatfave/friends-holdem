@@ -64,9 +64,36 @@ function tone(freq, dur, type = 'sine', vol = 0.15, when = 0) {
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   o.start(t); o.stop(t + dur + 0.02);
 }
+// 화이트노이즈 버스트(필터+엔벨로프) — 실제 카드/칩 질감 합성
+function noise(dur, vol, when = 0, filterType = 'highpass', freq = 2000, q = 0) {
+  if (!soundSettings.master) return;
+  const c = ac(); if (!c) return;
+  const len = Math.max(1, Math.floor(c.sampleRate * dur));
+  const buf = c.createBuffer(1, len, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource(); src.buffer = buf;
+  const filt = c.createBiquadFilter(); filt.type = filterType; filt.frequency.value = freq; if (q) filt.Q.value = q;
+  const g = c.createGain();
+  const t = c.currentTime + when;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(filt); filt.connect(g); g.connect(c.destination);
+  src.start(t); src.stop(t + dur + 0.02);
+}
+// 칩 하나 부딪히는 소리(밴드패스 노이즈 + 짧은 금속 링)
+function chipClink(when = 0, vol = 0.09) {
+  noise(0.035, vol, when, 'bandpass', 2500 + Math.random() * 1500, 9);
+  tone(2200 + Math.random() * 1000, 0.028, 'triangle', vol * 0.3, when);
+}
+// 카드 한 장 '슥' 슬라이드(하이패스 노이즈 스위시)
+function cardFlick(when = 0, vol = 0.12) {
+  noise(0.09, vol, when, 'highpass', 1100 + Math.random() * 700, 0.7);
+}
 // fx 카테고리(카드·칩·승리)
-const sfxDeal = () => { if (!soundSettings.fx) return; tone(520, 0.08, 'triangle', 0.12); tone(360, 0.08, 'triangle', 0.1, 0.04); };
-const sfxChip = () => { if (!soundSettings.fx) return; tone(900, 0.05, 'square', 0.07); tone(1250, 0.05, 'square', 0.05, 0.03); };
+const sfxDeal = () => { if (!soundSettings.fx) return; cardFlick(0, 0.12); cardFlick(0.055, 0.085); };
+const sfxChip = () => { if (!soundSettings.fx) return; chipClink(0, 0.09); chipClink(0.045, 0.07); };
 const sfxWin = () => { if (!soundSettings.fx) return; [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.26, 'triangle', 0.13, i * 0.09)); };
 const sfxAllIn = () => { if (!soundSettings.fx) return; [180, 280, 400, 560, 820].forEach((f, i) => tone(f, 0.16, 'sawtooth', 0.11, i * 0.05)); tone(90, 0.55, 'sine', 0.2, 0.04); };
 const sfxBust = () => { if (!soundSettings.fx) return; [540, 410, 300, 200, 130].forEach((f, i) => tone(f, 0.2, 'triangle', 0.12, i * 0.08)); };
@@ -77,15 +104,15 @@ const sfxChipRiffle = (amount) => {
   const units = Math.max(0, amount) / bb;
   // 칩 개수↔길이: 약 0.4초(작은 베팅)~1초(큰 베팅)
   const n = Math.max(7, Math.min(18, Math.round(7 + units * 1.0)));
-  for (let i = 0; i < n; i++) tone(820 + Math.random() * 520, 0.05, 'square', 0.05, i * 0.055);
+  for (let i = 0; i < n; i++) chipClink(i * 0.052, 0.055 + Math.random() * 0.03);
 };
 // 핸드 종료 팟 수집 '차르륵' — 팟 크기 3단계(작음/중간/큼)로 길이 차등
 const sfxPotCollect = (amount) => {
   if (!soundSettings.fx) return;
   const bb = (lastState && lastState.blinds && lastState.blinds.bb) || 2;
   const units = Math.max(0, amount) / bb;
-  const n = units < 8 ? 6 : units < 24 ? 11 : 18;
-  for (let i = 0; i < n; i++) tone(780 + Math.random() * 560, 0.05, 'square', 0.058, i * 0.05);
+  const n = units < 8 ? 8 : units < 24 ? 14 : 22;
+  for (let i = 0; i < n; i++) chipClink(i * 0.046, 0.06 + Math.random() * 0.03);
 };
 const sfxFanfare = () => {
   if (!soundSettings.fx) return;
@@ -842,10 +869,13 @@ function renderSeats(s) {
   const players = s.players;
   const n = players.length;
   // 인원이 많을수록 좌석을 축소해 겹침 방지
-  seatsEl.style.setProperty('--seat-scale', n <= 4 ? '1' : n <= 6 ? '0.86' : '0.74');
-  // 나를 맨 아래(6시 방향)에 배치
+  // 인원 많을수록 더 적극적으로 축소 → 겹침 방지
+  seatsEl.style.setProperty('--seat-scale', n <= 3 ? '1' : n <= 5 ? '0.84' : n <= 7 ? '0.72' : '0.62');
+  seatsEl.style.setProperty('--me-scale', n <= 4 ? '1' : n <= 6 ? '0.9' : '0.8');
+  // 나를 맨 아래(6시 방향)에 배치, 나머지는 아래 중앙을 비운 위쪽 호에 균등 배치(겹침 방지)
+  const hasMe = players.some((p) => p.id === myId); // 관전자는 내 자리 없음
   const meIdx = Math.max(0, players.findIndex((p) => p.id === myId));
-  const positions = ovalPositions(n);
+  const opos = hasMe ? othersPositions(n - 1) : ovalPositions(n);
   // 게임 도중 새로 합류한 플레이어 감지 → 등장 애니 + 토스트
   const currentIds = players.map((p) => p.id);
   if (_playersInit) {
@@ -868,13 +898,13 @@ function renderSeats(s) {
 
   for (let i = 0; i < n; i++) {
     const p = players[(meIdx + i) % n];
-    const isMe = p.id === myId;
+    const isMe = hasMe && p.id === myId;
     let seat = full ? null : seatsEl.querySelector(`.seat[data-pid="${cssEsc(p.id)}"]`);
     if (!seat) {
       // 신규 생성(전체 재생성 또는 새 좌석)
       seat = document.createElement('div');
       seat.dataset.pid = p.id;
-      const pos = positions[i];
+      const pos = isMe ? null : (hasMe ? (opos[i - 1] || { x: 50, y: 20 }) : opos[i]);
       seat.style.left = (isMe ? 50 : pos.x) + '%';
       seat.style.top = (isMe ? 88 : pos.y) + '%';
       const result = s.results?.reveal?.find((r) => r.id === p.id);
@@ -990,9 +1020,26 @@ function ovalPositions(n) {
   return out;
 }
 
+// 내 자리(아래 중앙)를 비우고 나머지 k명을 위쪽 호에 균등 배치 → 큰 내 카드와 안 겹침
+function othersPositions(k) {
+  if (k <= 0) return [];
+  const mobile = window.innerWidth <= 640;
+  const cx = 50, cy = mobile ? 46 : 47;
+  const rx = mobile ? 41 : 48, ry = mobile ? 43 : 37;
+  const gap = 0.62; // 아래 중앙 양옆으로 비우는 반각(라디안)
+  const span = 2 * Math.PI - 2 * gap;
+  const out = [];
+  for (let j = 0; j < k; j++) {
+    const a = Math.PI / 2 + gap + span * ((j + 0.5) / k); // 아래 직후부터 시계방향으로 한 바퀴(아래 비움)
+    out.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
+  }
+  return out;
+}
+
 function renderActions(s) {
   const bar = $('actionbar');
   bar.innerHTML = '';
+  bar.classList.toggle('myturn', !!(s.legal && !s.finished && !s.paused)); // 내 차례 강조
   if (s.finished) return;
   if (s.paused) {
     bar.innerHTML = '<span class="waiting-turn">자리 비움으로 대기 중 — 인원이 모이면 자동 재개됩니다</span>';
@@ -1053,12 +1100,13 @@ function renderActions(s) {
     const potAfterCall = s.pot + toCall;
     const potBet = (frac) => Math.max(min, Math.min(max, currentBet + Math.round(frac * potAfterCall)));
 
-    // ½팟 / ⅔팟 / 팟 — 누르면 즉시 레이즈
+    // ½팟 / ⅔팟 / 팟 — 누르면 즉시 레이즈. 버튼에 베팅(레이즈 to) 금액 표시
     const quick = document.createElement('div');
     quick.className = 'quick-bets';
-    quick.appendChild(qbtn('½팟', () => act('raise', potBet(0.5))));
-    quick.appendChild(qbtn('⅔팟', () => act('raise', potBet(2 / 3))));
-    quick.appendChild(qbtn('팟', () => act('raise', potBet(1))));
+    quick.appendChild(qbtn('½팟', potBet(0.5), () => act('raise', potBet(0.5))));
+    quick.appendChild(qbtn('⅔팟', potBet(2 / 3), () => act('raise', potBet(2 / 3))));
+    quick.appendChild(qbtn('팟', potBet(1), () => act('raise', potBet(1))));
+    if (max > potBet(1)) quick.appendChild(qbtn('올인', max, () => act('raise', max)));
 
     raiseRow.appendChild(quick);
     raiseRow.appendChild(slider);
@@ -1077,8 +1125,12 @@ function btn(cls, label, fn) {
   b.className = cls; b.textContent = label; b.onclick = fn;
   return b;
 }
-function qbtn(label, fn) {
-  const b = document.createElement('button'); b.textContent = label; b.onclick = fn; return b;
+function qbtn(label, amount, fn) {
+  const b = document.createElement('button');
+  b.className = 'qb';
+  b.innerHTML = `<span class="qb-lbl">${label}</span><span class="qb-amt">${fmtAmt(amount)}</span>`;
+  b.onclick = fn;
+  return b;
 }
 
 function act(type, amount) {

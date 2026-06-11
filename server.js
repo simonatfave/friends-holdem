@@ -304,7 +304,7 @@ io.on('connection', (socket) => {
     });
     game.addPlayer(playerId, name);
     game.getPlayer(playerId).socketId = socket.id;
-    const actionSec = clampInt(settings?.actionSeconds, 0, 120, 25);
+    const actionSec = clampInt(settings?.actionSeconds, 0, 120, 10);
     rooms.set(code, { game, hostId: playerId, actionLimit: actionSec > 0 ? actionSec * 1000 : 0 });
     roomCode = code;
     socket.join(code);

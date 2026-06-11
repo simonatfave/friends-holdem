@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=49" />
+  <link rel="stylesheet" href="style.css?v=51" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -73,7 +73,7 @@
           </div>
         </div>
         <label>턴 제한시간(초, 0=무제한)</label>
-        <input id="actionSeconds" type="number" value="25" min="0" max="120" />
+        <input id="actionSeconds" type="number" value="10" min="0" max="120" />
         <p class="stack-info">시작 칩 ⚫20 · 🔴20 · 🟢20 <b>= 320</b></p>
         <button id="createBtn" class="primary">방 만들기</button>
       </div>
@@ -202,6 +202,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=49"></script>
+  <script src="client.js?v=51"></script>
 </body>
 </html>
