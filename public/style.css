@@ -1379,3 +1379,12 @@ body:not(.waiting-mode) .action-timer.hidden { display: block !important; visibi
 /* 상대 프로필 모달 */
 .opp-card { max-width: 340px; width: 90vw; }
 .lb-row:hover, .online-user:hover { filter: brightness(1.12); }
+
+/* 테이블 색상 테마 */
+body[data-theme=blue]     { --felt: #2b6fb0; --felt-dark: #173a5e; }
+body[data-theme=red]      { --felt: #a84242; --felt-dark: #5e1f1f; }
+body[data-theme=purple]   { --felt: #7a4ab0; --felt-dark: #3e2065; }
+body[data-theme=charcoal] { --felt: #46505e; --felt-dark: #232a33; }
+.theme-swatches { display: flex; gap: 6px; }
+.theme-swatches .sw { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #3a4756; cursor: pointer; padding: 0; }
+.theme-swatches .sw.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }

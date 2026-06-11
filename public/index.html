@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=76" />
+  <link rel="stylesheet" href="style.css?v=77" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -269,6 +269,7 @@
       <div class="wb-row">
         <span class="wb-code">방 코드 <b id="wbCode">----</b></span>
         <button id="wbCopy" class="ghost">복사</button>
+        <button id="wbInvite" class="ghost">🔗 초대링크</button>
       </div>
       <p id="wbHint" class="wb-hint"></p>
       <div class="wb-actions">
@@ -332,6 +333,15 @@
         <label class="toggle-row"><span>효과음(카드·칩·승리)</span><input type="checkbox" id="optFx" checked /></label>
         <label class="toggle-row"><span>연출 줄이기 (흔들림·딜링·이모지비 끄기)</span><input type="checkbox" id="optReduceMotion" /></label>
         <label class="toggle-row"><span>금액 BB 단위로 표시</span><input type="checkbox" id="optBBUnits" /></label>
+        <div class="toggle-row"><span>테이블 색상</span>
+          <span class="theme-swatches" id="themeSwatches">
+            <button type="button" class="sw" data-theme="green" style="background:#1f7a4d"></button>
+            <button type="button" class="sw" data-theme="blue" style="background:#2563a8"></button>
+            <button type="button" class="sw" data-theme="red" style="background:#9e3a3a"></button>
+            <button type="button" class="sw" data-theme="purple" style="background:#6a3a9e"></button>
+            <button type="button" class="sw" data-theme="charcoal" style="background:#3a4250"></button>
+          </span>
+        </div>
         <button id="settingsClose" class="primary">닫기</button>
       </div>
     </div>
@@ -350,7 +360,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="util.js?v=76"></script>
-  <script src="client.js?v=76"></script>
+  <script src="util.js?v=77"></script>
+  <script src="client.js?v=77"></script>
 </body>
 </html>

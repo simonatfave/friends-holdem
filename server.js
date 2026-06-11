@@ -145,6 +145,15 @@ function rateOk(key, ms) {
 // ---------- 방 관리 ----------
 const rooms = new Map(); // code -> { game, hostId, timer, settings }
 
+// 봇에게 줄 흔한 이름 풀(중복 안 되게 골라서 부여)
+const BOT_NAMES = ['데이빗', '빌리', '제임스', '마이크', '존', '토니', '케빈', '스티브', '크리스', '라이언', '제이크', '폴', '마크', '루크', '네이슨', '에릭', '샘', '조던', '대니', '오스카', '헨리', '레오', '맥스', '아담'];
+function botName(g) {
+  const used = new Set(g.players.filter((p) => p.isBot).map((p) => p.name.replace(/^🤖\s*/, '')));
+  const avail = BOT_NAMES.filter((n) => !used.has(n));
+  const pick = avail.length ? avail[Math.floor(Math.random() * avail.length)] : '봇' + Math.floor(Math.random() * 1000);
+  return '🤖 ' + pick;
+}
+
 function makeRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code;
@@ -411,7 +420,8 @@ function finalizeLeave(code, pid) {
   if (!room) return;
   const g = room.game;
   const btnId = g.players[g.button] ? g.players[g.button].id : null;
-  g.removePlayer(pid);
+  // 자진 퇴장은 시작 후에도 좌석에서 완전히 제거(removePlayer는 시작 후 connected=false만 하므로 직접 제거)
+  g.players = g.players.filter((x) => x.id !== pid);
   if (btnId != null && btnId !== pid) g.button = Math.max(0, g.players.findIndex((x) => x.id === btnId));
   if (room.hostId === pid && g.players.length) room.hostId = (g.players.find((x) => !x.isBot) || g.players[0]).id;
   if (g.players.filter((x) => !x.isBot).length === 0) { clearRoomTimers(room); rooms.delete(code); return; }
@@ -838,14 +848,12 @@ io.on('connection', (socket) => {
       const b = bots.pop();
       g.players = g.players.filter((p) => p.id !== b.id);
     }
-    // 부족분 추가
+    // 부족분 추가(흔한 이름 랜덤 부여)
     let i = 0;
     while (g.players.filter((p) => p.isBot).length < target) {
       i++;
-      g.addPlayer('bot_' + Date.now() + '_' + i, '🤖 Bot', true);
+      g.addPlayer('bot_' + Date.now() + '_' + i, botName(g), true);
     }
-    // 봇 번호 정리
-    g.players.filter((p) => p.isBot).forEach((b, idx) => { b.name = `🤖 Bot ${idx + 1}`; });
     cb?.({ ok: true, count: target });
     broadcast(roomCode);
   });
@@ -859,8 +867,7 @@ io.on('connection', (socket) => {
     if (g.started) return cb?.({ ok: false, error: '이미 시작됨' });
     if (g.players.length >= (room.maxPlayers || 9)) return cb?.({ ok: false, error: '자리가 가득 찼습니다' });
     const chair = (typeof seat === 'number') ? seat : null;
-    g.addPlayer('bot_' + Date.now() + '_' + Math.floor(Math.random() * 1000), '🤖 Bot', true, chair);
-    g.players.filter((p) => p.isBot).forEach((b, idx) => { b.name = `🤖 Bot ${idx + 1}`; });
+    g.addPlayer('bot_' + Date.now() + '_' + Math.floor(Math.random() * 1000), botName(g), true, chair);
     cb?.({ ok: true });
     broadcast(roomCode);
   });
@@ -875,7 +882,6 @@ io.on('connection', (socket) => {
     const target = g.players.find((p) => p.id === id && p.isBot);
     if (!target) return cb?.({ ok: false, error: '봇을 찾을 수 없습니다' });
     g.players = g.players.filter((p) => p.id !== id);
-    g.players.filter((p) => p.isBot).forEach((b, idx) => { b.name = `🤖 Bot ${idx + 1}`; });
     cb?.({ ok: true });
     broadcast(roomCode);
   });

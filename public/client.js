@@ -86,7 +86,7 @@ document.addEventListener('keydown', (e) => {
 // ---------- 효과음 (Web Audio, 에셋 없이 생성) + 설정 ----------
 function loadSound() {
   const prefRM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const base = { master: true, turn: true, fx: true, bbUnits: false, reduceMotion: prefRM, volume: 1 };
+  const base = { master: true, turn: true, fx: true, bbUnits: false, reduceMotion: prefRM, volume: 1, theme: 'green' };
   try { return Object.assign(base, JSON.parse(localStorage.getItem('dice_sound') || '{}')); }
   catch (e) { return base; }
 }
@@ -104,6 +104,8 @@ function fmtAmt(n) {
 function saveSound() { try { localStorage.setItem('dice_sound', JSON.stringify(soundSettings)); } catch (e) {} }
 const soundSettings = loadSound();
 applyMotionPref();
+function applyTheme() { document.body.dataset.theme = soundSettings.theme || 'green'; }
+applyTheme();
 let audioCtx = null;
 function ac() {
   if (!audioCtx) {
@@ -213,6 +215,16 @@ $('settingsBtn').onclick = () => {
   show('settingsPanel');
 };
 $('settingsClose').onclick = () => hide('settingsPanel');
+// 테이블 색상 테마
+if ($('themeSwatches')) {
+  $('themeSwatches').querySelectorAll('.sw').forEach((b) => {
+    b.classList.toggle('active', b.dataset.theme === (soundSettings.theme || 'green'));
+    b.onclick = () => {
+      soundSettings.theme = b.dataset.theme; saveSound(); applyTheme();
+      $('themeSwatches').querySelectorAll('.sw').forEach((x) => x.classList.toggle('active', x === b));
+    };
+  });
+}
 $('optMaster').onchange = (e) => { soundSettings.master = e.target.checked; saveSound(); syncMuteIcon(); };
 $('optTurn').onchange = (e) => { soundSettings.turn = e.target.checked; saveSound(); };
 $('optFx').onchange = (e) => { soundSettings.fx = e.target.checked; saveSound(); };
@@ -323,7 +335,31 @@ function emojiRain(emoji) {
 
 // ---------- 로그인 / 회원가입 / 계정 ----------
 let myProfile = null;
-function openLobby() { hide('gate'); show('lobby'); showLobbyPane('home'); }
+// 초대 링크로 들어온 경우 방 코드 파싱
+let _inviteCode = null;
+try {
+  const r = new URL(location.href).searchParams.get('room');
+  if (r) { _inviteCode = r.toUpperCase().slice(0, 8); history.replaceState({}, '', location.pathname); }
+} catch (e) {}
+function openLobby() {
+  hide('gate'); show('lobby'); showLobbyPane('home');
+  if (_inviteCode) { const c = _inviteCode; _inviteCode = null; setTimeout(() => tryInviteJoin(c), 200); }
+}
+// 초대 링크 자동 입장(진행 중/가득참이면 관전으로)
+function tryInviteJoin(code) {
+  if (!myName) return;
+  socket.emit('join', { code, name: myName }, (res) => {
+    if (res && res.ok) {
+      myId = res.youId; enterWaiting(code);
+      if (res.lateJoin) setTimeout(() => toast('진행 중인 게임에 합류했습니다. 다음 핸드부터 참여합니다.', 'ok'), 200);
+    } else {
+      socket.emit('spectate', { code, name: myName }, (r2) => {
+        if (r2 && r2.ok) { myId = r2.youId; isSpectator = true; myRoomCode = code; hide('lobby'); }
+        else toast('초대받은 방에 입장하지 못했습니다', 'error');
+      });
+    }
+  });
+}
 function updateMeDisplay() {
   if (!myProfile) return;
   $('meNick').textContent = myProfile.nick;
@@ -799,6 +835,20 @@ $('wbCopy').onclick = () => {
   $('wbCopy').textContent = '복사됨!';
   setTimeout(() => ($('wbCopy').textContent = '복사'), 1500);
 };
+$('wbInvite').onclick = () => {
+  const url = location.origin + location.pathname + '?room=' + encodeURIComponent(myRoomCode);
+  navigator.clipboard?.writeText(url);
+  toast('초대 링크를 복사했습니다', 'ok');
+};
+// 베팅 키보드 단축키 (F=폴드, C=체크/콜, R=레이즈) — 채팅 입력 중이 아닐 때만
+document.addEventListener('keydown', (e) => {
+  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (!$('game') || $('game').classList.contains('hidden')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'f') { const b = document.querySelector('.btn-fold'); if (b) { e.preventDefault(); b.click(); } }
+  else if (k === 'c') { const b = document.querySelector('.btn-check') || document.querySelector('.btn-call'); if (b) { e.preventDefault(); b.click(); } }
+  else if (k === 'r') { const b = document.querySelector('.btn-raise'); if (b) { e.preventDefault(); b.click(); } }
+});
 function resetToLobby() {
   document.body.classList.remove('waiting-mode', 'my-turn-glow');
   $('waitBanner').classList.add('hidden');
