@@ -1339,6 +1339,16 @@ body:not(.waiting-mode) .action-timer.hidden { display: block !important; visibi
 .lb-wins { text-align: right; font-weight: 800; color: var(--gold); }
 .lb-bal { text-align: right; color: var(--green); font-weight: 700; }
 
+/* 관전자 '참여하기' 큰 버튼(액션 영역) */
+.btn-join-table {
+  padding: 14px 28px; border-radius: 14px; border: none; cursor: pointer;
+  background: linear-gradient(180deg,#57e093,var(--green)); color: #06301a;
+  font-size: 18px; font-weight: 800; box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 6px 14px rgba(0,0,0,.35);
+  animation: joinCta 1.3s ease-in-out infinite;
+}
+.btn-join-table:active { transform: translateY(2px); }
+@keyframes joinCta { 0%,100%{ box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 0 14px rgba(62,201,122,.5); } 50%{ box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 0 26px rgba(62,201,122,.9); } }
+
 /* 시스템(입퇴장) 채팅 메시지 */
 .chat-sys { color: var(--muted); font-size: 12px; font-style: italic; opacity: .92; }
 .chat-sys-dot { color: var(--accent); font-style: normal; }

@@ -1823,7 +1823,16 @@ function renderActions(s) {
   }
   const me = s.players.find((p) => p.id === myId);
   if (!me || me.eliminated || me.chips <= 0) {
-    bar.innerHTML = '<span class="waiting-turn">관전 중...</span>';
+    // 관전 중이고 빈 자리가 있으면 크고 명확한 '참여하기' 버튼 표시
+    if (isSpectator && !s.finished && s.players.length < (s.maxPlayers || 9)) {
+      const b = document.createElement('button');
+      b.className = 'btn-join-table';
+      b.textContent = '➕ 이 게임에 참여하기';
+      b.onclick = () => $('specJoinBtn').click();
+      bar.appendChild(b);
+    } else {
+      bar.innerHTML = '<span class="waiting-turn">관전 중...</span>';
+    }
     return;
   }
 

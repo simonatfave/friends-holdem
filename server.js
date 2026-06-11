@@ -987,10 +987,12 @@ io.on('connection', (socket) => {
 
   socket.on('chat', ({ text }) => {
     const room = rooms.get(roomCode);
-    if (!room) return;
+    if (!room || !text) return;
     const p = room.game.getPlayer(playerId);
-    if (!p || !text) return;
-    io.to(roomCode).emit('chat', { name: p.name, text: String(text).slice(0, 200), t: Date.now() });
+    const isSpec = room.spectators && room.spectators.has(socket.id);
+    if (!p && !isSpec) return; // 방의 플레이어 또는 관전자만 채팅 가능
+    const name = p ? p.name : (socket.specName || '관전자');
+    io.to(roomCode).emit('chat', { name: p ? name : `👀 ${name}`, text: String(text).slice(0, 200), t: Date.now() });
   });
 
   // 자리 비움 / 복귀 (게임 중 나가지 않고 핸드 쉬기)
