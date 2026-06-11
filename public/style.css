@@ -77,7 +77,7 @@ input:focus { border-color: var(--accent); }
 .online-line b { color: var(--text); font-size: 15px; }
 .online-caret { color: var(--muted); font-weight: 700; margin-left: 2px; }
 /* 접속자 목록 패널 */
-.online-card { max-width: 340px; width: 90vw; }
+.settings-card.online-card { max-width: 340px; width: 90vw; }
 .online-user-list { display: flex; flex-direction: column; gap: 7px; max-height: 50vh; overflow-y: auto; margin-bottom: 14px; }
 .online-user { display: flex; align-items: center; gap: 11px; background: #161c25; border: 1px solid #2a3340; border-radius: 11px; padding: 8px 12px; }
 .online-user.me { border-color: var(--gold); background: rgba(232,196,102,.08); }
@@ -96,7 +96,7 @@ input:focus { border-color: var(--accent); }
 .avatar-pic.lg { width: 84px; height: 84px; font-size: 34px; }
 
 /* ---------- 회원가입 모달 ---------- */
-.signup-card { max-width: 360px; width: 92vw; }
+.settings-card.signup-card { max-width: 380px; width: 92vw; }
 .su-avatar-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .su-avatar-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .su-avatar-actions .ghost { margin: 0; }
@@ -121,7 +121,7 @@ input:focus { border-color: var(--accent); }
 .me-nick { font-weight: 800; font-size: 17px; color: var(--text); }
 .me-balance { color: var(--gold); font-weight: 700; }
 .me-balance b { font-size: 17px; }
-.account-card { max-width: 360px; width: 92vw; }
+.settings-card.account-card { max-width: 360px; width: 92vw; }
 .acc-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #161c25; border: 1px solid #2a3340; border-radius: 12px; margin-bottom: 12px; }
 .acc-nick { font-weight: 800; font-size: 18px; color: var(--text); }
 .acc-balance { color: var(--gold); font-weight: 700; }
@@ -136,7 +136,7 @@ input:focus { border-color: var(--accent); }
 .acc-hist-row.win { border-color: var(--gold); color: var(--gold); }
 
 /* 세션별 블라인드 에디터 */
-.timer-card { max-width: 380px; }
+.settings-card.timer-card { max-width: 380px; }
 .sess-head, .sess-row { display: grid; grid-template-columns: 26px 1fr 1fr 32px; gap: 6px; align-items: center; }
 .sess-head { color: var(--muted); font-size: 11px; margin: 6px 0 4px; padding: 0 2px; text-align: center; }
 .sess-list { display: flex; flex-direction: column; gap: 6px; max-height: 34vh; overflow-y: auto; margin-bottom: 8px; }
