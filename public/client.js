@@ -2232,7 +2232,11 @@ function updateTimeBankBtn(s) {
   const bank = me ? (me.timeBank || 0) : 0;
   const visible = myTurn && bank >= 1000 && !!s.actionLimit;
   btn.classList.toggle('hidden', !visible);
-  if (visible) btn.textContent = `⏱ 시간 추가 +15s (잔여 ${Math.round(bank / 1000)}s)`;
+  if (visible) {
+    const mobile = window.innerWidth <= 640;
+    btn.textContent = mobile ? '⏱' : `⏱ 시간 추가 +15s (잔여 ${Math.round(bank / 1000)}s)`;
+    btn.title = `시간 추가 +15초 (잔여 ${Math.round(bank / 1000)}초)`;
+  }
 }
 $('timeBankBtn').onclick = () => {
   socket.emit('useTimeBank', {}, (r) => {

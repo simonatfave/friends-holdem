@@ -694,8 +694,12 @@ button { font-family: inherit; }
   /* 세로 테이블: 사용 가능한 '세로 공간' 기준으로 크기 결정(짧은 폰에선 잘리지 않게) */
   .poker-table { height: min(60vh, 132vw); width: calc(min(60vh, 132vw) * 5 / 7); aspect-ratio: 5 / 7; border-width: 9px; }
   .table-wrap { padding-bottom: 26px; }
-  /* 타임뱅크: 모바일은 테이블 하단 중앙(내 카드 아래)에 배치해 카드와 안 겹치게 */
-  .timebank-btn { left: 50%; right: auto; bottom: 0; transform: translateX(-50%); padding: 6px 13px; font-size: 12px; }
+  /* 타임뱅크: 모바일은 우측 하단에 아이콘만(최소화) */
+  .timebank-btn { left: auto; right: 8px; bottom: 6px; transform: none;
+    width: 40px; height: 40px; padding: 0; font-size: 19px; line-height: 1; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; }
+  /* 승리 알림: 모바일은 테이블 정중앙에(플레이어 UI와 안 겹치게) */
+  .winner-banner { top: 44%; font-size: clamp(15px, 4.2vw, 22px); max-width: 84%; }
   .community { gap: 5px; top: 47%; }
   .pot-display { top: 63%; }
   .seat-inner { padding: 4px 5px; }
