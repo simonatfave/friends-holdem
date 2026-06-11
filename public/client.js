@@ -658,12 +658,13 @@ function refreshRooms() {
       const statusCls = r.finished ? '' : (r.started ? 'play' : 'wait');
       const statusTxt = r.finished ? '종료' : (r.started ? '진행중' : '대기중');
       const seatTxt = `${r.total}/${r.maxPlayers}명${r.full ? ' · 가득참' : ''}`;
-      const info = r.started
-        ? `방장 ${esc(r.hostName)} · ${seatTxt} · 핸드 #${r.handNumber}`
-        : `방장 ${esc(r.hostName)} · ${seatTxt} 대기`;
+      const sub = r.started ? `${seatTxt} · 핸드 #${r.handNumber}` : `${seatTxt} · 대기 중`;
+      // 공개방은 코드 대신 방장 이름을 방 제목으로 표시
       row.innerHTML =
-        `<span class="rc">${r.code}</span>` +
-        `<span class="rinfo"><span class="rstat ${statusCls}">${statusTxt}</span><br>${info}</span>`;
+        `<span class="rinfo">` +
+          `<span class="rtitle">${esc(r.hostName)}님의 방 <span class="rstat ${statusCls}">${statusTxt}</span></span>` +
+          `<span class="rsub">${sub}</span>` +
+        `</span>`;
       const btnWrap = document.createElement('div');
       btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
       if (!r.finished) {
