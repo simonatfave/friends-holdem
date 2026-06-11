@@ -954,6 +954,7 @@ function renderGame(s) {
     bets: betMap(s),
     lastActions: lastActionMap(s),
     level: s.level,
+    buttonId: (s.players.find((p) => p.isButton) || {}).id,
     allInIds: s.players.filter((p) => p.allIn).map((p) => p.id),
     bustIds: s.players.filter((p) => p.eliminated).map((p) => p.id),
   };
@@ -1044,8 +1045,16 @@ function rollNumber(el, from, to, dur = 600) {
 function handleFx(s, prev) {
   if (!prev) return; // 첫 렌더는 조용히
   const newHand = s.handNumber !== prev.handNumber;
-  if (newHand) { sfxDeal(); dealCardsFromDeck(s); if (_lastHandRecap) showRecapToast(_lastHandRecap); }
-  else if (s.community.length > prev.commCount) sfxDeal();
+  if (newHand) {
+    showShuffle();                                   // 중앙에서 카드 셔플
+    setTimeout(() => { sfxDeal(); dealCardsFromDeck(s); }, 450); // 셔플 후 딜링
+    if (_lastHandRecap) showRecapToast(_lastHandRecap);
+  } else if (s.community.length > prev.commCount) sfxDeal();
+  // 딜러 버튼 슬라이드 이동(이전 좌석 → 새 좌석)
+  const newBtnId = (s.players.find((p) => p.isButton) || {}).id;
+  if (newBtnId && prev.buttonId && newBtnId !== prev.buttonId) {
+    setTimeout(() => slideDealerButton(prev.buttonId, newBtnId), newHand ? 500 : 0);
+  }
 
   if (s.pot > prev.pot && !newHand) {
     bump($('potBadge'));
@@ -1332,6 +1341,44 @@ function seatChipStackHtml(p) {
   return `<div class="chip-stack" title="${fmtAmt(p.chips)}">${s}</div>`;
 }
 
+// 핸드 시작: 중앙에서 카드를 셔플(리플)하는 모션
+function showShuffle() {
+  const table = document.querySelector('.poker-table');
+  if (!table) return;
+  const tr = table.getBoundingClientRect();
+  const cx = tr.left + tr.width / 2, cy = tr.top + tr.height * 0.4;
+  const wrap = document.createElement('div');
+  wrap.className = 'shuffle-fx';
+  wrap.style.left = cx + 'px'; wrap.style.top = cy + 'px';
+  for (let i = 0; i < 6; i++) {
+    const c = document.createElement('div');
+    c.className = 'shuffle-card';
+    c.style.setProperty('--i', i);
+    wrap.appendChild(c);
+  }
+  document.body.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 950);
+}
+// 딜러 버튼이 이전 좌석에서 새 좌석으로 슬라이드 이동
+function slideDealerButton(fromId, toId) {
+  const toSeat = document.querySelector(`.seat[data-pid="${cssEsc(toId)}"]`);
+  if (!toSeat) return;
+  const tr = toSeat.getBoundingClientRect();
+  const tx = tr.left + tr.width / 2, ty = tr.top + 10;
+  let sx = tx, sy = ty;
+  const fromSeat = document.querySelector(`.seat[data-pid="${cssEsc(fromId)}"]`);
+  if (fromSeat) { const fr = fromSeat.getBoundingClientRect(); sx = fr.left + fr.width / 2; sy = fr.top + 10; }
+  const d = document.createElement('div');
+  d.className = 'dealer-fly'; d.textContent = 'D';
+  d.style.left = sx + 'px'; d.style.top = sy + 'px';
+  d.style.transform = 'translate(-50%,-50%)';
+  document.body.appendChild(d);
+  requestAnimationFrame(() => {
+    d.style.transition = 'transform .5s cubic-bezier(.45,.05,.25,1)';
+    d.style.transform = `translate(calc(-50% + ${tx - sx}px), calc(-50% + ${ty - sy}px))`;
+  });
+  setTimeout(() => d.remove(), 560);
+}
 // 핸드 시작: 중앙 덱에서 각 좌석으로 카드가 날아가 꽂히는 딜링 모션
 function dealCardsFromDeck(s) {
   const table = document.querySelector('.poker-table');
@@ -1599,7 +1646,8 @@ function renderHole(p, seatIdx = 0) {
     let extra = '', style = '';
     if (_dealNewHand) {
       extra = 'deal-in';
-      const delay = (seatIdx * 0.12 + ci * 0.07).toFixed(2);
+      // 셔플 연출이 끝난 뒤 카드가 등장하도록 기본 딜레이를 둠
+      const delay = (0.5 + seatIdx * 0.12 + ci * 0.07).toFixed(2);
       style = `style="animation-delay:${delay}s"`;
     } else if (showdownReveal && !c.hidden) {
       extra = 'flip-in';

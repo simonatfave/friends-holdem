@@ -561,14 +561,25 @@ button { font-family: inherit; }
 .action-raise { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; flex-wrap: wrap; min-height: 54px; }
 .action-raise.empty { visibility: hidden; } /* 레이즈 불가 시에도 공간 유지 */
 .actionbar button {
+  position: relative; overflow: hidden;
   padding: 16px 30px; border-radius: 14px; border: none; font-size: 19px; font-weight: 800; cursor: pointer;
   letter-spacing: .3px; box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 6px 14px rgba(0,0,0,.35);
-  transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
+  transition: transform .14s cubic-bezier(.2,.8,.3,1.5), filter .12s ease, box-shadow .15s ease;
   white-space: nowrap;
 }
 .quick-bets button { white-space: nowrap; min-width: 52px; }
-.actionbar button:hover { filter: brightness(1.1); transform: translateY(-1px); }
-.actionbar button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.35); }
+/* 호버 마이크로 애니메이션: 살짝 떠오르며 확대 + 샤인 스윕 */
+.actionbar button:hover { filter: brightness(1.12); transform: translateY(-3px) scale(1.045); box-shadow: 0 8px 0 rgba(0,0,0,.22), 0 12px 22px rgba(0,0,0,.4); }
+.actionbar button::after {
+  content: ''; position: absolute; top: 0; left: -120%; width: 60%; height: 100%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.45), transparent);
+  transform: skewX(-18deg);
+}
+.actionbar button:hover::after { animation: btnShine .6s ease; }
+@keyframes btnShine { from { left: -120%; } to { left: 140%; } }
+.actionbar button:active { transform: translateY(2px) scale(.98); box-shadow: 0 1px 0 rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.35); }
+.quick-bets button.qb { transition: transform .14s cubic-bezier(.2,.8,.3,1.5), filter .12s ease; }
+.quick-bets button.qb:hover { transform: translateY(-2px) scale(1.06); filter: brightness(1.12); }
 .btn-raise:hover { box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 0 20px rgba(232,196,102,.7); }
 .btn-call:hover { box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 0 20px rgba(62,201,122,.6); }
 .btn-fold { background: linear-gradient(180deg, #5b6675, #45505e); color: #fff; }
@@ -1207,4 +1218,31 @@ body.my-turn-glow::after {
   .seat-av { width: 18px; height: 18px; font-size: 10px; margin-right: 3px; }
   .chip-stack { height: 6px; }
   .cs-disc { width: 7px; height: 3px; }
+}
+
+/* ================= v66: 딜러버튼 슬라이드 / 셔플 ================= */
+/* 좌석 사이를 슬라이드하는 딜러 버튼 */
+.dealer-fly {
+  position: fixed; z-index: 260; pointer-events: none;
+  width: 22px; height: 22px; border-radius: 50%; background: #fff; color: #000;
+  font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.6), 0 0 10px rgba(255,255,255,.6);
+}
+
+/* 핸드 시작 셔플(리플) */
+.shuffle-fx { position: fixed; z-index: 240; pointer-events: none; transform: translate(-50%,-50%); }
+.shuffle-card {
+  position: absolute; left: -14px; top: -19px; width: 28px; height: 38px; border-radius: 4px;
+  background: repeating-linear-gradient(45deg,#3a4a6b 0 5px,#2c3a57 5px 10px); border: 1.5px solid #8aa0c8;
+  box-shadow: 0 3px 8px rgba(0,0,0,.5);
+  animation: shuffleRiffle .9s ease-in-out backwards;
+  animation-delay: calc(var(--i) * 0.05s);
+}
+@keyframes shuffleRiffle {
+  0% { transform: translateX(0) rotate(0); }
+  18% { transform: translateX(-30px) rotate(-14deg); }
+  38% { transform: translateX(26px) rotate(12deg); }
+  58% { transform: translateX(-16px) rotate(-7deg); }
+  78% { transform: translateX(9px) rotate(4deg); }
+  100% { transform: translateX(0) rotate(0); }
 }
