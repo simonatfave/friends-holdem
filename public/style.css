@@ -624,6 +624,11 @@ button { font-family: inherit; }
 .sidepanel { display: flex; gap: 8px; height: 120px; }
 .log, .chatbox { flex: 1; background: var(--panel); border: 1px solid #33404f; border-radius: 12px; padding: 8px; overflow-y: auto; font-size: 14px; }
 .log div { color: var(--muted); padding: 1px 0; }
+/* 로그/채팅 스크롤바: 내용이 넘치면 보이도록 */
+.log, .chat-messages, .log-full { scrollbar-width: thin; scrollbar-color: #4a5868 transparent; overscroll-behavior: contain; }
+.log::-webkit-scrollbar, .chat-messages::-webkit-scrollbar, .log-full::-webkit-scrollbar { width: 9px; }
+.log::-webkit-scrollbar-thumb, .chat-messages::-webkit-scrollbar-thumb, .log-full::-webkit-scrollbar-thumb { background: #4a5868; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+.log::-webkit-scrollbar-thumb:hover, .chat-messages::-webkit-scrollbar-thumb:hover, .log-full::-webkit-scrollbar-thumb:hover { background: #5e6f82; background-clip: padding-box; }
 .chatbox { display: flex; flex-direction: column; }
 .chat-messages { flex: 1; overflow-y: auto; }
 .chat-messages div { padding: 1px 0; }

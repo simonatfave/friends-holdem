@@ -1942,8 +1942,10 @@ function act(type, amount) {
 
 function renderLog(s) {
   const log = $('log');
+  // 사용자가 위로 스크롤해 과거 기록을 보고 있으면 자동으로 끌어내리지 않음(스크롤백 유지)
+  const nearBottom = (log.scrollHeight - log.scrollTop - log.clientHeight) < 48;
   log.innerHTML = (s.log || []).map((l) => `<div>${esc(l.msg)}</div>`).join('');
-  log.scrollTop = log.scrollHeight;
+  if (nearBottom) log.scrollTop = log.scrollHeight;
 }
 
 function renderWinner(s) {

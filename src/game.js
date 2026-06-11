@@ -91,7 +91,7 @@ export class Game {
 
   pushLog(msg) {
     this.log.push({ t: Date.now(), msg });
-    if (this.log.length > 60) this.log.shift();
+    if (this.log.length > 400) this.log.shift(); // 스크롤백 버퍼
   }
 
   // 시간 기반 블라인드인가 (세션별 또는 단일)
@@ -859,7 +859,7 @@ export class Game {
       legal: this.legalActions(viewerId),
       results: h?.results ?? null,
       finalResults: this.finished ? this.results : null,
-      log: this.log.slice(-12),
+      log: this.log.slice(-200),
       youId: viewerId,
     };
   }
