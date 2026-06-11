@@ -208,7 +208,7 @@ const rankLabel = (r) => RANK_LBL[r] || String(r);
 
 // ---------- 입장 비밀번호 게이트 ----------
 const GATE_PW = '0110';
-function openLobby() { hide('gate'); show('lobby'); setTimeout(() => $('nameInput') && $('nameInput').focus(), 50); }
+function openLobby() { hide('gate'); show('lobby'); showLobbyPane('home'); setTimeout(() => $('nameInput') && $('nameInput').focus(), 50); }
 function submitGate() {
   if ($('gatePw').value.trim() === GATE_PW) {
     try { sessionStorage.setItem('dice_auth', '1'); } catch (e) {}
@@ -223,17 +223,54 @@ $('gateBtn').onclick = submitGate;
 $('gatePw').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitGate(); });
 try { if (sessionStorage.getItem('dice_auth') === '1') openLobby(); else $('gatePw').focus(); } catch (e) { $('gatePw').focus(); }
 
-// ---------- 로비 탭 ----------
-document.querySelectorAll('.tab').forEach((t) => {
-  t.onclick = () => {
-    document.querySelectorAll('.tab').forEach((x) => x.classList.remove('active'));
-    t.classList.add('active');
-    const tab = t.dataset.tab;
-    $('createPane').classList.toggle('hidden', tab !== 'create');
-    $('joinPane').classList.toggle('hidden', tab !== 'join');
-    $('roomsPane').classList.toggle('hidden', tab !== 'rooms');
-    if (tab === 'rooms') refreshRooms();
-  };
+// ---------- 로비 화면 전환 (시작 / 방만들기 / 참여하기) ----------
+function showLobbyPane(which) {
+  $('lobbyHome').classList.toggle('hidden', which !== 'home');
+  $('createPane').classList.toggle('hidden', which !== 'create');
+  $('joinPane').classList.toggle('hidden', which !== 'join');
+  $('lobbyError').textContent = '';
+}
+$('goCreate').onclick = () => { if (!getName()) return; showLobbyPane('create'); };
+$('goJoin').onclick = () => { if (!getName()) return; showLobbyPane('join'); refreshRooms(); };
+document.querySelectorAll('[data-back]').forEach((b) => (b.onclick = () => showLobbyPane('home')));
+
+// 세그먼트 토글: 최대 인원 / 공개 설정
+let createMax = 6, createSecret = false;
+$('segMax').querySelectorAll('.seg-btn').forEach((b) => (b.onclick = () => {
+  $('segMax').querySelectorAll('.seg-btn').forEach((x) => x.classList.remove('active'));
+  b.classList.add('active'); createMax = Number(b.dataset.max);
+}));
+$('segVis').querySelectorAll('.seg-btn').forEach((b) => (b.onclick = () => {
+  $('segVis').querySelectorAll('.seg-btn').forEach((x) => x.classList.remove('active'));
+  b.classList.add('active'); createSecret = b.dataset.secret === '1';
+  $('secretCodeRow').classList.toggle('hidden', !createSecret);
+}));
+
+// 타이머 설정 팝업
+const timerSettings = { actionSeconds: 10, levelMinutes: 3 };
+$('openTimer').onclick = () => {
+  $('actionSeconds').value = timerSettings.actionSeconds;
+  $('levelMinutes').value = timerSettings.levelMinutes;
+  show('timerPopup');
+};
+$('timerClose').onclick = () => {
+  timerSettings.actionSeconds = $('actionSeconds').value;
+  timerSettings.levelMinutes = $('levelMinutes').value;
+  hide('timerPopup');
+};
+
+// 접속 인원 표시(봇 제외)
+socket.on('online', (n) => { const el = $('onlineCount'); if (el) el.textContent = n; });
+
+// 시스템 안내(관전 입장 등) 토스트
+let _noticeTimer = null;
+socket.on('notice', (text) => {
+  let t = document.getElementById('noticeToast');
+  if (!t) { t = document.createElement('div'); t.id = 'noticeToast'; t.className = 'recap-toast notice-toast'; document.body.appendChild(t); }
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(_noticeTimer);
+  _noticeTimer = setTimeout(() => t.classList.remove('show'), 3500);
 });
 
 // ---------- 방 목록 ----------
@@ -242,31 +279,30 @@ function refreshRooms() {
   socket.emit('listRooms', {}, (res) => {
     const box = $('roomList');
     if (!res || !res.ok) { box.innerHTML = '<div class="room-empty">불러오기 실패</div>'; return; }
-    if (!res.rooms.length) { box.innerHTML = '<div class="room-empty">열려 있는 방이 없습니다. 새로 만들어 보세요!</div>'; return; }
+    if (!res.rooms.length) { box.innerHTML = '<div class="room-empty">열려 있는 공개 방이 없습니다.</div>'; return; }
     box.innerHTML = '';
     res.rooms.forEach((r) => {
       const row = document.createElement('div');
       row.className = 'room-row';
-      const statusCls = r.started ? (r.finished ? '' : 'play') : 'wait';
+      const statusCls = r.finished ? '' : (r.started ? 'play' : 'wait');
       const statusTxt = r.finished ? '종료' : (r.started ? '진행중' : '대기중');
+      const seatTxt = `${r.total}/${r.maxPlayers}명${r.full ? ' · 가득참' : ''}`;
       const info = r.started
-        ? `방장 ${esc(r.hostName)} · ${r.humans}명 · 핸드 #${r.handNumber}${r.blinds ? ` · 블라인드 ${r.blinds.sb}/${r.blinds.bb}` : ''}`
-        : `방장 ${esc(r.hostName)} · ${r.humans}명 대기`;
+        ? `방장 ${esc(r.hostName)} · ${seatTxt} · 핸드 #${r.handNumber}`
+        : `방장 ${esc(r.hostName)} · ${seatTxt} 대기`;
       row.innerHTML =
         `<span class="rc">${r.code}</span>` +
         `<span class="rinfo"><span class="rstat ${statusCls}">${statusTxt}</span><br>${info}</span>`;
       const btnWrap = document.createElement('div');
       btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
       if (!r.finished) {
-        // 대기·진행 모두 자리가 있으면 참여 가능(진행 중이면 다음 핸드부터)
-        if (r.total < 9) {
+        if (!r.full) { // 자리 있으면 참여
           const j = document.createElement('button');
           j.className = 'join-btn'; j.textContent = '참여';
           j.onclick = () => joinRoom(r.code);
           btnWrap.appendChild(j);
         }
-        // 진행 중인 방은 관전도 가능
-        if (r.started) {
+        if (r.started || r.full) { // 진행 중이거나 가득 찬 방은 관전
           const sp = document.createElement('button');
           sp.className = 'spec-btn'; sp.textContent = '관전';
           sp.onclick = () => spectateRoom(r.code);
@@ -288,9 +324,11 @@ function joinRoom(code) {
   });
 }
 function spectateRoom(code) {
-  socket.emit('spectate', { code }, (res) => {
+  const name = $('nameInput').value.trim() || '관전자';
+  myName = $('nameInput').value.trim() || myName;
+  socket.emit('spectate', { code, name }, (res) => {
     if (!res.ok) return ($('lobbyError').textContent = res.error);
-    myId = res.youId; isSpectator = true; myRoomCode = code; // 참여 전환에 방코드 필요
+    myId = res.youId; isSpectator = true; myRoomCode = code;
     hide('lobby');
   });
 }
@@ -303,13 +341,18 @@ function getName() {
 
 $('createBtn').onclick = () => {
   const name = getName(); if (!name) return;
+  const sc = ($('secretCode').value || '').replace(/\D/g, '');
+  if (createSecret && sc.length !== 4) return ($('lobbyError').textContent = '비밀방 코드는 숫자 4자리로 입력하세요');
   myName = name;
   socket.emit('create', {
     name,
     settings: {
-      levelMinutes: $('levelMinutes').value,
-      actionSeconds: $('actionSeconds').value,
+      maxPlayers: createMax,
       startBB: $('startBB').value,
+      secret: createSecret,
+      password: createSecret ? sc : '',
+      levelMinutes: timerSettings.levelMinutes,
+      actionSeconds: timerSettings.actionSeconds,
     },
   }, (res) => {
     if (!res.ok) return ($('lobbyError').textContent = res.error);
@@ -318,11 +361,12 @@ $('createBtn').onclick = () => {
   });
 };
 
-$('joinBtn').onclick = () => {
+// 코드로 입장 (비밀방 / 공개방 모두)
+$('joinByCode').onclick = () => {
   const name = getName(); if (!name) return;
   myName = name;
   const code = $('codeInput').value.trim().toUpperCase();
-  if (!code) return ($('lobbyError').textContent = '방 코드를 입력하세요');
+  if (!code) return ($('lobbyError').textContent = '코드를 입력하세요');
   socket.emit('join', { code, name }, (res) => {
     if (!res.ok) return ($('lobbyError').textContent = res.error);
     myId = res.youId;
@@ -368,7 +412,7 @@ function doLeaveToLobby(confirmMsg) {
     _seatSig = ''; _commSig = ''; _seenPlayerIds = new Set(); _playersInit = false;
     _recentJoiners.clear(); _recentAllIn.clear(); _recentBust.clear();
     $('leaveBtn').classList.add('hidden');
-    hide('game'); hide('waiting'); show('lobby');
+    hide('game'); hide('waiting'); show('lobby'); showLobbyPane('home');
   });
 }
 $('wbLeave').onclick = () => doLeaveToLobby('대기 중인 방에서 나갈까요?');
@@ -415,7 +459,7 @@ socket.on('state', (s) => {
   const amBusted = !!(meNow && meNow.eliminated);
   // 관전자 또는 탈락자에게 나가기 버튼 / 관전자에게만 참여 버튼
   $('leaveBtn').classList.toggle('hidden', !(isSpectator || amBusted));
-  $('specJoinBtn').classList.toggle('hidden', !(isSpectator && !s.finished));
+  $('specJoinBtn').classList.toggle('hidden', !(isSpectator && !s.finished && s.players.length < (s.maxPlayers || 9)));
   if (meNow) $('optSitOut').checked = !!meNow.sittingOut; // 자리 비움 토글 상태 반영
 });
 
@@ -492,7 +536,7 @@ function renderWaitingTable(s) {
 function renderWaitingSeats(s) {
   const seatsEl = $('seats');
   seatsEl.innerHTML = '';
-  const TOTAL = 9; // 9-max 좌석을 모두 표시
+  const TOTAL = s.maxPlayers || 9; // 방 최대 인원만큼 좌석 표시(6 또는 9)
   seatsEl.style.setProperty('--seat-scale', '0.72');
   const positions = ovalPositions(TOTAL);
   const me = s.players.find((p) => p.id === myId);

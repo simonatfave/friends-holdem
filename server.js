@@ -53,6 +53,8 @@ function serializeRooms() {
       code,
       hostId: room.hostId,
       actionLimit: room.actionLimit,
+      maxPlayers: room.maxPlayers || 9,
+      secret: !!room.secret,
       game: {
         startingChips: g.startingChips,
         levelDurationSec: g.levelDurationSec,
@@ -104,7 +106,7 @@ function loadRooms() {
       g.started = !!rg.started;
       g.finished = false;
       g.results = rg.results || [];
-      const room = { game: g, hostId: r.hostId, actionLimit: r.actionLimit, restoredAt: Date.now() };
+      const room = { game: g, hostId: r.hostId, actionLimit: r.actionLimit, maxPlayers: r.maxPlayers || 9, secret: !!r.secret, restoredAt: Date.now() };
       rooms.set(r.code, room);
       // 진행 중이었으면 새 핸드로 재개(중단된 핸드는 버림, 칩은 핸드 전 스택으로 보존)
       if (g.started) {
@@ -130,6 +132,8 @@ function stateFor(room, viewerId) {
   st.actionLimit = room.actionLimitEffective || room.actionLimit || null;
   st.spectator = room.spectators ? room.spectators.has(viewerId) : false;
   st.isHost = room.hostId === viewerId;
+  st.maxPlayers = room.maxPlayers || 9;
+  st.secret = !!room.secret;
   return st;
 }
 function broadcast(code) {
@@ -143,6 +147,10 @@ function broadcast(code) {
     for (const sid of room.spectators) io.to(sid).emit('state', stateFor(room, sid));
   }
   saveRoomsSoon(); // 상태 변화 시 디스크에 스냅샷(디바운스)
+}
+// 접속한 사람 수(봇 제외 = 소켓 수) 전체 브로드캐스트
+function broadcastOnline() {
+  io.emit('online', io.engine.clientsCount);
 }
 
 // 자리 비움/합류 후 진행 인원이 다시 충분해지면 일시정지 해제하고 새 핸드 시작
@@ -280,9 +288,20 @@ function maybeBotAct(code) {
 io.on('connection', (socket) => {
   let roomCode = null;
   let playerId = socket.id;
+  broadcastOnline(); // 새 접속 → 인원 수 갱신
+  socket.emit('online', io.engine.clientsCount);
 
   socket.on('create', ({ name, settings }, cb) => {
-    const code = makeRoomCode();
+    const secret = !!settings?.secret;
+    let code;
+    if (secret) {
+      // 비밀방: 호스트가 정한 4자리 숫자 코드가 곧 방 코드(입장 키)
+      code = String(settings?.password || '').replace(/\D/g, '').slice(0, 4);
+      if (code.length !== 4) return cb?.({ ok: false, error: '비밀방 코드는 숫자 4자리여야 합니다' });
+      if (rooms.has(code)) return cb?.({ ok: false, error: '이미 사용 중인 코드입니다. 다른 코드를 쓰세요' });
+    } else {
+      code = makeRoomCode();
+    }
     const levelMinutes = clampInt(settings?.levelMinutes, 1, 60, 3);
     // 방장이 정한 시작 빅블라인드로 블라인드 곡선 스케일
     const startBB = clampInt(settings?.startBB, 2, 1000, 2);
@@ -305,17 +324,24 @@ io.on('connection', (socket) => {
     game.addPlayer(playerId, name);
     game.getPlayer(playerId).socketId = socket.id;
     const actionSec = clampInt(settings?.actionSeconds, 0, 120, 10);
-    rooms.set(code, { game, hostId: playerId, actionLimit: actionSec > 0 ? actionSec * 1000 : 0 });
+    const maxPlayers = settings?.maxPlayers === 6 ? 6 : 9; // 최대 인원 6 또는 9
+    rooms.set(code, {
+      game, hostId: playerId,
+      actionLimit: actionSec > 0 ? actionSec * 1000 : 0,
+      maxPlayers, secret,
+    });
     roomCode = code;
     socket.join(code);
     cb?.({ ok: true, code, youId: playerId });
     broadcast(code);
+    broadcastOnline();
   });
 
-  socket.on('join', ({ code, name }, cb) => {
+  socket.on('join', ({ code, name, password, seat } = {}, cb) => {
     code = (code || '').toUpperCase().trim();
     const room = rooms.get(code);
     if (!room) return cb?.({ ok: false, error: '방을 찾을 수 없습니다' });
+    const cap = room.maxPlayers || 9;
     const { game } = room;
     if (game.started) {
       // 재접속 처리: 같은 이름이 끊겨있으면 자리 인수(탈락자도 자기 자리로 복귀해 관전)
@@ -339,7 +365,7 @@ io.on('connection', (socket) => {
       if (game.players.some((p) => p.name === name)) {
         return cb?.({ ok: false, error: '이미 참여 중이거나 탈락한 이름입니다. 다른 닉네임을 쓰세요' });
       }
-      if (game.players.length >= 9) return cb?.({ ok: false, error: '방이 가득 찼습니다 (최대 9명)' });
+      if (game.players.length >= cap) return cb?.({ ok: false, error: '방이 가득 찼습니다. 관전만 가능합니다' });
       const btnId = game.players[game.button]?.id; // 좌석 정렬로 버튼 인덱스가 밀리지 않게 보존
       game.addPlayer(playerId, name);
       if (btnId != null) game.button = game.players.findIndex((p) => p.id === btnId);
@@ -353,9 +379,12 @@ io.on('connection', (socket) => {
       else broadcast(code);
       return;
     }
-    if (game.players.length >= 9) return cb?.({ ok: false, error: '방이 가득 찼습니다 (최대 9명)' });
-    game.addPlayer(playerId, name);
+    if (game.players.length >= cap) return cb?.({ ok: false, error: '방이 가득 찼습니다. 관전만 가능합니다' });
+    // 대기방: 선택한 빈 자리(chair)에 앉히기(없으면 가장 낮은 빈 자리)
+    const chair = (typeof seat === 'number') ? seat : null;
+    game.addPlayer(playerId, name, false, chair);
     game.getPlayer(playerId).socketId = socket.id;
+    if (room.spectators) room.spectators.delete(socket.id);
     roomCode = code;
     socket.join(code);
     cb?.({ ok: true, code, youId: playerId });
@@ -385,7 +414,7 @@ io.on('connection', (socket) => {
     const humans = g.players.filter((p) => !p.isBot).length;
     let target = parseInt(count, 10);
     if (Number.isNaN(target)) target = 0;
-    target = Math.max(0, Math.min(target, 9 - humans)); // 전체 최대 9명
+    target = Math.max(0, Math.min(target, (room.maxPlayers || 9) - humans)); // 방 최대 인원까지
     // 초과 봇 제거
     let bots = g.players.filter((p) => p.isBot);
     while (bots.length > target) {
@@ -411,7 +440,7 @@ io.on('connection', (socket) => {
     if (room.hostId !== playerId) return cb?.({ ok: false, error: '방장만 추가할 수 있습니다' });
     const g = room.game;
     if (g.started) return cb?.({ ok: false, error: '이미 시작됨' });
-    if (g.players.length >= 9) return cb?.({ ok: false, error: '자리가 가득 찼습니다 (최대 9명)' });
+    if (g.players.length >= (room.maxPlayers || 9)) return cb?.({ ok: false, error: '자리가 가득 찼습니다' });
     const chair = (typeof seat === 'number') ? seat : null;
     g.addPlayer('bot_' + Date.now() + '_' + Math.floor(Math.random() * 1000), '🤖 Bot', true, chair);
     g.players.filter((p) => p.isBot).forEach((b, idx) => { b.name = `🤖 Bot ${idx + 1}`; });
@@ -454,11 +483,15 @@ io.on('connection', (socket) => {
   socket.on('listRooms', (_d, cb) => {
     const list = [];
     for (const [code, room] of rooms) {
+      if (room.secret) continue; // 비밀방은 목록에 노출하지 않음(코드로만 입장)
       const g = room.game;
+      const cap = room.maxPlayers || 9;
       list.push({
         code,
         humans: g.players.filter((p) => !p.isBot).length,
         total: g.players.length,
+        maxPlayers: cap,
+        full: g.players.length >= cap,
         started: g.started,
         finished: g.finished,
         handNumber: g.handNumber,
@@ -472,16 +505,19 @@ io.on('connection', (socket) => {
   });
 
   // 진행중인 방 관전
-  socket.on('spectate', ({ code }, cb) => {
+  socket.on('spectate', ({ code, name } = {}, cb) => {
     code = (code || '').toUpperCase().trim();
     const room = rooms.get(code);
     if (!room) return cb?.({ ok: false, error: '방을 찾을 수 없습니다' });
     roomCode = code;
     if (!room.spectators) room.spectators = new Set();
     room.spectators.add(socket.id);
+    socket.specName = (name && String(name).slice(0, 16)) || '관전자';
     socket.join(code);
     cb?.({ ok: true, code, youId: socket.id, spectator: true });
     io.to(socket.id).emit('state', stateFor(room, socket.id));
+    room.game.pushLog(`👀 ${socket.specName} 님이 관전을 시작했습니다`);
+    io.to(code).emit('notice', `👀 ${socket.specName} 님이 방에 들어와 관전 중입니다`);
   });
 
   // 이모지 리액션
@@ -544,6 +580,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    setTimeout(broadcastOnline, 50); // 접속 종료 → 인원 수 갱신(모든 경우)
     const room = rooms.get(roomCode);
     if (!room) return;
     // 관전자였으면 제거 후 종료
