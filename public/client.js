@@ -1749,8 +1749,9 @@ function renderSeats(s) {
       seat = document.createElement('div');
       seat.dataset.pid = p.id;
       const pos = isMe ? null : (hasMe ? (opos[i - 1] || { x: 50, y: 20 }) : opos[i]);
+      const meTop = (window.innerWidth <= 640) ? 84 : 88; // 모바일은 내 카드가 펠트 밖으로 안 나가게 살짝 위로
       seat.style.left = (isMe ? 50 : pos.x) + '%';
-      seat.style.top = (isMe ? 88 : pos.y) + '%';
+      seat.style.top = (isMe ? meTop : pos.y) + '%';
       const result = s.results?.reveal?.find((r) => r.id === p.id);
       seat.innerHTML = `
         <div class="seat-inner">
@@ -1877,7 +1878,7 @@ function ovalPositions(n) {
   const out = [];
   // 모바일(세로형 테이블)은 가로 반경을 줄이고 세로 반경을 키워 좌석이 테이블에 맞게
   const mobile = window.innerWidth <= 640;
-  const cx = 50, cy = 49, rx = mobile ? 39 : 48, ry = mobile ? 43 : 37;
+  const cx = 50, cy = mobile ? 47 : 49, rx = mobile ? 36 : 48, ry = mobile ? 37 : 37;
   for (let i = 0; i < n; i++) {
     const angle = Math.PI / 2 + (2 * Math.PI * i) / n; // 90도(아래)에서 시작
     out.push({
@@ -1892,8 +1893,8 @@ function ovalPositions(n) {
 function othersPositions(k) {
   if (k <= 0) return [];
   const mobile = window.innerWidth <= 640;
-  const cx = 50, cy = mobile ? 46 : 47;
-  const rx = mobile ? 41 : 48, ry = mobile ? 43 : 37;
+  const cx = 50, cy = mobile ? 45 : 47;
+  const rx = mobile ? 37 : 48, ry = mobile ? 38 : 37;
   const gap = 0.62; // 아래 중앙 양옆으로 비우는 반각(라디안)
   const span = 2 * Math.PI - 2 * gap;
   const out = [];
