@@ -1164,9 +1164,16 @@ function renderFinal(s) {
   const champ = ranked.find((r) => r.place === 1);
   $('champName').textContent = champ ? champ.name : '';
   const ol = $('finalRanks');
-  ol.innerHTML = ranked.map((r) =>
-    `<li class="${r.place === 1 ? 'first' : ''}">${r.place}위 — ${esc(r.name)} ${r.place === 1 ? '🏆' : ''}</li>`
-  ).join('');
+  const medal = (p) => (p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : '🏷️');
+  ol.innerHTML = ranked.map((r) => {
+    const isMe = r.id === myId;
+    const placeTxt = r.place === 1 ? '우승 🏆' : `${r.place}위 · 탈락`;
+    return `<li class="rank-row ${r.place === 1 ? 'first' : ''} ${isMe ? 'mine' : ''}">
+      <span class="rank-medal">${medal(r.place)}</span>
+      <span class="rank-name">${esc(r.name)}${isMe ? ' <span class="tag you">나</span>' : ''}</span>
+      <span class="rank-place">${placeTxt}</span>
+    </li>`;
+  }).join('');
   show('finalScreen');
   if (!finalShown) {
     finalShown = true;

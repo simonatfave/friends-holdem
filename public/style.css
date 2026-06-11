@@ -322,7 +322,7 @@ button { font-family: inherit; }
 }
 /* 내 좌석: 카드 크게(다른 좌석보다), 가로를 더 넓혀 비율 보정 */
 .seat.me-seat {
-  --hc-h: min(100px, 13vh, 15vw);
+  --hc-h: min(80px, 10.4vh, 12vw); /* 내 카드 20% 축소 */
   --hc-w: calc(var(--hc-h) * 0.714); /* 좌석 폭 계산용 (카드 비율은 aspect-ratio로 고정) */
   transform: translate(-50%,-50%) scale(var(--me-scale, 1)); /* 인원 많으면 축소해 겹침 방지 */
   z-index: 6;
@@ -428,7 +428,8 @@ button { font-family: inherit; }
 .action-timer { position: relative; z-index: 30; }
 .sidepanel { position: relative; z-index: 30; }
 .action-main { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; }
-.action-main button { min-width: 112px; }
+/* 버튼 개수(2개·3개)와 상관없이 항상 같은 크기로 고정 */
+.action-main button { flex: 0 0 134px; width: 134px; min-width: 0; padding: 16px 6px; }
 .action-raise { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; flex-wrap: wrap; min-height: 54px; }
 .action-raise.empty { visibility: hidden; } /* 레이즈 불가 시에도 공간 유지 */
 .actionbar button {
@@ -466,8 +467,8 @@ button { font-family: inherit; }
   padding: 9px 14px; font-size: 15px; font-weight: 700; background: var(--panel-light); color: var(--text);
   border: 1px solid #3f4b5a; box-shadow: 0 2px 0 rgba(0,0,0,.25);
 }
-/* 두 줄: 라벨 + 베팅 금액 */
-.quick-bets button.qb { display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1.1; }
+/* 두 줄: 라벨 + 베팅 금액. 폭 고정으로 크기 변동 방지 */
+.quick-bets button.qb { display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1.1; flex: 0 0 auto; width: 62px; min-width: 62px; padding: 8px 4px; }
 .quick-bets .qb-lbl { font-size: 14px; }
 .quick-bets .qb-amt { font-size: 12px; font-weight: 800; color: var(--gold); }
 
@@ -511,9 +512,22 @@ button { font-family: inherit; }
 }
 @keyframes nameGlow { 0%,100%{text-shadow:0 0 18px rgba(232,196,102,.5);} 50%{text-shadow:0 0 32px rgba(232,196,102,.95);} }
 .champ-sub { color: var(--text); font-size: 16px; margin-bottom: 20px; }
-.final-card ol { text-align: left; margin: 0 auto 22px; display: inline-block; }
-.final-card li { padding: 5px 0; color: var(--muted); font-size: 15px; }
-.final-card li.first { color: var(--gold); font-weight: 800; font-size: 19px; }
+.final-card ol { list-style: none; margin: 4px auto 20px; padding: 0; width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 6px; }
+.final-card li.rank-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 11px;
+  background: #161c25; border: 1px solid #2a3340; color: var(--text); font-size: 15px;
+}
+.final-card li.rank-row .rank-medal { font-size: 20px; width: 26px; text-align: center; flex: 0 0 auto; }
+.final-card li.rank-row .rank-name { flex: 1; text-align: left; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.final-card li.rank-row .rank-place { flex: 0 0 auto; font-size: 13px; color: var(--muted); }
+.final-card li.rank-row.first {
+  background: linear-gradient(180deg, #3a2f12, #241c08);
+  border-color: var(--gold); color: var(--gold);
+}
+.final-card li.rank-row.first .rank-name { color: #ffe9a8; }
+.final-card li.rank-row.first .rank-place { color: var(--gold); font-weight: 800; }
+.final-card li.rank-row.mine { box-shadow: 0 0 0 2px rgba(74,140,255,.55); }
 
 /* 컨페티 */
 .confetti { position: absolute; inset: 0; overflow: hidden; z-index: 1; pointer-events: none; }
@@ -547,11 +561,11 @@ button { font-family: inherit; }
   .fly-chip { display: none !important; }
   .bet-chip, .chip-s { animation: none !important; }
   /* 내 카드는 모바일에서도 크게(다른 좌석보다), 컴팩트하게 */
-  .seat.me-seat { --hc-h: min(82px, 13vh, 19vw); }
+  .seat.me-seat { --hc-h: min(66px, 10.5vh, 15vw); } /* 내 카드 20% 축소 */
   .actionbar { gap: 8px; }
   .actionbar button { padding: 15px 18px; font-size: 17px; }
   .action-main { gap: 8px; padding: 0 4px; }
-  .action-main button { flex: 1; padding: 16px 8px; }
+  .action-main button { flex: 0 0 30%; width: 30%; min-width: 0; padding: 15px 4px; } /* 개수 무관 동일 크기 */
   .action-raise { gap: 9px; padding: 8px 11px; width: calc(100% - 8px); }
   .quick-bets { flex: 0 0 auto; }
   .quick-bets button { padding: 11px 13px; font-size: 14px; }
