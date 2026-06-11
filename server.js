@@ -150,10 +150,11 @@ function broadcast(code) {
   }
   saveRoomsSoon(); // 상태 변화 시 디스크에 스냅샷(디바운스)
 }
-// 접속한 사람(봇 제외 = 소켓) 수 + 닉네임 목록 브로드캐스트
+// 닉네임을 입력해 '로그인 완료'한 사람만 접속 수로 집계 (봇 제외)
 const userNames = new Map(); // socketId -> 닉네임
 function broadcastOnline() {
-  io.emit('online', { count: io.engine.clientsCount, names: [...userNames.values()].filter(Boolean) });
+  const names = [...userNames.values()].filter(Boolean);
+  io.emit('online', { count: names.length, names });
 }
 
 // 자리 비움/합류 후 진행 인원이 다시 충분해지면 일시정지 해제하고 새 핸드 시작
@@ -291,12 +292,13 @@ function maybeBotAct(code) {
 io.on('connection', (socket) => {
   let roomCode = null;
   let playerId = socket.id;
-  broadcastOnline(); // 새 접속 → 인원 수 갱신
-  socket.emit('online', { count: io.engine.clientsCount, names: [...userNames.values()].filter(Boolean) });
+  broadcastOnline(); // 새 접속 → 인원 수 갱신(닉네임 입력자 기준)
   // 닉네임 등록(로비에서 닉 입력 후) → 접속자 목록에 반영
   socket.on('identify', (name) => {
     const nm = String(name || '').slice(0, 16).trim();
-    if (nm) { userNames.set(socket.id, nm); broadcastOnline(); }
+    if (nm) userNames.set(socket.id, nm);
+    else userNames.delete(socket.id); // 닉네임 비우면 집계 제외
+    broadcastOnline();
   });
 
   socket.on('create', ({ name, settings }, cb) => {

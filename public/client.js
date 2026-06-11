@@ -232,6 +232,12 @@ function showLobbyPane(which) {
 }
 $('goCreate').onclick = () => { const n = getName(); if (!n) return; myName = n; identify(); showLobbyPane('create'); };
 $('goJoin').onclick = () => { const n = getName(); if (!n) return; myName = n; identify(); showLobbyPane('join'); refreshRooms(); };
+// 닉네임을 입력하면 '로그인 완료'로 집계(타이핑 멈추면 반영)
+let _idTimer = null;
+$('nameInput').addEventListener('input', () => {
+  clearTimeout(_idTimer);
+  _idTimer = setTimeout(() => { myName = $('nameInput').value.trim(); socket.emit('identify', myName); }, 500);
+});
 document.querySelectorAll('[data-back]').forEach((b) => (b.onclick = () => showLobbyPane('home')));
 
 // 세그먼트 토글: 최대 인원 / 공개 설정
@@ -1245,11 +1251,11 @@ function renderWinner(s) {
   const banner = $('winnerBanner');
   if (s.results && s.phase === 'handComplete') {
     const lines = s.results.awards.map((a) =>
-      `🏆 ${a.winners.map((w) => esc(w.name)).join(', ')} 승리!` +
-      ` <span class="wb-amt">+${fmtAmt(a.amount)}</span>` +
-      (a.handName ? ` <span class="wb-hand">${esc(a.handName)}</span>` : '')
+      `<span class="wb-title">🏆 ${a.winners.map((w) => esc(w.name)).join(', ')} 승리!</span>` +
+      `<span class="wb-sub"><span class="wb-amt">+${fmtAmt(a.amount)}</span>` +
+      (a.handName ? ` <span class="wb-hand">· ${esc(a.handName)}</span>` : '') + `</span>`
     );
-    banner.innerHTML = lines.join('<br>');
+    banner.innerHTML = lines.join('<hr class="wb-div">');
     banner.classList.remove('hidden');
     banner.classList.remove('pop'); void banner.offsetWidth; banner.classList.add('pop');
   } else {
