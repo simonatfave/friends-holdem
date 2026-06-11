@@ -829,6 +829,8 @@ function renderWaitingSeats(s) {
 
 let _potChipsFrom = 0;
 let _winCards = new Set();
+let _winStreak = new Map(); // pid -> 연속 핸드 승리 수
+let _streakHand = -1;
 
 // ---------- 게임 렌더 ----------
 function renderGame(s) {
@@ -842,6 +844,17 @@ function renderGame(s) {
   if (s.results && s.phase === 'handComplete') {
     (s.results.reveal || []).filter((r) => r.isWinner).forEach((r) =>
       (r.best || []).forEach((c) => _winCards.add(c.r + '-' + c.s)));
+  }
+  // 연승 스트릭: 쇼다운마다 1회 갱신(승자 +1, 참여했는데 못 따면 0으로)
+  if (s.phase === 'handComplete' && s.results && _streakHand !== s.handNumber) {
+    _streakHand = s.handNumber;
+    const winIds = new Set();
+    (s.results.awards || []).forEach((a) => a.winners.forEach((w) => winIds.add(w.id)));
+    s.players.forEach((p) => {
+      const played = p.hole && !p.sittingOut && !p.eliminated;
+      if (winIds.has(p.id)) _winStreak.set(p.id, (_winStreak.get(p.id) || 0) + 1);
+      else if (played) _winStreak.set(p.id, 0);
+    });
   }
 
   $('handBadge').textContent = `${isSpectator ? '👁 관전 · ' : ''}핸드 #${s.handNumber}`;
@@ -1018,6 +1031,18 @@ function handleFx(s, prev) {
     const potTotal = (s.results.awards || []).reduce((a, x) => a + (x.amount || 0), 0);
     setTimeout(() => sfxPotCollect(potTotal), 280); // 팟 크기 비례 차르륵(승리음과 살짝 텀)
     flyPotToWinners(s);
+    // 족보 대형 팝업(실제 쇼다운, 2인 이상 공개 시) + 강한 족보엔 화면 흔들림
+    const revealed = (s.results.reveal || []).length;
+    const topAward = (s.results.awards || []).find((a) => a.handName) || (s.results.awards || [])[0];
+    const hn = topAward && topAward.handName;
+    if (hn && revealed >= 2) {
+      const tier = rankTier(hn);
+      setTimeout(() => showHandRankPopup(hn, tier), 360);
+      if (tier >= 4) setTimeout(() => screenShake('hard'), 360);
+      else if (tier >= 3) setTimeout(() => screenShake('soft'), 360);
+    }
+    // 큰 팟이 굳으면 가볍게 흔들림(쇼다운 없는 경우 포함)
+    if (potTotal >= (s.blinds ? s.blinds.bb * 30 : 60)) screenShake('soft');
     // 직전 핸드 요약 저장 → 다음 핸드 시작 시 토스트로 표시
     _lastHandRecap = (s.results.awards || []).map((a) =>
       `${a.winners.map((w) => esc(w.name)).join(', ')} +${fmtAmt(a.amount)}${a.handName ? ' · ' + esc(a.handName) : ''}`
@@ -1031,6 +1056,7 @@ function handleFx(s, prev) {
       _recentAllIn.set(p.id, Date.now() + 1500);
       showAllInFx(p.name);
       sfxAllIn();
+      screenShake('soft');
     }
   });
   // 칩 소진(탈락) 전환 감지 → 탈락 연출
@@ -1046,7 +1072,7 @@ function handleFx(s, prev) {
   // 헤드업(2인) 올인 성립 → 아주 특별한 VS 배틀 연출
   if (s.phase === 'runout' && prev.phase !== 'runout') {
     const conts = s.players.filter((p) => s.equity && s.equity[p.id] != null);
-    if (conts.length === 2) showHeadsUpBattle(conts[0], conts[1]);
+    if (conts.length === 2) { showHeadsUpBattle(conts[0], conts[1]); screenShake('hard'); }
   }
 }
 
@@ -1105,6 +1131,43 @@ function showRecapToast(text) {
   t.classList.add('show');
   clearTimeout(_recapTimer);
   _recapTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// 화면(테이블) 흔들림 — 올인·대형 팟의 타격감
+let _shakeTimer = null;
+function screenShake(level = 'soft') {
+  const t = document.querySelector('.poker-table');
+  if (!t) return;
+  t.classList.remove('shake-soft', 'shake-hard');
+  void t.offsetWidth; // 리플로우 → 연속 흔들림 재시작
+  t.classList.add(level === 'hard' ? 'shake-hard' : 'shake-soft');
+  clearTimeout(_shakeTimer);
+  _shakeTimer = setTimeout(() => t.classList.remove('shake-soft', 'shake-hard'), level === 'hard' ? 540 : 380);
+}
+// 족보 등급(1~5) — 팝업 강도/색상 결정
+function rankTier(name) {
+  if (!name) return 0;
+  if (name.includes('스트레이트 플러시')) return 5;
+  if (name.includes('포카드')) return 4;
+  if (name.includes('풀 하우스')) return 4;
+  if (name.includes('플러시')) return 3;
+  if (name.includes('스트레이트')) return 3;
+  if (name.includes('투 페어')) return 2;
+  if (name.includes('트리플')) return 2;
+  return 1; // 원 페어 / 하이 카드
+}
+// 족보 대형 팝업 — 쇼다운에서 화면 중앙에 등급별 색·강도로 등장
+let _rankTimer = null;
+function showHandRankPopup(name, tier) {
+  const host = document.querySelector('.poker-table') || document.body;
+  let ov = document.getElementById('rankFx');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'rankFx'; }
+  if (ov.parentElement !== host) host.appendChild(ov);
+  ov.className = 'rank-fx tier' + tier;
+  ov.innerHTML = `<div class="rank-name">${esc(name)}!</div>`;
+  ov.classList.remove('show'); void ov.offsetWidth; ov.classList.add('show');
+  clearTimeout(_rankTimer);
+  _rankTimer = setTimeout(() => ov.classList.remove('show'), 2200);
 }
 
 // 게임 중 새 플레이어 합류 토스트
@@ -1306,7 +1369,9 @@ function renderSeats(s) {
 }
 
 function seatNameTags(p) {
-  return `${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${(!p.connected && !p.isBot) ? '<span class="tag off">끊김</span>' : ''} ${(p.sittingOut && !p.eliminated) ? '<span class="tag sitout">자리비움</span>' : ''} ${(p.penaltyShort && !p.eliminated) ? '<span class="tag short">⏱단축</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}`;
+  const streak = _winStreak.get(p.id) || 0;
+  const streakTag = (streak >= 2 && !p.eliminated) ? `<span class="tag streak">🔥${streak}</span>` : '';
+  return `${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${streakTag} ${(!p.connected && !p.isBot) ? '<span class="tag off">끊김</span>' : ''} ${(p.sittingOut && !p.eliminated) ? '<span class="tag sitout">자리비움</span>' : ''} ${(p.penaltyShort && !p.eliminated) ? '<span class="tag short">⏱단축</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}`;
 }
 function seatClasses(s, p, isMe) {
   const done = s.phase === 'handComplete' && s.results;

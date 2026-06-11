@@ -226,6 +226,51 @@ button { font-family: inherit; }
 .card.win { box-shadow: 0 0 0 3px var(--gold), 0 0 18px rgba(232,196,102,.9); animation: winPulse .8s ease-in-out infinite; z-index: 4; }
 @keyframes winPulse { 0%,100% { box-shadow: 0 0 0 3px var(--gold), 0 0 14px rgba(232,196,102,.7); } 50% { box-shadow: 0 0 0 3px var(--gold), 0 0 26px rgba(232,196,102,1); } }
 .card.muck:not(.win) { opacity: .55; }
+.card.win { box-shadow: 0 0 0 3px var(--gold), 0 0 22px rgba(232,196,102,1); }
+
+/* ---------- 현재 차례 좌석: 회전 스포트라이트 링 ---------- */
+.seat.active .seat-inner { position: relative; }
+.seat.active .seat-inner::after {
+  content: ''; position: absolute; inset: -6px; border-radius: 16px; z-index: -1; pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0 28%, rgba(232,196,102,.95) 50%, transparent 72% 100%);
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+          mask: radial-gradient(closest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+  animation: spotSpin 1.6s linear infinite;
+}
+.seat.active.myturn .seat-inner::after { background: conic-gradient(from 0deg, transparent 0 22%, rgba(120,220,160,1) 50%, transparent 78% 100%); }
+@keyframes spotSpin { to { transform: rotate(360deg); } }
+
+/* ---------- 연승 스트릭 뱃지 ---------- */
+.tag.streak { background: linear-gradient(180deg,#ff7a3d,#e23d2b); color:#fff; font-weight:800; animation: streakPulse 1s ease-in-out infinite; }
+@keyframes streakPulse { 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.13); } }
+
+/* ---------- 화면(테이블) 흔들림 ---------- */
+@keyframes shakeSoft { 10%,90%{transform:translate(-1px,0);} 30%,70%{transform:translate(2px,-1px);} 50%{transform:translate(-2px,1px);} }
+@keyframes shakeHard { 10%{transform:translate(-3px,1px) rotate(-.4deg);} 25%{transform:translate(4px,-2px) rotate(.5deg);} 40%{transform:translate(-5px,2px) rotate(-.5deg);} 55%{transform:translate(4px,1px);} 70%{transform:translate(-3px,-1px) rotate(.3deg);} 85%{transform:translate(2px,1px);} }
+.poker-table.shake-soft { animation: shakeSoft .38s ease; }
+.poker-table.shake-hard { animation: shakeHard .54s ease; }
+
+/* ---------- 족보 대형 팝업 ---------- */
+.rank-fx { position: absolute; top: 38%; left: 50%; transform: translate(-50%,-50%); z-index: 60; pointer-events: none; opacity: 0; text-align: center; }
+.rank-fx.show { animation: rankPop 2.2s cubic-bezier(.2,.8,.3,1.4) forwards; }
+.rank-fx .rank-name { font-weight: 900; font-size: clamp(30px, 7vw, 64px); letter-spacing: 1px; white-space: nowrap; color: var(--gold); text-shadow: 0 3px 18px rgba(0,0,0,.85), 0 0 24px rgba(232,196,102,.85); }
+@keyframes rankPop {
+  0% { opacity: 0; transform: translate(-50%,-50%) scale(.5); }
+  14% { opacity: 1; transform: translate(-50%,-50%) scale(1.14); }
+  24% { transform: translate(-50%,-50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-60%) scale(.96); }
+}
+.rank-fx.tier1 .rank-name { color: #cfd6df; text-shadow: 0 3px 14px rgba(0,0,0,.85); font-size: clamp(24px,5.4vw,44px); }
+.rank-fx.tier2 .rank-name { color: #8fd0ff; }
+.rank-fx.tier3 .rank-name { color: #5ad08a; text-shadow: 0 3px 18px rgba(0,0,0,.85), 0 0 22px rgba(90,208,138,.85); }
+.rank-fx.tier4 .rank-name { color: var(--gold); }
+.rank-fx.tier5 .rank-name {
+  background: linear-gradient(90deg,#ff5e5e,#ffd166,#5ad08a,#5a9bff,#c06cff);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: clamp(34px,8vw,72px); animation: royalGlow 1.2s ease-in-out infinite;
+}
+@keyframes royalGlow { 0%,100%{ filter: drop-shadow(0 0 10px rgba(255,209,102,.8)); } 50%{ filter: drop-shadow(0 0 26px rgba(192,108,255,.95)); } }
 
 /* 연결 끊김 */
 .tag.off { background: var(--red); color: #fff; }
