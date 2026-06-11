@@ -198,6 +198,7 @@ export class Game {
       minRaise: blinds.bb,
       toActIndex: 0,
       hasActed: {},
+      lastAct: {}, // id -> { type, amount } 마지막 액션(라벨용)
       lastAggressor: null,
       results: null,
     };
@@ -297,16 +298,19 @@ export class Game {
     if (action === 'fold') {
       h.folded[p.id] = true;
       h.hasActed[p.id] = true;
+      h.lastAct[p.id] = { type: 'fold' };
       this.pushLog(`${p.name} 폴드`);
     } else if (action === 'check') {
       if (toCall > 0) return { ok: false, error: '체크할 수 없습니다 (콜 필요)' };
       h.hasActed[p.id] = true;
+      h.lastAct[p.id] = { type: 'check' };
       this.pushLog(`${p.name} 체크`);
     } else if (action === 'call') {
       if (toCall <= 0) return { ok: false, error: '콜할 게 없습니다' };
       const pay = Math.min(toCall, p.chips);
       this.commitBet(p, pay);
       h.hasActed[p.id] = true;
+      h.lastAct[p.id] = { type: 'call', amount: pay, allIn: p.chips === 0 };
       this.pushLog(`${p.name} 콜 ${pay}`);
     } else if (action === 'raise' || action === 'bet') {
       // amount = 목표 총 베팅액(to)
@@ -331,6 +335,7 @@ export class Game {
         if (!h.folded[s.id] && !h.allIn[s.id] && s.id !== p.id) h.hasActed[s.id] = false;
       }
       h.hasActed[p.id] = true;
+      h.lastAct[p.id] = { type: toCall === 0 ? 'bet' : 'raise', amount: target, allIn: isAllIn };
       this.pushLog(`${p.name} ${h.bets[p.id] === pay && toCall === 0 ? '벳' : '레이즈'} → ${target}`);
     } else {
       return { ok: false, error: '알 수 없는 액션' };
@@ -802,11 +807,19 @@ export class Game {
         folded: h ? !!h.folded[p.id] : false,
         allIn: h ? !!h.allIn[p.id] : false,
         bet: h ? (h.bets[p.id] ?? 0) : 0,
+        lastAction: h ? (h.lastAct[p.id] || null) : null,
         isButton: h ? h.seats[0]?.id === p.id : false,
         isToAct: p.id === toActId,
         hole: showHole ? h.holes[p.id] : (inHand ? [{ hidden: true }, { hidden: true }] : null),
       };
     });
+
+    // 뷰어의 현재 최선 족보(플랍 이후, 폴드 안 했을 때)
+    let myHand = null;
+    if (h && h.holes[viewerId] && !h.folded[viewerId] && h.community.length >= 3
+        && h.seats.some((s) => s.id === viewerId)) {
+      myHand = handName(evaluate7([...h.holes[viewerId], ...h.community]), 'ko');
+    }
 
     // 시간 기반 블라인드일 때 다음 레벨까지 남은 초
     let secondsToNextLevel = null;
@@ -825,6 +838,7 @@ export class Game {
       blinds,
       nextLevelIn: this.handsPerLevel - ((this.handNumber - 1) % this.handsPerLevel) - 1,
       timedBlinds: this.isTimed(),
+      myHand,
       secondsToNextLevel,
       runout: !!h?.runout,
       equity: h?.equity ?? null,

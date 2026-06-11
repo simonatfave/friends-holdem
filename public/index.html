@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=56" />
+  <link rel="stylesheet" href="style.css?v=58" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -29,10 +29,29 @@
           <text x="92" y="67" font-family="-apple-system,Segoe UI,sans-serif" font-size="58" font-weight="800" fill="#e8c466" letter-spacing="3">DICE</text>
         </svg>
       </div>
-      <p class="sub">입장하려면 비밀번호를 입력하세요</p>
-      <input id="gatePw" type="password" inputmode="numeric" autocomplete="off" placeholder="비밀번호" maxlength="16" />
-      <button id="gateBtn" class="primary">입장</button>
+      <p class="sub">닉네임과 비밀번호로 로그인하세요</p>
+      <label>닉네임</label>
+      <input id="authNick" maxlength="16" autocomplete="username" placeholder="닉네임 (2자 이상)" />
+      <label>비밀번호</label>
+      <input id="authPw" type="password" autocomplete="current-password" placeholder="비밀번호 (4자 이상)" maxlength="32" />
+      <button id="loginBtn" class="primary">로그인</button>
+      <button id="signupBtn" class="primary alt">회원가입</button>
       <p id="gateError" class="error"></p>
+    </div>
+  </div>
+
+  <!-- 내 계정 (잔고 · 통계 · 히스토리) -->
+  <div id="accountPanel" class="overlay hidden">
+    <div class="settings-card account-card">
+      <h3>내 계정</h3>
+      <div class="acc-head">
+        <span id="accNick" class="acc-nick">–</span>
+        <span class="acc-balance">💰 <b id="accBalance">0</b></span>
+      </div>
+      <div class="acc-stats" id="accStats"></div>
+      <h4 class="acc-h4">최근 게임</h4>
+      <div id="accHistory" class="acc-history"></div>
+      <button id="accClose" class="primary">닫기</button>
     </div>
   </div>
 
@@ -56,10 +75,14 @@
 
       <!-- 1단계: 시작 -->
       <div id="lobbyHome" class="pane">
-        <label>닉네임</label>
-        <input id="nameInput" maxlength="16" placeholder="이름을 입력하세요" />
+        <div class="me-row">
+          <span class="me-nick" id="meNick">–</span>
+          <span class="me-balance">💰 <b id="meBalance">0</b></span>
+        </div>
+        <input id="nameInput" type="hidden" />
         <button id="goCreate" class="primary">방 만들기</button>
         <button id="goJoin" class="primary alt">참여하기</button>
+        <button id="accBtn" class="ghost wide">📊 내 계정 · 통계</button>
       </div>
 
       <!-- 2단계: 방 만들기 옵션 -->
@@ -183,6 +206,7 @@
         <div id="seats"></div>
         <div class="winner-banner hidden" id="winnerBanner"></div>
       </div>
+      <div id="myHandHint" class="hand-hint hidden"></div>
     </div>
 
     <div class="action-timer hidden" id="actionTimer"><div id="actionTimerFill"></div></div>
@@ -226,6 +250,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=56"></script>
+  <script src="client.js?v=58"></script>
 </body>
 </html>

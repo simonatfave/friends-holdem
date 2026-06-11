@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { scryptSync, randomBytes, timingSafeEqual } from 'crypto';
 import { Game, defaultBlindSchedule } from './src/game.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -21,6 +22,47 @@ app.use(
 app.get('/health', (_req, res) => res.json({ ok: true, rooms: rooms.size }));
 
 const PORT = process.env.PORT || 3000;
+
+// ---------- 계정 시스템 (파일 기반) ----------
+const USERS_FILE = process.env.USERS_FILE || join(__dirname, 'users.json');
+const users = new Map(); // nickLower -> account
+function loadUsers() {
+  try {
+    if (!existsSync(USERS_FILE)) return;
+    const data = JSON.parse(readFileSync(USERS_FILE, 'utf8'));
+    for (const u of data) users.set(u.nick.toLowerCase(), u);
+    console.log(`계정 ${users.size}개 로드`);
+  } catch (e) { console.error('계정 로드 실패:', e.message); }
+}
+let _usersTimer = null;
+function saveUsersSoon() {
+  if (_usersTimer) return;
+  _usersTimer = setTimeout(() => {
+    _usersTimer = null;
+    try { writeFileSync(USERS_FILE, JSON.stringify([...users.values()])); }
+    catch (e) { console.error('계정 저장 실패:', e.message); }
+  }, 1000);
+}
+function hashPw(pw, salt) { return scryptSync(String(pw), salt, 32).toString('hex'); }
+function makeAccount(nick, pw) {
+  const salt = randomBytes(12).toString('hex');
+  return {
+    nick, salt, hash: hashPw(pw, salt), createdAt: Date.now(),
+    balance: 1000, // 시작 포인트(밸런스)
+    stats: { games: 0, wins: 0, handsWon: 0, biggestPot: 0, bestPlace: null },
+    history: [], // 최근 게임 결과(최신이 앞)
+  };
+}
+function verifyPw(acc, pw) {
+  try {
+    const a = Buffer.from(acc.hash, 'hex');
+    const b = scryptSync(String(pw), acc.salt, 32);
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch (e) { return false; }
+}
+function profileOf(acc) {
+  return { nick: acc.nick, balance: acc.balance, stats: acc.stats, history: acc.history.slice(0, 20) };
+}
 
 // ---------- 방 관리 ----------
 const rooms = new Map(); // code -> { game, hostId, timer, settings }
@@ -148,6 +190,8 @@ function broadcast(code) {
   if (room.spectators) {
     for (const sid of room.spectators) io.to(sid).emit('state', stateFor(room, sid));
   }
+  tallyHand(code);          // 핸드 승자 통계 누적
+  recordGameResults(code);  // 토너먼트 종료 시 계정 기록
   saveRoomsSoon(); // 상태 변화 시 디스크에 스냅샷(디바운스)
 }
 // 닉네임을 입력해 '로그인 완료'한 사람만 접속 수로 집계 (봇 제외)
@@ -155,6 +199,49 @@ const userNames = new Map(); // socketId -> 닉네임
 function broadcastOnline() {
   const names = [...userNames.values()].filter(Boolean);
   io.emit('online', { count: names.length, names });
+}
+// 핸드 종료 시 승자 통계 누적(중복 방지)
+function tallyHand(code) {
+  const room = rooms.get(code);
+  if (!room) return;
+  const g = room.game, h = g.hand;
+  if (!h || h.phase !== 'handComplete' || !h.results) return;
+  if (room.lastTalliedHand === g.handNumber) return;
+  room.lastTalliedHand = g.handNumber;
+  room.tally = room.tally || {};
+  for (const a of h.results.awards || []) {
+    for (const w of a.winners) {
+      const t = (room.tally[w.name] = room.tally[w.name] || { handsWon: 0, biggestPot: 0 });
+      t.handsWon++;
+      t.biggestPot = Math.max(t.biggestPot, a.amount || 0);
+    }
+  }
+}
+// 토너먼트 종료 시 계정에 결과 기록(한 번만)
+function recordGameResults(code) {
+  const room = rooms.get(code);
+  if (!room || room.recorded || !room.game.finished) return;
+  room.recorded = true;
+  const g = room.game;
+  const humanCount = g.players.filter((p) => !p.isBot).length;
+  for (const r of g.results || []) {
+    const acc = users.get(String(r.name).toLowerCase());
+    if (!acc) continue;
+    acc.stats.games++;
+    if (r.place === 1) { acc.stats.wins++; acc.balance += 100 * Math.max(1, humanCount - 1); }
+    else acc.balance = Math.max(0, acc.balance - 50);
+    if (acc.stats.bestPlace == null || r.place < acc.stats.bestPlace) acc.stats.bestPlace = r.place;
+    const t = room.tally && room.tally[r.name];
+    if (t) { acc.stats.handsWon += t.handsWon || 0; acc.stats.biggestPot = Math.max(acc.stats.biggestPot, t.biggestPot || 0); }
+    acc.history.unshift({ at: Date.now(), code, place: r.place, players: humanCount, win: r.place === 1 });
+    if (acc.history.length > 50) acc.history.length = 50;
+  }
+  saveUsersSoon();
+  for (const p of g.players) {
+    if (p.isBot || !p.socketId) continue;
+    const acc = users.get(String(p.name).toLowerCase());
+    if (acc) io.to(p.socketId).emit('profile', profileOf(acc));
+  }
 }
 
 // 자리 비움/합류 후 진행 인원이 다시 충분해지면 일시정지 해제하고 새 핸드 시작
@@ -299,6 +386,32 @@ io.on('connection', (socket) => {
     if (nm) userNames.set(socket.id, nm);
     else userNames.delete(socket.id); // 닉네임 비우면 집계 제외
     broadcastOnline();
+  });
+
+  // ---------- 회원가입 / 로그인 / 프로필 ----------
+  socket.on('signup', ({ nick, password } = {}, cb) => {
+    nick = String(nick || '').trim().slice(0, 16);
+    if (nick.length < 2) return cb?.({ ok: false, error: '닉네임은 2자 이상이어야 합니다' });
+    if (!password || String(password).length < 4) return cb?.({ ok: false, error: '비밀번호는 4자 이상이어야 합니다' });
+    if (users.has(nick.toLowerCase())) return cb?.({ ok: false, error: '이미 사용 중인 닉네임입니다' });
+    const acc = makeAccount(nick, password);
+    users.set(nick.toLowerCase(), acc);
+    saveUsersSoon();
+    socket.account = nick;
+    userNames.set(socket.id, nick); broadcastOnline();
+    cb?.({ ok: true, profile: profileOf(acc) });
+  });
+  socket.on('login', ({ nick, password } = {}, cb) => {
+    nick = String(nick || '').trim();
+    const acc = users.get(nick.toLowerCase());
+    if (!acc || !verifyPw(acc, password)) return cb?.({ ok: false, error: '닉네임 또는 비밀번호가 올바르지 않습니다' });
+    socket.account = acc.nick;
+    userNames.set(socket.id, acc.nick); broadcastOnline();
+    cb?.({ ok: true, profile: profileOf(acc) });
+  });
+  socket.on('getProfile', (_d, cb) => {
+    const acc = socket.account && users.get(socket.account.toLowerCase());
+    cb?.(acc ? { ok: true, profile: profileOf(acc) } : { ok: false });
   });
 
   socket.on('create', ({ name, settings }, cb) => {
@@ -657,6 +770,7 @@ setInterval(() => {
   }
 }, 60000);
 
+loadUsers(); // 계정 로드
 loadRooms(); // 이전 상태 복구
 httpServer.listen(PORT, () => {
   console.log(`🎲 Dice 서버 실행: http://localhost:${PORT}`);

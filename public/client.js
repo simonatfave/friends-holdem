@@ -206,22 +206,64 @@ const isRedSuit = (s) => s === 1 || s === 2;
 const RANK_LBL = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A', 10: '10' };
 const rankLabel = (r) => RANK_LBL[r] || String(r);
 
-// ---------- 입장 비밀번호 게이트 ----------
-const GATE_PW = '0110';
-function openLobby() { hide('gate'); show('lobby'); showLobbyPane('home'); setTimeout(() => $('nameInput') && $('nameInput').focus(), 50); }
-function submitGate() {
-  if ($('gatePw').value.trim() === GATE_PW) {
-    try { sessionStorage.setItem('dice_auth', '1'); } catch (e) {}
-    openLobby();
-  } else {
-    $('gateError').textContent = '비밀번호가 올바르지 않습니다';
-    $('gatePw').value = '';
-    $('gatePw').focus();
-  }
+// ---------- 로그인 / 회원가입 / 계정 ----------
+let myProfile = null;
+function openLobby() { hide('gate'); show('lobby'); showLobbyPane('home'); }
+function updateMeDisplay() {
+  if (!myProfile) return;
+  $('meNick').textContent = myProfile.nick;
+  $('meBalance').textContent = myProfile.balance;
 }
-$('gateBtn').onclick = submitGate;
-$('gatePw').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitGate(); });
-try { if (sessionStorage.getItem('dice_auth') === '1') openLobby(); else $('gatePw').focus(); } catch (e) { $('gatePw').focus(); }
+function onLoggedIn(profile) {
+  myProfile = profile;
+  myName = profile.nick;
+  const ni = $('nameInput'); if (ni) ni.value = profile.nick;
+  updateMeDisplay();
+  identify();
+  openLobby();
+}
+function doAuth(kind) {
+  const nick = $('authNick').value.trim();
+  const password = $('authPw').value;
+  if (!nick || !password) { $('gateError').textContent = '닉네임과 비밀번호를 입력하세요'; return; }
+  $('gateError').textContent = '';
+  socket.emit(kind, { nick, password }, (res) => {
+    if (!res || !res.ok) { $('gateError').textContent = (res && res.error) || '실패했습니다'; return; }
+    onLoggedIn(res.profile);
+  });
+}
+$('loginBtn').onclick = () => doAuth('login');
+$('signupBtn').onclick = () => doAuth('signup');
+$('authPw').addEventListener('keydown', (e) => { if (e.key === 'Enter') doAuth('login'); });
+setTimeout(() => $('authNick') && $('authNick').focus(), 50);
+
+// 게임 종료 후 서버가 보내는 프로필 갱신
+socket.on('profile', (p) => { myProfile = p; updateMeDisplay(); if (!$('accountPanel').classList.contains('hidden')) renderAccount(); });
+
+// 내 계정 보기
+$('accBtn').onclick = () => { renderAccount(); show('accountPanel'); };
+$('accClose').onclick = () => hide('accountPanel');
+function renderAccount() {
+  if (!myProfile) return;
+  $('accNick').textContent = myProfile.nick;
+  $('accBalance').textContent = myProfile.balance;
+  const st = myProfile.stats || {};
+  const rows = [
+    ['게임 수', st.games || 0], ['우승', st.wins || 0],
+    ['승률', (st.games ? Math.round((st.wins / st.games) * 100) : 0) + '%'],
+    ['핸드 승', st.handsWon || 0], ['최고 순위', st.bestPlace ? st.bestPlace + '위' : '-'],
+    ['최대 팟', st.biggestPot || 0],
+  ];
+  $('accStats').innerHTML = rows.map(([k, v]) => `<div class="acc-stat"><span class="acc-k">${k}</span><span class="acc-v">${v}</span></div>`).join('');
+  const hist = myProfile.history || [];
+  $('accHistory').innerHTML = hist.length
+    ? hist.map((h) => {
+        const d = new Date(h.at);
+        const dt = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        return `<div class="acc-hist-row ${h.win ? 'win' : ''}"><span>${dt}</span><span>${h.players}인</span><span>${h.place}위${h.win ? ' 🏆' : ''}</span></div>`;
+      }).join('')
+    : '<div class="room-empty">아직 게임 기록이 없어요</div>';
+}
 
 // ---------- 로비 화면 전환 (시작 / 방만들기 / 참여하기) ----------
 function showLobbyPane(which) {
@@ -664,15 +706,19 @@ function renderGame(s) {
     }
   }
   $('potDisplay').textContent = s.pot > 0 ? `팟: ${fmtAmt(s.pot)}` : '';
-  renderPotStack(s);
 
+  _revealFlip = s.phase === 'handComplete' && _newHandPhasePrev !== 'handComplete'; // 쇼다운 첫 진입에 상대 카드 플립
   renderSeats(s);
   animateChips(s, prev ? prev.chips : null);
   renderActions(s);
   renderLog(s);
   renderWinner(s);
+  // 내 패 힌트
+  const hint = $('myHandHint');
+  if (hint) { hint.textContent = s.myHand ? `내 패: ${s.myHand}` : ''; hint.classList.toggle('hidden', !s.myHand); }
 
   handleFx(s, prev);
+  _newHandPhasePrev = s.phase;
   prevSnap = {
     handNumber: s.handNumber,
     commCount: s.community.length,
@@ -680,18 +726,25 @@ function renderGame(s) {
     pot: s.pot,
     toActId: s.toActId,
     chips: chipMap(s),
+    bets: betMap(s),
+    lastActions: lastActionMap(s),
+    level: s.level,
     allInIds: s.players.filter((p) => p.allIn).map((p) => p.id),
     bustIds: s.players.filter((p) => p.eliminated).map((p) => p.id),
   };
 
   if (s.finished && s.finalResults) renderFinal(s);
 }
-
+let _revealFlip = false;
+let _newHandPhasePrev = null;
 function chipMap(s) {
   const m = {};
   s.players.forEach((p) => (m[p.id] = p.chips));
   return m;
 }
+function betMap(s) { const m = {}; s.players.forEach((p) => (m[p.id] = p.bet || 0)); return m; }
+function actKey(la) { return la ? la.type + (la.allIn ? '!' : '') + (la.amount || '') : ''; }
+function lastActionMap(s) { const m = {}; s.players.forEach((p) => (m[p.id] = actKey(p.lastAction))); return m; }
 
 // 팟 칩 더미: 가치별 칩으로 분해 (검정 10, 빨강 5, 녹색 1)
 const POT_DENOM = [[10, '#23262d'], [5, '#e25555'], [1, '#3ec97a']];
@@ -776,6 +829,19 @@ function handleFx(s, prev) {
   }
   if (s.toActId === myId && prev.toActId !== myId) { sfxTurn(); notifyMyTurn(); }
   if (s.toActId !== myId) stopTitleBlink();
+
+  // 베팅 칩이 팟으로 슬라이드 + 마지막 액션 라벨
+  const pb = prev.bets || {}, pla = prev.lastActions || {};
+  s.players.forEach((p) => {
+    const nb = p.bet || 0;
+    if (!newHand && nb > (pb[p.id] || 0)) flyBetToPot(p.id); // 베팅 증가 → 칩 슬라이드
+    if (p.lastAction && actKey(p.lastAction) !== (pla[p.id] || '')) showActionLabel(p.id, p.lastAction);
+  });
+
+  // 블라인드(세션) 상승 알림
+  if (prev.level != null && s.level > prev.level && s.blinds) {
+    showBlindToast(`⬆ 블라인드 상승 ${s.blinds.sb}/${s.blinds.bb}`);
+  }
 
   if (s.phase === 'handComplete' && prev.phase !== 'handComplete' && s.results) {
     sfxWin();
@@ -945,6 +1011,54 @@ function flyPotToWinners(s) {
     }
   });
 }
+
+// 베팅 칩이 좌석 → 중앙(팟)으로 슬라이드
+function flyBetToPot(id) {
+  const table = document.querySelector('.poker-table');
+  const seat = document.querySelector(`.seat[data-pid="${cssEsc(id)}"]`);
+  if (!table || !seat) return;
+  const tr = table.getBoundingClientRect();
+  const cx = tr.left + tr.width / 2, cy = tr.top + tr.height / 2;
+  const sr = seat.getBoundingClientRect();
+  const sx = sr.left + sr.width / 2, sy = sr.top + sr.height / 2;
+  for (let k = 0; k < 2; k++) {
+    const chip = document.createElement('div');
+    chip.className = 'bet-fly';
+    chip.style.left = sx + 'px'; chip.style.top = sy + 'px';
+    chip.style.transform = 'translate(-50%,-50%)';
+    document.body.appendChild(chip);
+    requestAnimationFrame(() => {
+      chip.style.transition = `transform .42s cubic-bezier(.3,.7,.3,1) ${k * 0.05}s, opacity .42s ${k * 0.05}s`;
+      chip.style.transform = `translate(calc(-50% + ${cx - sx}px), calc(-50% + ${cy - sy}px)) scale(.7)`;
+      chip.style.opacity = '0.1';
+    });
+    setTimeout(() => chip.remove(), 560 + k * 60);
+  }
+}
+
+// 플레이어 마지막 액션 라벨(좌석 위로 잠깐 표시)
+const ACT_LABEL = { fold: '폴드', check: '체크', call: '콜', bet: '벳', raise: '레이즈' };
+function showActionLabel(id, la) {
+  const seat = document.querySelector(`.seat[data-pid="${cssEsc(id)}"]`);
+  if (!seat) return;
+  const el = document.createElement('div');
+  el.className = 'act-label ' + (la.allIn ? 'allin' : la.type);
+  el.textContent = la.allIn ? '올인!' : (ACT_LABEL[la.type] || la.type);
+  seat.appendChild(el);
+  setTimeout(() => el.remove(), 1400);
+}
+
+// 블라인드 상승 토스트
+let _blindTimer = null;
+function showBlindToast(text) {
+  let t = document.getElementById('blindToast');
+  if (!t) { t = document.createElement('div'); t.id = 'blindToast'; t.className = 'recap-toast blind-toast'; document.body.appendChild(t); }
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(_blindTimer);
+  _blindTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
 function cssEsc(s) {
   return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&');
 }
@@ -1094,12 +1208,16 @@ function updateSeatInPlace(seat, p, s) {
 
 function renderHole(p, seatIdx = 0) {
   if (!p.hole) return '';
+  const showdownReveal = _revealFlip && p.id !== myId && !p.folded; // 쇼다운 시 상대 카드 플립
   return p.hole.map((c, ci) => {
     let extra = '', style = '';
     if (_dealNewHand) {
       extra = 'deal-in';
       const delay = (seatIdx * 0.12 + ci * 0.07).toFixed(2);
       style = `style="animation-delay:${delay}s"`;
+    } else if (showdownReveal && !c.hidden) {
+      extra = 'flip-in';
+      style = `style="animation-delay:${(ci * 0.12).toFixed(2)}s"`;
     }
     if (c.hidden) return cardHtml(null, true, p.folded, extra, style);
     return cardHtml(c, false, p.folded, extra, style);
