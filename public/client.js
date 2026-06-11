@@ -61,6 +61,20 @@ function toast(text, kind) {
   _appToastTimer = setTimeout(() => t.classList.remove('show'), 3200);
 }
 
+// 콜드 스타트(무료 서버 잠듦) 안내: 연결이 2.5초 내 안 되면 깨우는 중 안내
+const _coldTimer = setTimeout(() => {
+  if (!socket.connected) toast('서버를 깨우는 중입니다… 최대 1분 정도 걸릴 수 있어요');
+}, 2500);
+socket.on('connect', () => clearTimeout(_coldTimer));
+
+// 모달 ESC로 닫기(게임 진행에 영향 없는 오버레이만)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  ['accountPanel', 'signupPanel', 'onlinePanel', 'settingsPanel', 'timerPopup'].forEach((id) => {
+    const el = $(id); if (el && !el.classList.contains('hidden')) hide(id);
+  });
+});
+
 // 배포 버전 표시 (client.js?v=NN 에서 자동 추출)
 (function showVersion() {
   const s = document.querySelector('script[src*="client.js"]');

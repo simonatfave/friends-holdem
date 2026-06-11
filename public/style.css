@@ -1290,3 +1290,8 @@ body.reduce-motion.my-turn-glow::after { animation: none !important; }
   .tag.streak, .monster-pot.show,
   body.my-turn-glow::after { animation: none !important; }
 }
+
+/* 노치/홈바 safe-area 대응 */
+.topbar { padding-top: max(0px, env(safe-area-inset-top)); }
+.actionbar { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+.app-toast { bottom: calc(86px + env(safe-area-inset-bottom)); }

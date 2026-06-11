@@ -40,7 +40,8 @@ async function initDb() {
     try {
       pool = new pg.default.Pool({ connectionString: DB_URL, ssl, max: 4, connectionTimeoutMillis: 8000 });
       await pool.query('CREATE TABLE IF NOT EXISTS accounts (nick text primary key, data jsonb)');
-      console.log(`DB 연결 OK — 계정 영구 저장 (ssl=${ssl ? 'on' : 'off'})`);
+      await pool.query('CREATE TABLE IF NOT EXISTS room_states (code text primary key, data jsonb)');
+      console.log(`DB 연결 OK — 계정·방 영구 저장 (ssl=${ssl ? 'on' : 'off'})`);
       return true;
     } catch (e) {
       try { await pool?.end(); } catch (_) {}
@@ -198,51 +199,70 @@ function serializeRooms() {
 let _saveTimer = null;
 function saveRoomsSoon() {
   if (_saveTimer) return;
-  _saveTimer = setTimeout(() => {
+  _saveTimer = setTimeout(async () => {
     _saveTimer = null;
-    try { writeFileSync(SAVE_FILE, JSON.stringify(serializeRooms())); }
-    catch (e) { console.error('상태 저장 실패:', e.message); }
+    const list = serializeRooms();
+    if (pool) {
+      try {
+        const codes = list.map((r) => r.code);
+        if (codes.length) await pool.query('DELETE FROM room_states WHERE code <> ALL($1)', [codes]);
+        else await pool.query('DELETE FROM room_states');
+        for (const r of list) {
+          await pool.query('INSERT INTO room_states(code,data) VALUES($1,$2) ON CONFLICT(code) DO UPDATE SET data=$2', [r.code, r]);
+        }
+      } catch (e) { console.error('방 상태 DB 저장 실패:', e.message); }
+    } else {
+      try { writeFileSync(SAVE_FILE, JSON.stringify(list)); }
+      catch (e) { console.error('상태 저장 실패:', e.message); }
+    }
   }, 1500);
 }
-function loadRooms() {
-  try {
-    if (!existsSync(SAVE_FILE)) return;
-    const data = JSON.parse(readFileSync(SAVE_FILE, 'utf8'));
-    for (const r of data) {
-      const rg = r.game;
-      const g = new Game({
-        startingChips: rg.startingChips,
-        levelDurationSec: rg.levelDurationSec,
-        levelDurations: rg.levelDurations,
-        handsPerLevel: rg.handsPerLevel,
-        blindSchedule: rg.blindSchedule,
-      });
-      g.players = rg.players.map((p) => ({
-        ...p, connected: false, socketId: null,
-      }));
-      g.button = rg.button ?? -1;
-      g.level = rg.level ?? 0;
-      g.handNumber = rg.handNumber ?? 0;
-      g.startedAt = rg.startedAt ?? null;
-      g.started = !!rg.started;
-      g.finished = false;
-      g.results = rg.results || [];
-      const room = { game: g, hostId: r.hostId, actionLimit: r.actionLimit, maxPlayers: r.maxPlayers || 9, secret: !!r.secret, restoredAt: Date.now() };
-      rooms.set(r.code, room);
-      // 진행 중이었으면 새 핸드로 재개(중단된 핸드는 버림, 칩은 핸드 전 스택으로 보존)
-      if (g.started) {
-        const playable = g.players.filter((p) => !p.eliminated && p.chips > 0 && !p.sittingOut);
-        if (playable.length >= 2) {
-          g.startHand();
-          startActionTimer(r.code); // 끊긴 플레이어는 타이머가 자동 폴드하지 않음(대기)
-          scheduleNextHand(r.code);
-          maybeBotAct(r.code);
-          driveRunout(r.code);
-        } else {
-          g.paused = true;
-        }
-      }
+// 직렬화된 방 데이터 1건 → 메모리 복구
+function reconstructRoom(r) {
+  const rg = r.game;
+  const g = new Game({
+    startingChips: rg.startingChips,
+    levelDurationSec: rg.levelDurationSec,
+    levelDurations: rg.levelDurations,
+    handsPerLevel: rg.handsPerLevel,
+    blindSchedule: rg.blindSchedule,
+  });
+  g.players = rg.players.map((p) => ({ ...p, connected: false, socketId: null }));
+  g.button = rg.button ?? -1;
+  g.level = rg.level ?? 0;
+  g.handNumber = rg.handNumber ?? 0;
+  g.startedAt = rg.startedAt ?? null;
+  g.started = !!rg.started;
+  g.finished = false;
+  g.results = rg.results || [];
+  const room = { game: g, hostId: r.hostId, actionLimit: r.actionLimit, maxPlayers: r.maxPlayers || 9, secret: !!r.secret, restoredAt: Date.now() };
+  rooms.set(r.code, room);
+  // 진행 중이었으면 새 핸드로 재개(중단된 핸드는 버림, 칩은 핸드 전 스택으로 보존)
+  if (g.started) {
+    const playable = g.players.filter((p) => !p.eliminated && p.chips > 0 && !p.sittingOut);
+    if (playable.length >= 2) {
+      g.startHand();
+      startActionTimer(r.code);
+      scheduleNextHand(r.code);
+      maybeBotAct(r.code);
+      driveRunout(r.code);
+    } else {
+      g.paused = true;
     }
+  }
+}
+async function loadRooms() {
+  try {
+    let data = null;
+    if (pool) {
+      try { const { rows } = await pool.query('SELECT data FROM room_states'); data = rows.map((r) => r.data); }
+      catch (e) { console.error('방 상태 DB 로드 실패:', e.message); }
+    }
+    if (!data) {
+      if (!existsSync(SAVE_FILE)) return;
+      data = JSON.parse(readFileSync(SAVE_FILE, 'utf8'));
+    }
+    for (const r of data) reconstructRoom(r);
     if (rooms.size) console.log(`이전 상태 복구: ${rooms.size}개 방`);
   } catch (e) { console.error('상태 복구 실패:', e.message); }
 }
@@ -416,7 +436,32 @@ function startActionTimer(code) {
   if (!seat) return;
   const p = g.getPlayer(seat.id);
   if (!p || p.isBot) return; // 봇은 maybeBotAct가 처리
-  if (!p.connected) return; // 끊긴/복구 직후 플레이어는 자동 폴드하지 않고 대기
+  if (!p.connected) {
+    // 끊긴 플레이어가 차례면: 유예(기본 18초) 후 자동 체크/폴드 + 자리비움 → 테이블 진행
+    const grace = 18000;
+    room.actionLimitEffective = grace;
+    room.actionDeadline = Date.now() + grace;
+    room.actionTimer = setTimeout(() => {
+      if (!rooms.has(code)) return;
+      const pp = g.getPlayer(seat.id);
+      if (!pp) return;
+      if (pp.connected) { startActionTimer(code); broadcast(code); return; } // 그 사이 복귀 → 정상 타이머
+      const legal = g.legalActions(seat.id);
+      if (!legal) return;
+      const check = legal.find((a) => a.type === 'check');
+      const res = g.handleAction(seat.id, check ? 'check' : 'fold');
+      if (res.ok) {
+        pp.sittingOut = true; // 돌아올 때까지 다음 핸드 자동 스킵
+        g.pushLog(`${pp.name} 님이 연결 끊김으로 자동 ${check ? '체크' : '폴드'} 되었습니다`);
+        startActionTimer(code);
+        broadcast(code);
+        scheduleNextHand(code);
+        maybeBotAct(code);
+        driveRunout(code);
+      }
+    }, grace);
+    return;
+  }
   // 직전에 무액션 타임아웃한 플레이어는 이번 차례 시간 1/3(최소 3초)
   const limit = p.penaltyShort ? Math.max(3000, Math.round(room.actionLimit / 3)) : room.actionLimit;
   room.actionLimitEffective = limit;
@@ -474,6 +519,15 @@ function maybeBotAct(code) {
 io.on('connection', (socket) => {
   let roomCode = null;
   let playerId = socket.id;
+  // 모든 이벤트 핸들러를 try/catch로 감싸 한 곳의 예외가 전체를 막지 않도록
+  const _on = socket.on.bind(socket);
+  socket.on = (event, handler) => _on(event, function (...args) {
+    const cb = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null;
+    try { return handler.apply(this, args); }
+    catch (e) { console.error(`[${event}] 처리 오류:`, e); if (cb) try { cb({ ok: false, error: '서버 오류가 발생했습니다' }); } catch (_) {} }
+  });
+  // 실제 클라이언트 IP(프록시 뒤에서는 x-forwarded-for 우선) — 레이트리밋 키
+  const clientIp = String(socket.handshake.headers['x-forwarded-for'] || '').split(',')[0].trim() || socket.handshake.address || socket.id;
   broadcastOnline(); // 새 접속 → 인원 수 갱신(닉네임 입력자 기준)
   // 닉네임 등록(로비에서 닉 입력 후) → 접속자 목록에 반영
   socket.on('identify', (name) => {
@@ -485,7 +539,7 @@ io.on('connection', (socket) => {
 
   // ---------- 회원가입 / 로그인 / 프로필 ----------
   socket.on('signup', ({ nick, password, avatar } = {}, cb) => {
-    if (!rateOk('signup:' + socket.id, 5000)) return cb?.({ ok: false, error: '잠시 후 다시 시도하세요' });
+    if (!rateOk('signup:' + clientIp, 5000)) return cb?.({ ok: false, error: '잠시 후 다시 시도하세요' });
     nick = String(nick || '').trim().slice(0, 16);
     if (nick.length < 2) return cb?.({ ok: false, error: '닉네임은 2자 이상이어야 합니다' });
     if (!password || String(password).length < 4) return cb?.({ ok: false, error: '비밀번호는 4자 이상이어야 합니다' });
@@ -630,6 +684,7 @@ io.on('connection', (socket) => {
       if (seat) {
         seat.connected = true;
         seat.socketId = socket.id;
+        if (seat.sittingOut) seat.sittingOut = false; // 끊김 자동 자리비움에서 복귀
         playerId = seat.id;
         roomCode = code;
         if (room.spectators) room.spectators.delete(socket.id);
@@ -886,6 +941,11 @@ io.on('connection', (socket) => {
     const { game } = room;
     const p = game.getPlayer(playerId);
     if (p) p.connected = false;
+    // 자기 차례에 끊겼으면 유예 타이머로 전환(테이블이 멈추지 않도록)
+    if (p && game.started && game.hand && game.hand.phase !== 'handComplete') {
+      const seat = game.hand.seats[game.hand.toActIndex];
+      if (seat && seat.id === playerId) startActionTimer(roomCode);
+    }
     if (!game.started) {
       game.removePlayer(playerId);
       // 방장이 나가면 다음 사람에게 위임
@@ -929,8 +989,10 @@ setInterval(() => {
   }
 }, 60000);
 
-loadUsers(); // 계정 로드
-loadRooms(); // 이전 상태 복구
 httpServer.listen(PORT, () => {
   console.log(`🎲 Dice 서버 실행: http://localhost:${PORT}`);
 });
+(async () => {
+  await loadUsers(); // 계정 로드(+DB 연결 초기화)
+  await loadRooms(); // 이전 방 상태 복구(DB 우선)
+})();
