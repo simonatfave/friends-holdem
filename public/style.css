@@ -1295,3 +1295,35 @@ body.reduce-motion.my-turn-glow::after { animation: none !important; }
 .topbar { padding-top: max(0px, env(safe-area-inset-top)); }
 .actionbar { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 .app-toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
+
+/* ================= v69: 타임뱅크 / 리더보드 / 자리비움 / 시스템 채팅 ================= */
+/* 타임뱅크 버튼 */
+.timebank-btn {
+  display: block; margin: 4px auto 0; padding: 7px 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid #b8932f; background: linear-gradient(180deg,#3a3526,#2a2618); color: var(--gold);
+  font-weight: 800; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  animation: tbPulse 1.2s ease-in-out infinite;
+}
+.timebank-btn:active { transform: translateY(1px); }
+@keyframes tbPulse { 0%,100%{ box-shadow: 0 2px 8px rgba(0,0,0,.4); } 50%{ box-shadow: 0 2px 14px rgba(232,196,102,.6); } }
+
+/* 자리비움 상단바 버튼 활성 상태 */
+.badge.sitout-on { background: var(--gold); color: #2a2106; border-color: var(--gold); font-weight: 800; }
+
+/* 리더보드 */
+.lb-card { max-width: 380px; width: 92vw; }
+.lb-head { display: grid; grid-template-columns: 30px 1fr 52px 64px; gap: 6px; color: var(--muted); font-size: 11px; padding: 0 8px 6px; }
+.lb-head span:nth-child(3), .lb-head span:nth-child(4) { text-align: right; }
+.lb-list { display: flex; flex-direction: column; gap: 6px; max-height: 56vh; overflow-y: auto; margin-bottom: 14px; }
+.lb-row { display: grid; grid-template-columns: 30px 1fr 52px 64px; gap: 6px; align-items: center; background: #161c25; border: 1px solid #2a3340; border-radius: 10px; padding: 7px 8px; }
+.lb-row.me { border-color: var(--gold); background: rgba(232,196,102,.08); }
+.lb-rank { font-weight: 800; text-align: center; font-size: 14px; }
+.lb-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.lb-id .avatar-pic.sm { width: 30px; height: 30px; font-size: 13px; }
+.lb-nick { font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-wins { text-align: right; font-weight: 800; color: var(--gold); }
+.lb-bal { text-align: right; color: var(--green); font-weight: 700; }
+
+/* 시스템(입퇴장) 채팅 메시지 */
+.chat-sys { color: var(--muted); font-size: 12px; font-style: italic; opacity: .92; }
+.chat-sys-dot { color: var(--accent); font-style: normal; }

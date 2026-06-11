@@ -215,11 +215,22 @@ $('optFx').onchange = (e) => { soundSettings.fx = e.target.checked; saveSound();
 if ($('optReduceMotion')) $('optReduceMotion').onchange = (e) => { soundSettings.reduceMotion = e.target.checked; saveSound(); applyMotionPref(); };
 $('optBBUnits').checked = !!soundSettings.bbUnits;
 $('optBBUnits').onchange = (e) => { soundSettings.bbUnits = e.target.checked; saveSound(); if (lastState) renderGame(lastState); };
-$('optSitOut').onchange = (e) => {
-  socket.emit('sitOut', { out: e.target.checked }, (r) => {
-    if (!r || !r.ok) { e.target.checked = !e.target.checked; if (r && r.error) toast(r.error, 'error'); }
+// 자리 비움 토글(상단바 버튼) — 현재 상태는 _amSittingOut에 보관
+let _amSittingOut = false;
+$('sitOutBtn').onclick = () => {
+  socket.emit('sitOut', { out: !_amSittingOut }, (r) => {
+    if (!r || !r.ok) { if (r && r.error) toast(r.error, 'error'); return; }
+    _amSittingOut = !!r.sittingOut;
+    updateSitOutBtn();
+    toast(_amSittingOut ? '자리를 비웠습니다 (다음 핸드 쉼)' : '복귀했습니다', 'ok');
   });
 };
+function updateSitOutBtn() {
+  const btn = $('sitOutBtn');
+  if (!btn) return;
+  btn.textContent = _amSittingOut ? '▶ 복귀하기' : '💺 자리비움';
+  btn.classList.toggle('sitout-on', _amSittingOut);
+}
 
 // PWA 서비스워커 등록
 if ('serviceWorker' in navigator) {
@@ -296,11 +307,7 @@ function emojiRain(emoji) {
   }
 }
 
-// 서버는 무늬를 숫자 0~3으로 보냄: 0=♠,1=♥,2=♦,3=♣
-const SUIT_SYM = ['♠', '♥', '♦', '♣'];
-const isRedSuit = (s) => s === 1 || s === 2;
-const RANK_LBL = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A', 10: '10' };
-const rankLabel = (r) => RANK_LBL[r] || String(r);
+// 카드 상수(SUIT_SYM·isRedSuit·RANK_LBL·rankLabel)는 util.js에 정의됨
 
 // ---------- 로그인 / 회원가입 / 계정 ----------
 let myProfile = null;
@@ -425,6 +432,36 @@ $('suPw2').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitSig
 // 게임 종료 후 서버가 보내는 프로필 갱신
 socket.on('profile', (p) => { myProfile = p; updateMeDisplay(); if (!$('accountPanel').classList.contains('hidden')) renderAccount(); });
 
+// 리더보드
+$('lbBtn').onclick = () => {
+  socket.emit('leaderboard', {}, (res) => {
+    if (!res || !res.ok) { toast('리더보드를 불러오지 못했습니다', 'error'); return; }
+    renderLeaderboard(res.top || []);
+    show('leaderboardPanel');
+  });
+};
+$('lbClose').onclick = () => hide('leaderboardPanel');
+function renderLeaderboard(top) {
+  const box = $('lbList');
+  if (!top.length) { box.innerHTML = '<div class="room-empty">아직 기록이 없어요</div>'; return; }
+  box.innerHTML = '';
+  top.forEach((u, i) => {
+    const row = document.createElement('div');
+    row.className = 'lb-row' + (myProfile && u.nick.toLowerCase() === myProfile.nick.toLowerCase() ? ' me' : '');
+    const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+    const av = document.createElement('span');
+    av.className = 'avatar-pic sm'; paintAvatar(av, u.avatar, u.nick);
+    row.innerHTML = `<span class="lb-rank">${rank}</span>`;
+    const id = document.createElement('span'); id.className = 'lb-id';
+    id.appendChild(av);
+    const nm = document.createElement('span'); nm.className = 'lb-nick'; nm.textContent = u.nick; id.appendChild(nm);
+    row.appendChild(id);
+    const w = document.createElement('span'); w.className = 'lb-wins'; w.textContent = u.wins; row.appendChild(w);
+    const b = document.createElement('span'); b.className = 'lb-bal'; b.textContent = u.balance; row.appendChild(b);
+    box.appendChild(row);
+  });
+}
+
 // 내 계정 보기
 $('accBtn').onclick = () => { renderAccount(); show('accountPanel'); };
 $('accClose').onclick = () => hide('accountPanel');
@@ -460,16 +497,19 @@ $('pwSave').onclick = () => {
     toast('비밀번호가 변경되었습니다', 'ok');
   });
 };
+// 로그인 화면으로 되돌리기(세션 종료 공통)
+function logoutToGate() {
+  setToken(null); myProfile = null; myName = ''; myRoomCode = '';
+  document.body.classList.remove('waiting-mode', 'my-turn-glow');
+  ['accountPanel', 'game', 'waiting', 'lobby', 'finalScreen', 'signupPanel', 'onlinePanel', 'settingsPanel', 'leaderboardPanel'].forEach((id) => { try { hide(id); } catch (e) {} });
+  show('gate');
+  $('authNick').value = ''; $('authPw').value = ''; $('gateError').textContent = '';
+  setTimeout(() => $('authNick') && $('authNick').focus(), 50);
+}
 // 로그아웃
 $('accLogout').onclick = () => {
   if (!confirm('로그아웃할까요?')) return;
-  socket.emit('logout', {}, () => {
-    setToken(null); myProfile = null; myName = ''; myRoomCode = '';
-    ['accountPanel', 'game', 'waiting', 'lobby', 'finalScreen', 'signupPanel', 'onlinePanel', 'settingsPanel'].forEach((id) => { try { hide(id); } catch (e) {} });
-    show('gate');
-    $('authNick').value = ''; $('authPw').value = ''; $('gateError').textContent = '';
-    setTimeout(() => $('authNick') && $('authNick').focus(), 50);
-  });
+  socket.emit('logout', {}, () => logoutToGate());
 };
 function renderAccount() {
   if (!myProfile) return;
@@ -758,7 +798,15 @@ function doLeaveToLobby(confirmMsg) {
 // 최종 화면: '로비로 이동'(로그인 세션 유지, 새로고침 없음)
 $('finalToLobby').onclick = () => doLeaveToLobby();
 $('wbLeave').onclick = () => doLeaveToLobby('대기 중인 방에서 나갈까요?');
-$('leaveBtn').onclick = () => doLeaveToLobby(isSpectator ? '관전을 종료할까요?' : '방에서 나갈까요?');
+$('leaveBtn').onclick = () => {
+  if (isSpectator) { doLeaveToLobby('관전을 종료할까요?'); return; } // 관전자는 로비로(세션 유지)
+  // 플레이어 나가기: 전적 기록 + 게임/세션 종료(로그아웃)
+  if (!confirm('게임에서 나가시겠어요?\n진행 중이면 전적에 기록되고 로그아웃됩니다.')) return;
+  socket.emit('quit', {}, (r) => {
+    if (r && r.profile) myProfile = r.profile;
+    logoutToGate();
+  });
+};
 // 관전 중 게임 참여
 $('specJoinBtn').onclick = () => {
   let name = myName || ($('nameInput') ? $('nameInput').value.trim() : '');
@@ -802,14 +850,13 @@ socket.on('state', (s) => {
   // 관전자 또는 탈락자에게 나가기 버튼 / 관전자에게만 참여 버튼
   $('leaveBtn').classList.toggle('hidden', !(isSpectator || amBusted));
   $('specJoinBtn').classList.toggle('hidden', !(isSpectator && !s.finished && s.players.length < (s.maxPlayers || 9)));
-  if (meNow) $('optSitOut').checked = !!meNow.sittingOut; // 자리 비움 토글 상태 반영
+  // 자리 비움 버튼: 진행 중 게임의 활성 플레이어에게만 표시
+  const canSitOut = !!(meNow && !amBusted && !isSpectator && s.started && !s.finished);
+  $('sitOutBtn').classList.toggle('hidden', !canSitOut);
+  if (meNow) { _amSittingOut = !!meNow.sittingOut; updateSitOutBtn(); }
 });
 
 // 타이머 틱 (액션 제한 바 + 블라인드 카운트다운)
-function fmtTime(sec) {
-  sec = Math.max(0, Math.ceil(sec));
-  return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
-}
 function tickTimers() {
   const s = lastState;
   const at = $('actionTimer');
@@ -849,10 +896,15 @@ function clearTimeAlert() {
 let lastTickSec = null;
 setInterval(tickTimers, 250);
 
-socket.on('chat', ({ name, text }) => {
+socket.on('chat', ({ name, text, system }) => {
   const box = $('chatMessages');
   const div = document.createElement('div');
-  div.innerHTML = `<span class="cname">${esc(name)}:</span> ${esc(text)}`;
+  if (system) {
+    div.className = 'chat-sys';
+    div.innerHTML = `<span class="chat-sys-dot">•</span> ${esc(text)}`;
+  } else {
+    div.innerHTML = `<span class="cname">${esc(name)}:</span> ${esc(text)}`;
+  }
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 });
@@ -999,6 +1051,7 @@ function renderGame(s) {
   document.body.classList.toggle('my-turn-glow', s.toActId === myId && !s.finished && !!s.phase && !isSpectator);
   toggleMonsterPot(s);
   updateEquityBar(s);
+  updateTimeBankBtn(s);
 
   handleFx(s, prev);
   _newHandPhasePrev = s.phase;
@@ -1546,9 +1599,6 @@ function showBlindToast(text) {
   _blindTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-function cssEsc(s) {
-  return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&');
-}
 
 let _seatSig = '';
 let _commSig = '';
@@ -1985,7 +2035,10 @@ $('seats').addEventListener('click', (e) => {
 
 // ---------- 채팅 ----------
 $('chatSend').onclick = sendChat;
-$('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+// 한글 IME 조합 중 Enter는 무시(조합 중 전송되면 마지막 글자가 중복됨)
+$('chatInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) sendChat();
+});
 function sendChat() {
   const t = $('chatInput').value.trim();
   if (!t) return;
@@ -1993,10 +2046,26 @@ function sendChat() {
   $('chatInput').value = '';
 }
 
-// ---------- 유틸 ----------
-function esc(str) {
-  return String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+// 타임뱅크: 내 차례에 추가 시간 사용
+function updateTimeBankBtn(s) {
+  const btn = $('timeBankBtn');
+  if (!btn) return;
+  const me = s.players && s.players.find((p) => p.id === myId);
+  const myTurn = s.toActId === myId && !s.finished && !!s.phase && !isSpectator;
+  const bank = me ? (me.timeBank || 0) : 0;
+  const visible = myTurn && bank >= 1000 && !!s.actionLimit;
+  btn.classList.toggle('hidden', !visible);
+  if (visible) btn.textContent = `⏱ 시간 추가 +15s (잔여 ${Math.round(bank / 1000)}s)`;
 }
+$('timeBankBtn').onclick = () => {
+  socket.emit('useTimeBank', {}, (r) => {
+    if (!r || !r.ok) { if (r && r.error) toast(r.error, 'error'); return; }
+    toast('시간을 추가했습니다 (+15초)', 'ok');
+  });
+};
+
+// ---------- 유틸 ----------
+// esc()는 util.js에 정의됨
 let errTimer;
 function flashError(msg) {
   let el = $('errToast');

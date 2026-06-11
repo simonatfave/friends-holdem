@@ -275,15 +275,21 @@ function stateFor(room, viewerId) {
   st.isHost = room.hostId === viewerId;
   st.maxPlayers = room.maxPlayers || 9;
   st.secret = !!room.secret;
-  // 좌석에 프로필 아바타 표시용(계정 닉네임 기준)
+  // 좌석에 프로필 아바타 + 타임뱅크 잔량 표시
   if (st.players) {
     for (const p of st.players) {
+      const gp = room.game.getPlayer(p.id);
+      if (gp) { gp.timeBank = gp.timeBank ?? 30000; p.timeBank = gp.timeBank; }
       if (p.isBot) continue;
       const acc = users.get(String(p.name || '').toLowerCase());
       if (acc && acc.avatar) p.avatar = acc.avatar;
     }
   }
   return st;
+}
+// 입퇴장 등 시스템 안내를 채팅창에 표시
+function sysChat(code, text) {
+  io.to(code).emit('chat', { name: '', text, system: true });
 }
 function broadcast(code) {
   const room = rooms.get(code);
@@ -466,23 +472,27 @@ function startActionTimer(code) {
   const limit = p.penaltyShort ? Math.max(3000, Math.round(room.actionLimit / 3)) : room.actionLimit;
   room.actionLimitEffective = limit;
   room.actionDeadline = Date.now() + limit;
-  room.actionTimer = setTimeout(() => {
-    if (!rooms.has(code)) return;
-    const pp = g.getPlayer(seat.id);
-    if (!pp || !pp.connected) return; // 그 사이 끊겼으면 자동 행동 안 함
-    const legal = g.legalActions(seat.id);
-    if (!legal) return;
-    const check = legal.find((a) => a.type === 'check');
-    const res = g.handleAction(seat.id, check ? 'check' : 'fold');
-    if (res.ok) {
-      pp.penaltyShort = true; // 무액션 타임아웃 → 다음 차례 시간 단축
-      startActionTimer(code);
-      broadcast(code);
-      scheduleNextHand(code);
-      maybeBotAct(code);
-      driveRunout(code);
-    }
-  }, limit);
+  room.actionTimer = setTimeout(() => fireActionTimeout(code, seat.id), limit);
+}
+// 액션 제한 시간 만료 → 자동 체크/폴드(타임뱅크 연장도 이 콜백을 재사용)
+function fireActionTimeout(code, seatId) {
+  if (!rooms.has(code)) return;
+  const room = rooms.get(code);
+  const g = room.game;
+  const pp = g.getPlayer(seatId);
+  if (!pp || !pp.connected) return; // 그 사이 끊겼으면 자동 행동 안 함
+  const legal = g.legalActions(seatId);
+  if (!legal) return;
+  const check = legal.find((a) => a.type === 'check');
+  const res = g.handleAction(seatId, check ? 'check' : 'fold');
+  if (res.ok) {
+    pp.penaltyShort = true; // 무액션 타임아웃 → 다음 차례 시간 단축
+    startActionTimer(code);
+    broadcast(code);
+    scheduleNextHand(code);
+    maybeBotAct(code);
+    driveRunout(code);
+  }
 }
 
 // 봇 차례면 잠시 뒤 자동으로 행동 (테스트용 간단 정책: 콜링 스테이션 + 가끔 레이즈)
@@ -689,6 +699,7 @@ io.on('connection', (socket) => {
         roomCode = code;
         if (room.spectators) room.spectators.delete(socket.id);
         socket.join(code);
+        sysChat(code, `🔄 ${seat.name} 님이 다시 연결되었습니다`);
         cb?.({ ok: true, code, youId: playerId });
         broadcast(code);
         startActionTimer(code); // 복귀 시 본인 차례면 타이머 재가동
@@ -720,6 +731,7 @@ io.on('connection', (socket) => {
       if (room.spectators) room.spectators.delete(socket.id); // 관전 → 참여 전환
       socket.join(code);
       game.pushLog(`${name} 님이 참여했습니다 (다음 핸드부터)`);
+      sysChat(code, `➕ ${name} 님이 중간 합류했습니다 (다음 핸드부터)`);
       cb?.({ ok: true, code, youId: playerId, lateJoin: true });
       if (game.paused) resumePausedGame(code); // 자리 비움으로 멈춰있었다면 재개
       else broadcast(code);
@@ -734,6 +746,7 @@ io.on('connection', (socket) => {
     roomCode = code;
     socket.join(code);
     cb?.({ ok: true, code, youId: playerId });
+    sysChat(code, `➕ ${name} 님이 입장했습니다`);
     broadcast(code);
   });
 
@@ -866,10 +879,45 @@ io.on('connection', (socket) => {
     io.to(socket.id).emit('state', stateFor(room, socket.id));
     room.game.pushLog(`👀 ${socket.specName} 님이 관전을 시작했습니다`);
     io.to(code).emit('notice', `👀 ${socket.specName} 님이 방에 들어와 관전 중입니다`);
+    sysChat(code, `👀 ${socket.specName} 님이 관전을 시작했습니다`);
   });
 
   // 이모지 리액션
   const ALLOWED_EMOJI = ['😎', '🔥', '😱', '😂', '😭', '👍', '🤔', '🎉'];
+  // 타임뱅크: 내 차례에 추가 시간(최대 15초) 사용
+  socket.on('useTimeBank', (_d, cb) => {
+    const room = rooms.get(roomCode);
+    if (!room || !room.actionLimit) return cb?.({ ok: false });
+    const g = room.game;
+    if (!g.hand || g.hand.phase === 'handComplete' || g.hand.phase === 'showdown') return cb?.({ ok: false });
+    const seat = g.hand.seats[g.hand.toActIndex];
+    if (!seat || seat.id !== playerId) return cb?.({ ok: false, error: '내 차례가 아닙니다' });
+    const p = g.getPlayer(playerId);
+    if (!p) return cb?.({ ok: false });
+    p.timeBank = p.timeBank ?? 30000;
+    if (p.timeBank < 1000) return cb?.({ ok: false, error: '타임뱅크가 없습니다' });
+    const add = Math.min(p.timeBank, 15000);
+    p.timeBank -= add;
+    const remaining = Math.max(0, (room.actionDeadline || Date.now()) - Date.now()) + add;
+    if (room.actionTimer) clearTimeout(room.actionTimer);
+    room.actionDeadline = Date.now() + remaining;
+    room.actionLimitEffective = (room.actionLimitEffective || 0) + add;
+    room.actionTimer = setTimeout(() => fireActionTimeout(roomCode, seat.id), remaining);
+    broadcast(roomCode);
+    cb?.({ ok: true, timeBank: p.timeBank });
+  });
+  // 리더보드: 전체 계정 랭킹(우승 → 잔고 → 핸드승 순)
+  socket.on('leaderboard', (_d, cb) => {
+    const list = [...users.values()].map((a) => ({
+      nick: a.nick, avatar: a.avatar || null,
+      wins: (a.stats && a.stats.wins) || 0,
+      games: (a.stats && a.stats.games) || 0,
+      handsWon: (a.stats && a.stats.handsWon) || 0,
+      balance: a.balance || 0,
+    }));
+    list.sort((a, b) => b.wins - a.wins || b.balance - a.balance || b.handsWon - a.handsWon);
+    cb?.({ ok: true, top: list.slice(0, 50) });
+  });
   socket.on('react', ({ emoji }) => {
     if (!rateOk('react:' + socket.id, 500)) return; // 도배 방지
     const room = rooms.get(roomCode);
@@ -907,6 +955,10 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomCode);
     if (!room) { roomCode = null; return cb?.({ ok: true }); }
     const { game } = room;
+    const wasSpec = room.spectators && room.spectators.has(socket.id);
+    const leaver = game.getPlayer(playerId);
+    if (wasSpec) sysChat(roomCode, `👋 ${socket.specName || '관전자'} 님이 관전을 종료했습니다`);
+    else if (leaver) sysChat(roomCode, `👋 ${leaver.name} 님이 방을 나갔습니다`);
     if (room.spectators) room.spectators.delete(socket.id);
     if (!game.started) {
       game.removePlayer(playerId);
@@ -928,6 +980,54 @@ io.on('connection', (socket) => {
     cb?.({ ok: true });
   });
 
+  // 플레이어 '나가기': 전적 기록(자진 퇴장=1게임 패배) + 게임 퇴장 + 세션 종료(로그아웃)
+  socket.on('quit', (_d, cb) => {
+    const room = rooms.get(roomCode);
+    let profile = null;
+    if (room) {
+      const g = room.game;
+      const p = g.getPlayer(playerId);
+      if (p && !p.isBot) {
+        // 진행 중 & 아직 살아있는 플레이어가 나가면 전적에 1게임(패배)으로 기록
+        if (g.started && !p.eliminated) {
+          const acc = users.get(String(p.name).toLowerCase());
+          if (acc) {
+            const humanCount = g.players.filter((x) => !x.isBot).length;
+            const aliveAfter = g.players.filter((x) => !x.eliminated && x.id !== playerId).length;
+            const place = Math.max(2, aliveAfter + 1); // 중도 포기 순위
+            acc.stats.games++;
+            acc.balance = Math.max(0, acc.balance - 50);
+            acc.history.unshift({ at: Date.now(), code: roomCode, place, players: humanCount, win: false });
+            if (acc.history.length > 50) acc.history.length = 50;
+            saveUser(acc);
+            profile = profileOf(acc);
+          }
+        }
+        sysChat(roomCode, `👋 ${p.name} 님이 게임에서 나갔습니다`);
+        p.connected = false; p.sittingOut = true; // 진행 중이면 다음 핸드부터 빠짐(현재 턴이면 유예 자동폴드)
+      }
+      if (!g.started) {
+        g.removePlayer(playerId);
+        if (room.hostId === playerId && g.players.length) room.hostId = g.players[0].id;
+        if (g.players.filter((x) => !x.isBot).length === 0) { clearRoomTimers(room); rooms.delete(roomCode); }
+        else broadcast(roomCode);
+      } else {
+        // 현재 턴이면 유예 타이머로 즉시 진행되도록
+        const seat = g.hand && g.hand.phase !== 'handComplete' ? g.hand.seats[g.hand.toActIndex] : null;
+        if (seat && seat.id === playerId) startActionTimer(roomCode);
+        broadcast(roomCode);
+      }
+      socket.leave(roomCode);
+    }
+    // 세션 종료(로그아웃)
+    const acc2 = socket.account && users.get(socket.account.toLowerCase());
+    if (acc2) { revokeToken(acc2); saveUser(acc2); }
+    socket.account = null;
+    userNames.delete(socket.id); broadcastOnline();
+    roomCode = null;
+    cb?.({ ok: true, profile });
+  });
+
   socket.on('disconnect', () => {
     userNames.delete(socket.id);
     setTimeout(broadcastOnline, 50); // 접속 종료 → 인원 수 갱신(모든 경우)
@@ -936,11 +1036,15 @@ io.on('connection', (socket) => {
     // 관전자였으면 제거 후 종료
     if (room.spectators && room.spectators.has(socket.id)) {
       room.spectators.delete(socket.id);
+      sysChat(roomCode, `👋 ${socket.specName || '관전자'} 님이 관전을 종료했습니다`);
       if (!room.game.getPlayer(playerId)) return;
     }
     const { game } = room;
     const p = game.getPlayer(playerId);
-    if (p) p.connected = false;
+    if (p) {
+      p.connected = false;
+      if (game.started) sysChat(roomCode, `🔌 ${p.name} 님의 연결이 끊겼습니다`);
+    }
     // 자기 차례에 끊겼으면 유예 타이머로 전환(테이블이 멈추지 않도록)
     if (p && game.started && game.hand && game.hand.phase !== 'handComplete') {
       const seat = game.hand.seats[game.hand.toActIndex];

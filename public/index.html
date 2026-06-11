@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=68" />
+  <link rel="stylesheet" href="style.css?v=69" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -125,6 +125,7 @@
         <button id="goCreate" class="primary">방 만들기</button>
         <button id="goJoin" class="primary alt">참여하기</button>
         <button id="accBtn" class="ghost wide">📊 내 계정 · 통계</button>
+        <button id="lbBtn" class="ghost wide">🏆 리더보드</button>
       </div>
 
       <!-- 2단계: 방 만들기 옵션 -->
@@ -180,6 +181,16 @@
     </div>
   </div>
 
+  <!-- 리더보드 -->
+  <div id="leaderboardPanel" class="overlay hidden">
+    <div class="settings-card lb-card">
+      <h3>🏆 리더보드</h3>
+      <div class="lb-head"><span>#</span><span>플레이어</span><span>우승</span><span>잔고</span></div>
+      <div id="lbList" class="lb-list"></div>
+      <button id="lbClose" class="primary">닫기</button>
+    </div>
+  </div>
+
   <!-- 타이머 / 블라인드 세션 설정 팝업 -->
   <div id="timerPopup" class="overlay hidden">
     <div class="settings-card timer-card">
@@ -221,6 +232,7 @@
       <span class="badge" id="potBadge">팟 0</span>
       <button class="badge" id="muteBtn" title="소리 켜기/끄기" style="cursor:pointer">🔊</button>
       <button class="badge" id="settingsBtn" title="설정" style="cursor:pointer">⚙️</button>
+      <button class="badge hidden" id="sitOutBtn" title="자리 비움/복귀" style="cursor:pointer">💺 자리비움</button>
       <button class="badge hidden" id="specJoinBtn" title="게임 참여" style="cursor:pointer">➕ 참여</button>
       <button class="badge hidden" id="leaveBtn" title="나가기" style="cursor:pointer">🚪 나가기</button>
     </div>
@@ -261,6 +273,7 @@
     </div>
 
     <div class="action-timer hidden" id="actionTimer"><div id="actionTimerFill"></div></div>
+    <button id="timeBankBtn" class="timebank-btn hidden">⏱ 시간 추가</button>
     <div class="actionbar" id="actionbar"></div>
     <div class="emoji-bar" id="emojiBar"></div>
 
@@ -282,7 +295,6 @@
         <label class="toggle-row"><span>내 차례 알림음</span><input type="checkbox" id="optTurn" checked /></label>
         <label class="toggle-row"><span>효과음(카드·칩·승리)</span><input type="checkbox" id="optFx" checked /></label>
         <label class="toggle-row"><span>연출 줄이기 (흔들림·딜링·이모지비 끄기)</span><input type="checkbox" id="optReduceMotion" /></label>
-        <label class="toggle-row"><span>자리 비움 (핸드 쉬기)</span><input type="checkbox" id="optSitOut" /></label>
         <label class="toggle-row"><span>금액 BB 단위로 표시</span><input type="checkbox" id="optBBUnits" /></label>
         <button id="settingsClose" class="primary">닫기</button>
       </div>
@@ -302,6 +314,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=68"></script>
+  <script src="util.js?v=69"></script>
+  <script src="client.js?v=69"></script>
 </body>
 </html>
