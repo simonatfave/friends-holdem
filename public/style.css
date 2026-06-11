@@ -12,9 +12,9 @@
   --green: #3ec97a;
   --accent: #4a8cff;
   /* 카드 크기 — 화면(높이·너비)에 비례. 테이블이 작아지면 카드/좌석도 같이 줄어 겹침 방지 */
-  --cc-h: min(85px, 10.8vh, 12.2vw);         /* 커뮤니티 카드 높이 (추가 10% 축소) */
+  --cc-h: min(94px, 11.9vh, 13.4vw);         /* 커뮤니티 카드 높이 (+10%) */
   --cc-w: calc(var(--cc-h) * 0.714);
-  --hc-h: min(58px, 7.6vh, 8.6vw);           /* 홀 카드 높이 (추가 10% 축소) */
+  --hc-h: min(64px, 8.4vh, 9.5vw);           /* 홀 카드 높이 (+10%) */
   --hc-w: calc(var(--hc-h) * 0.714);          /* 카드 비율(5:7)과 일치 */
   --seat-w: calc(var(--hc-w) * 2 + 32px);
 }
@@ -449,7 +449,7 @@ button { font-family: inherit; }
 }
 /* 내 좌석: 카드 크게(다른 좌석보다), 가로를 더 넓혀 비율 보정 */
 .seat.me-seat {
-  --hc-h: min(72px, 9.4vh, 10.8vw); /* 내 카드 추가 10% 축소 */
+  --hc-h: min(79px, 10.3vh, 11.9vw); /* 내 카드 (+10%) */
   --hc-w: calc(var(--hc-h) * 0.714); /* 좌석 폭 계산용 (카드 비율은 aspect-ratio로 고정) */
   transform: translate(-50%,-50%) scale(var(--me-scale, 1)); /* 인원 많으면 축소해 겹침 방지 */
   z-index: 6;
@@ -702,7 +702,7 @@ button { font-family: inherit; }
   .fly-chip { display: none !important; }
   .bet-chip, .chip-s { animation: none !important; }
   /* 내 카드는 모바일에서도 크게(다른 좌석보다), 컴팩트하게 */
-  .seat.me-seat { --hc-h: min(59px, 9.5vh, 13.5vw); } /* 내 카드 추가 10% 축소 */
+  .seat.me-seat { --hc-h: min(65px, 10.5vh, 14.9vw); } /* 내 카드 (+10%) */
   .actionbar { gap: 8px; }
   .actionbar button { padding: 15px 18px; font-size: 17px; }
   .action-main { gap: 8px; padding: 0 4px; }
@@ -1310,8 +1310,8 @@ body.reduce-motion.my-turn-glow::after { animation: none !important; }
 /* ================= v69: 타임뱅크 / 리더보드 / 자리비움 / 시스템 채팅 ================= */
 /* 타임뱅크 버튼 — 테이블 하단에 절대배치(레이아웃 흔들림 방지) */
 .timebank-btn {
-  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 31; margin: 0;
-  padding: 7px 16px; border-radius: 999px; cursor: pointer;
+  position: absolute; right: 10px; bottom: 8px; z-index: 31; margin: 0;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
   border: 1px solid #b8932f; background: linear-gradient(180deg,#3a3526,#2a2618); color: var(--gold);
   font-weight: 800; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.4);
   animation: tbPulse 1.2s ease-in-out infinite;

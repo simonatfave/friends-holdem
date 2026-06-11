@@ -430,7 +430,11 @@ export class Game {
       h.community.push(h.deck.pop());
     }
     h.phase = next;
-    this.pushLog(`-- ${phaseLabel(next)} --`);
+    if (next === 'flop' || next === 'turn' || next === 'river') {
+      this.pushLog(`-- ${phaseLabel(next)} -- 보드: ${cardsLabel(h.community)}`);
+    } else {
+      this.pushLog(`-- ${phaseLabel(next)} --`);
+    }
 
     if (next === 'showdown') {
       this.doShowdown();
@@ -482,11 +486,11 @@ export class Game {
     if (h.community.length === 0) {
       h.deck.pop();
       h.community.push(h.deck.pop(), h.deck.pop(), h.deck.pop());
-      this.pushLog('-- 플랍 (올인) --');
+      this.pushLog(`-- 플랍 (올인) -- 보드: ${cardsLabel(h.community)}`);
     } else {
       h.deck.pop();
       h.community.push(h.deck.pop());
-      this.pushLog(`-- ${h.community.length === 4 ? '턴' : '리버'} (올인) --`);
+      this.pushLog(`-- ${h.community.length === 4 ? '턴' : '리버'} (올인) -- 보드: ${cardsLabel(h.community)}`);
     }
     h.equity = this.computeEquity(); // 보드가 바뀔 때마다 승률 갱신
     return false;
@@ -642,6 +646,11 @@ export class Game {
 
     h.results = { awards, reveal };
     h.phase = 'handComplete';
+    // 쇼다운 공개: 각 참가자의 홀 카드 + 족보(추후 검토용)
+    this.pushLog(`== 쇼다운 == 보드: ${cardsLabel(h.community)}`);
+    for (const s of contenders) {
+      this.pushLog(`${s.name}: ${cardsLabel(h.holes[s.id])} (${handName(scores[s.id], 'ko')})`);
+    }
     for (const a of awards) {
       this.pushLog(`${a.winners.map((w) => w.name).join(', ')} 팟 ${a.amount} 획득 (${a.handName || ''})`);
     }
@@ -859,6 +868,11 @@ export class Game {
 function phaseLabel(phase) {
   return { preflop: '프리플랍', flop: '플랍', turn: '턴', river: '리버', showdown: '쇼다운' }[phase] || phase;
 }
+// 로그용 카드 표기 (예: A♠ K♥)
+const LOG_SUIT = ['♠', '♥', '♦', '♣'];
+const LOG_RANK = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+function cardLabel(c) { return (LOG_RANK[c.r] || c.r) + LOG_SUIT[c.s]; }
+function cardsLabel(cards) { return (cards || []).map(cardLabel).join(' '); }
 
 function allActedOrNoBet(h, canAct) {
   // 베팅 라운드가 끝났는지(올인 정리 상황) — 남은 액터들이 모두 콜/체크 완료

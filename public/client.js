@@ -1691,7 +1691,7 @@ function seatAvatarHtml(p) {
 function seatNameTags(p) {
   const streak = _winStreak.get(p.id) || 0;
   const streakTag = (streak >= 2 && !p.eliminated) ? `<span class="tag streak">🔥${streak}</span>` : '';
-  return `${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${streakTag} ${(!p.connected && !p.isBot) ? '<span class="tag off">끊김</span>' : ''} ${(p.sittingOut && !p.eliminated) ? '<span class="tag sitout">자리비움</span>' : ''} ${(p.penaltyShort && !p.eliminated) ? '<span class="tag short">⏱단축</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}`;
+  return `${esc(p.name)} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${streakTag} ${(!p.connected && !p.isBot) ? '<span class="tag off">끊김</span>' : ''} ${(p.sittingOut && !p.eliminated) ? '<span class="tag sitout">자리비움</span>' : ''} ${(p.penaltyShort && !p.eliminated) ? '<span class="tag short">⏱단축</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}`;
 }
 function seatClasses(s, p, isMe) {
   const done = s.phase === 'handComplete' && s.results;
