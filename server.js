@@ -25,22 +25,55 @@ const PORT = process.env.PORT || 3000;
 
 // ---------- 계정 시스템 (파일 기반) ----------
 const USERS_FILE = process.env.USERS_FILE || join(__dirname, 'users.json');
+const DB_URL = process.env.DATABASE_URL; // 설정되면 PostgreSQL 영구 저장, 없으면 파일
 const users = new Map(); // nickLower -> account
-function loadUsers() {
+let pool = null;
+const _dirtyUsers = new Set(); // 변경된 계정(nickLower)
+
+async function initDb() {
+  if (!DB_URL) return false;
   try {
+    const pg = await import('pg');
+    pool = new pg.default.Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false }, max: 4 });
+    await pool.query('CREATE TABLE IF NOT EXISTS accounts (nick text primary key, data jsonb)');
+    console.log('DB 연결 OK — 계정 영구 저장');
+    return true;
+  } catch (e) { console.error('DB 연결 실패, 파일 저장으로 폴백:', e.message); pool = null; return false; }
+}
+async function loadUsers() {
+  if (await initDb()) {
+    try {
+      const { rows } = await pool.query('SELECT data FROM accounts');
+      for (const r of rows) { const a = r.data; users.set(a.nick.toLowerCase(), a); }
+      console.log(`DB 계정 ${users.size}개 로드`);
+      return;
+    } catch (e) { console.error('DB 계정 로드 실패:', e.message); }
+  }
+  try { // 파일 폴백
     if (!existsSync(USERS_FILE)) return;
     const data = JSON.parse(readFileSync(USERS_FILE, 'utf8'));
     for (const u of data) users.set(u.nick.toLowerCase(), u);
-    console.log(`계정 ${users.size}개 로드`);
+    console.log(`파일 계정 ${users.size}개 로드`);
   } catch (e) { console.error('계정 로드 실패:', e.message); }
 }
 let _usersTimer = null;
+function saveUser(acc) { _dirtyUsers.add(acc.nick.toLowerCase()); saveUsersSoon(); }
 function saveUsersSoon() {
   if (_usersTimer) return;
-  _usersTimer = setTimeout(() => {
+  _usersTimer = setTimeout(async () => {
     _usersTimer = null;
-    try { writeFileSync(USERS_FILE, JSON.stringify([...users.values()])); }
-    catch (e) { console.error('계정 저장 실패:', e.message); }
+    if (pool) {
+      const dirty = [..._dirtyUsers]; _dirtyUsers.clear();
+      try {
+        for (const nl of dirty) {
+          const acc = users.get(nl); if (!acc) continue;
+          await pool.query('INSERT INTO accounts(nick,data) VALUES($1,$2) ON CONFLICT(nick) DO UPDATE SET data=$2', [nl, acc]);
+        }
+      } catch (e) { console.error('DB 계정 저장 실패:', e.message); }
+    } else {
+      try { writeFileSync(USERS_FILE, JSON.stringify([...users.values()])); }
+      catch (e) { console.error('계정 저장 실패:', e.message); }
+    }
   }, 1000);
 }
 function hashPw(pw, salt) { return scryptSync(String(pw), salt, 32).toString('hex'); }
@@ -235,8 +268,8 @@ function recordGameResults(code) {
     if (t) { acc.stats.handsWon += t.handsWon || 0; acc.stats.biggestPot = Math.max(acc.stats.biggestPot, t.biggestPot || 0); }
     acc.history.unshift({ at: Date.now(), code, place: r.place, players: humanCount, win: r.place === 1 });
     if (acc.history.length > 50) acc.history.length = 50;
+    saveUser(acc);
   }
-  saveUsersSoon();
   for (const p of g.players) {
     if (p.isBot || !p.socketId) continue;
     const acc = users.get(String(p.name).toLowerCase());
@@ -396,7 +429,7 @@ io.on('connection', (socket) => {
     if (users.has(nick.toLowerCase())) return cb?.({ ok: false, error: '이미 사용 중인 닉네임입니다' });
     const acc = makeAccount(nick, password);
     users.set(nick.toLowerCase(), acc);
-    saveUsersSoon();
+    saveUser(acc);
     socket.account = nick;
     userNames.set(socket.id, nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc) });
