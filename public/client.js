@@ -1917,7 +1917,16 @@ function renderLog(s) {
 function renderWinner(s) {
   const banner = $('winnerBanner');
   if (s.results && s.phase === 'handComplete') {
-    const lines = s.results.awards.map((a) =>
+    // 같은 승자(들)가 메인·사이드 팟을 모두 이기면 한 줄로 금액 합산
+    const merged = new Map();
+    for (const a of s.results.awards) {
+      const key = a.winners.map((w) => w.id || w.name).join('|');
+      const m = merged.get(key) || { winners: a.winners, amount: 0, handName: a.handName };
+      m.amount += a.amount || 0;
+      if (!m.handName && a.handName) m.handName = a.handName;
+      merged.set(key, m);
+    }
+    const lines = [...merged.values()].map((a) =>
       `<span class="wb-title">🏆 ${a.winners.map((w) => esc(w.name)).join(', ')} 승리!</span>` +
       `<span class="wb-sub"><span class="wb-amt">+${fmtAmt(a.amount)}</span>` +
       (a.handName ? ` <span class="wb-hand">· ${esc(a.handName)}</span>` : '') + `</span>`
