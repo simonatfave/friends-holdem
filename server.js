@@ -32,13 +32,25 @@ const _dirtyUsers = new Set(); // 변경된 계정(nickLower)
 
 async function initDb() {
   if (!DB_URL) return false;
-  try {
-    const pg = await import('pg');
-    pool = new pg.default.Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false }, max: 4 });
-    await pool.query('CREATE TABLE IF NOT EXISTS accounts (nick text primary key, data jsonb)');
-    console.log('DB 연결 OK — 계정 영구 저장');
-    return true;
-  } catch (e) { console.error('DB 연결 실패, 파일 저장으로 폴백:', e.message); pool = null; return false; }
+  let pg;
+  try { pg = await import('pg'); }
+  catch (e) { console.error('pg 모듈 없음, 파일 저장 사용:', e.message); return false; }
+  // SSL 사용/미사용 둘 다 시도(외부=SSL 필요, Render 내부=SSL 미지원일 수 있음)
+  for (const ssl of [{ rejectUnauthorized: false }, false]) {
+    try {
+      pool = new pg.default.Pool({ connectionString: DB_URL, ssl, max: 4, connectionTimeoutMillis: 8000 });
+      await pool.query('CREATE TABLE IF NOT EXISTS accounts (nick text primary key, data jsonb)');
+      console.log(`DB 연결 OK — 계정 영구 저장 (ssl=${ssl ? 'on' : 'off'})`);
+      return true;
+    } catch (e) {
+      try { await pool?.end(); } catch (_) {}
+      pool = null;
+      if (ssl) { console.warn('SSL 연결 실패, SSL 없이 재시도...'); continue; }
+      console.error('DB 연결 실패, 파일 저장으로 폴백:', e.message);
+      return false;
+    }
+  }
+  return false;
 }
 async function loadUsers() {
   if (await initDb()) {
