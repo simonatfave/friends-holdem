@@ -1246,3 +1246,47 @@ body.my-turn-glow::after {
   78% { transform: translateX(9px) rotate(4deg); }
   100% { transform: translateX(0) rotate(0); }
 }
+
+/* ================= v67: 토스트 / 연출 최소화 / 계정 액션 ================= */
+/* 인라인 토스트(alert 대체) */
+.app-toast {
+  position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%) translateY(18px);
+  background: rgba(20,26,34,.97); color: var(--text); border: 1px solid #3a4756;
+  padding: 11px 18px; border-radius: 12px; font-size: 14px; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5); z-index: 400; max-width: 86vw; text-align: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+}
+.app-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.app-toast.error { border-color: #6e3030; color: #ffd0d0; }
+.app-toast.ok { border-color: #2f6e44; color: #c7ffdb; }
+
+/* 계정: 비밀번호 변경 / 로그아웃 */
+.acc-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.acc-actions .ghost { flex: 1; text-align: center; padding: 9px; }
+.ghost.danger { border-color: #6e3030; color: #f0a0a0; }
+.pw-change { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.pw-change .primary { margin-top: 2px; }
+
+/* 연출 최소화: 무한·과한 애니메이션 비활성 */
+.reduce-motion .seat.active .seat-inner::after { display: none; }
+.reduce-motion .tag.streak,
+.reduce-motion .monster-pot.show,
+.reduce-motion .seat.active .seat-inner,
+.reduce-motion .seat.winner .seat-inner,
+.reduce-motion .seat.winner .seat-av,
+.reduce-motion .card.win,
+.reduce-motion .result-badge.win,
+.reduce-motion .card.deal-in,
+.reduce-motion .card.flip-in,
+.reduce-motion .card.river-slow,
+.reduce-motion .dealer-btn { animation: none !important; }
+body.reduce-motion.my-turn-glow::after { animation: none !important; }
+.reduce-motion .rank-fx { transition: opacity .2s ease; }
+.reduce-motion .rank-fx.show { animation: none !important; opacity: 1; transform: translate(-50%,-50%); }
+
+/* OS 설정이 모션 감소면 무한 애니메이션은 기본적으로 끔(토글과 별개 안전장치) */
+@media (prefers-reduced-motion: reduce) {
+  .seat.active .seat-inner::after,
+  .tag.streak, .monster-pot.show,
+  body.my-turn-glow::after { animation: none !important; }
+}

@@ -121,10 +121,24 @@ const tokenIndex = new Map(); // token -> nickLower
 function indexAllTokens() {
   for (const acc of users.values()) if (acc.loginToken) tokenIndex.set(acc.loginToken, acc.nick.toLowerCase());
 }
+const TOKEN_TTL = 30 * 24 * 60 * 60 * 1000; // 세션 토큰 30일 만료
 function ensureToken(acc) {
-  if (!acc.loginToken) { acc.loginToken = randomBytes(18).toString('hex'); saveUser(acc); }
+  if (!acc.loginToken) { acc.loginToken = randomBytes(18).toString('hex'); acc.loginTokenAt = Date.now(); saveUser(acc); }
+  if (!acc.loginTokenAt) { acc.loginTokenAt = Date.now(); saveUser(acc); }
   tokenIndex.set(acc.loginToken, acc.nick.toLowerCase());
   return acc.loginToken;
+}
+function revokeToken(acc) {
+  if (acc.loginToken) tokenIndex.delete(acc.loginToken);
+  acc.loginToken = null; acc.loginTokenAt = null;
+}
+// 간단한 요청 속도 제한(소켓 단위 도배 방지)
+const _rate = new Map(); // key -> 마지막 허용 시각
+function rateOk(key, ms) {
+  const now = Date.now();
+  if (now - (_rate.get(key) || 0) < ms) return false;
+  _rate.set(key, now);
+  return true;
 }
 
 // ---------- 방 관리 ----------
@@ -471,6 +485,7 @@ io.on('connection', (socket) => {
 
   // ---------- 회원가입 / 로그인 / 프로필 ----------
   socket.on('signup', ({ nick, password, avatar } = {}, cb) => {
+    if (!rateOk('signup:' + socket.id, 5000)) return cb?.({ ok: false, error: '잠시 후 다시 시도하세요' });
     nick = String(nick || '').trim().slice(0, 16);
     if (nick.length < 2) return cb?.({ ok: false, error: '닉네임은 2자 이상이어야 합니다' });
     if (!password || String(password).length < 4) return cb?.({ ok: false, error: '비밀번호는 4자 이상이어야 합니다' });
@@ -496,9 +511,33 @@ io.on('connection', (socket) => {
     const nl = token && tokenIndex.get(token);
     const acc = nl && users.get(nl);
     if (!acc) return cb?.({ ok: false });
+    if (acc.loginTokenAt && Date.now() - acc.loginTokenAt > TOKEN_TTL) { // 만료된 토큰
+      revokeToken(acc); saveUser(acc);
+      return cb?.({ ok: false, error: '세션이 만료되었습니다. 다시 로그인해 주세요' });
+    }
     socket.account = acc.nick;
     userNames.set(socket.id, acc.nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: acc.loginToken });
+  });
+  // 로그아웃: 토큰 무효화
+  socket.on('logout', (_d, cb) => {
+    const acc = socket.account && users.get(socket.account.toLowerCase());
+    if (acc) { revokeToken(acc); saveUser(acc); }
+    socket.account = null;
+    userNames.delete(socket.id); broadcastOnline();
+    cb?.({ ok: true });
+  });
+  // 비밀번호 변경(현재 비번 확인 후, 기존 토큰 모두 무효화)
+  socket.on('changePassword', ({ oldPassword, newPassword } = {}, cb) => {
+    const acc = socket.account && users.get(socket.account.toLowerCase());
+    if (!acc) return cb?.({ ok: false, error: '로그인이 필요합니다' });
+    if (!verifyPw(acc, oldPassword)) return cb?.({ ok: false, error: '현재 비밀번호가 올바르지 않습니다' });
+    if (!newPassword || String(newPassword).length < 4) return cb?.({ ok: false, error: '새 비밀번호는 4자 이상이어야 합니다' });
+    const salt = randomBytes(12).toString('hex');
+    acc.salt = salt; acc.hash = hashPw(newPassword, salt);
+    revokeToken(acc); // 다른 기기 세션 만료
+    saveUser(acc);
+    cb?.({ ok: true, token: ensureToken(acc) });
   });
   socket.on('getProfile', (_d, cb) => {
     const acc = socket.account && users.get(socket.account.toLowerCase());
@@ -506,6 +545,7 @@ io.on('connection', (socket) => {
   });
   // 프로필 이미지 등록/변경/삭제(로그인 후)
   socket.on('setAvatar', ({ avatar } = {}, cb) => {
+    if (!rateOk('avatar:' + socket.id, 2000)) return cb?.({ ok: false, error: '잠시 후 다시 시도하세요' });
     const acc = socket.account && users.get(socket.account.toLowerCase());
     if (!acc) return cb?.({ ok: false, error: '로그인이 필요합니다' });
     if (avatar == null || avatar === '') {
@@ -776,6 +816,7 @@ io.on('connection', (socket) => {
   // 이모지 리액션
   const ALLOWED_EMOJI = ['😎', '🔥', '😱', '😂', '😭', '👍', '🤔', '🎉'];
   socket.on('react', ({ emoji }) => {
+    if (!rateOk('react:' + socket.id, 500)) return; // 도배 방지
     const room = rooms.get(roomCode);
     if (!room) return;
     const p = room.game.getPlayer(playerId);

@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=66" />
+  <link rel="stylesheet" href="style.css?v=67" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -84,6 +84,15 @@
       <div class="acc-stats" id="accStats"></div>
       <h4 class="acc-h4">최근 게임</h4>
       <div id="accHistory" class="acc-history"></div>
+      <div class="acc-actions">
+        <button type="button" id="accChangePw" class="ghost">🔑 비밀번호 변경</button>
+        <button type="button" id="accLogout" class="ghost danger">🚪 로그아웃</button>
+      </div>
+      <div id="pwChangeRow" class="pw-change hidden">
+        <input id="pwOld" type="password" placeholder="현재 비밀번호" maxlength="32" autocomplete="current-password" />
+        <input id="pwNew" type="password" placeholder="새 비밀번호 (4자 이상)" maxlength="32" autocomplete="new-password" />
+        <button id="pwSave" class="primary">변경 저장</button>
+      </div>
       <button id="accClose" class="primary">닫기</button>
     </div>
   </div>
@@ -272,6 +281,7 @@
         <label class="toggle-row"><span>전체 소리</span><input type="checkbox" id="optMaster" checked /></label>
         <label class="toggle-row"><span>내 차례 알림음</span><input type="checkbox" id="optTurn" checked /></label>
         <label class="toggle-row"><span>효과음(카드·칩·승리)</span><input type="checkbox" id="optFx" checked /></label>
+        <label class="toggle-row"><span>연출 줄이기 (흔들림·딜링·이모지비 끄기)</span><input type="checkbox" id="optReduceMotion" /></label>
         <label class="toggle-row"><span>자리 비움 (핸드 쉬기)</span><input type="checkbox" id="optSitOut" /></label>
         <label class="toggle-row"><span>금액 BB 단위로 표시</span><input type="checkbox" id="optBBUnits" /></label>
         <button id="settingsClose" class="primary">닫기</button>
@@ -292,6 +302,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=66"></script>
+  <script src="client.js?v=67"></script>
 </body>
 </html>

@@ -42,12 +42,24 @@ function sessionLost() {
   setToken(null); myProfile = null; myName = ''; myRoomCode = '';
   ['accountPanel', 'signupPanel', 'onlinePanel', 'settingsPanel', 'timerPopup', 'finalScreen', 'game', 'waiting', 'lobby'].forEach((id) => { try { hide(id); } catch (e) {} });
   try { show('gate'); } catch (e) {}
-  alert('서버와의 연결이 끊겨 로그인 세션이 종료되었습니다. 다시 로그인해 주세요.');
+  toast('서버와의 연결이 끊겨 로그인 세션이 종료되었습니다. 다시 로그인해 주세요.', 'error');
 }
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
+
+// 인라인 토스트(브라우저 alert 대체)
+let _appToastTimer = null;
+function toast(text, kind) {
+  let t = document.getElementById('appToast');
+  if (!t) { t = document.createElement('div'); t.id = 'appToast'; document.body.appendChild(t); }
+  t.className = 'app-toast' + (kind === 'error' ? ' error' : kind === 'ok' ? ' ok' : '');
+  t.textContent = text;
+  void t.offsetWidth; t.classList.add('show');
+  clearTimeout(_appToastTimer);
+  _appToastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
 
 // 배포 버전 표시 (client.js?v=NN 에서 자동 추출)
 (function showVersion() {
@@ -59,9 +71,14 @@ const hide = (id) => $(id).classList.add('hidden');
 
 // ---------- 효과음 (Web Audio, 에셋 없이 생성) + 설정 ----------
 function loadSound() {
-  try { return Object.assign({ master: true, turn: true, fx: true, bbUnits: false }, JSON.parse(localStorage.getItem('dice_sound') || '{}')); }
-  catch (e) { return { master: true, turn: true, fx: true, bbUnits: false }; }
+  const prefRM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const base = { master: true, turn: true, fx: true, bbUnits: false, reduceMotion: prefRM };
+  try { return Object.assign(base, JSON.parse(localStorage.getItem('dice_sound') || '{}')); }
+  catch (e) { return base; }
 }
+// 연출 최소화 여부(무거운 애니메이션 가드용)
+const lowFx = () => soundSettings.reduceMotion;
+function applyMotionPref() { document.body.classList.toggle('reduce-motion', !!soundSettings.reduceMotion); }
 // 금액 표기: BB 단위 토글에 따라 칩 수 또는 'NBB'
 function fmtAmt(n) {
   if (!soundSettings.bbUnits) return String(n);
@@ -72,6 +89,7 @@ function fmtAmt(n) {
 }
 function saveSound() { try { localStorage.setItem('dice_sound', JSON.stringify(soundSettings)); } catch (e) {} }
 const soundSettings = loadSound();
+applyMotionPref();
 let audioCtx = null;
 function ac() {
   if (!audioCtx) {
@@ -173,17 +191,19 @@ $('settingsBtn').onclick = () => {
   $('optMaster').checked = soundSettings.master;
   $('optTurn').checked = soundSettings.turn;
   $('optFx').checked = soundSettings.fx;
+  if ($('optReduceMotion')) $('optReduceMotion').checked = !!soundSettings.reduceMotion;
   show('settingsPanel');
 };
 $('settingsClose').onclick = () => hide('settingsPanel');
 $('optMaster').onchange = (e) => { soundSettings.master = e.target.checked; saveSound(); syncMuteIcon(); };
 $('optTurn').onchange = (e) => { soundSettings.turn = e.target.checked; saveSound(); };
 $('optFx').onchange = (e) => { soundSettings.fx = e.target.checked; saveSound(); };
+if ($('optReduceMotion')) $('optReduceMotion').onchange = (e) => { soundSettings.reduceMotion = e.target.checked; saveSound(); applyMotionPref(); };
 $('optBBUnits').checked = !!soundSettings.bbUnits;
 $('optBBUnits').onchange = (e) => { soundSettings.bbUnits = e.target.checked; saveSound(); if (lastState) renderGame(lastState); };
 $('optSitOut').onchange = (e) => {
   socket.emit('sitOut', { out: e.target.checked }, (r) => {
-    if (!r || !r.ok) { e.target.checked = !e.target.checked; if (r && r.error) alert(r.error); }
+    if (!r || !r.ok) { e.target.checked = !e.target.checked; if (r && r.error) toast(r.error, 'error'); }
   });
 };
 
@@ -248,6 +268,7 @@ function noteReactionStorm(emoji) {
   if (cnt >= 3 && now > _rainUntil) { _rainUntil = now + 3000; emojiRain(emoji); }
 }
 function emojiRain(emoji) {
+  if (lowFx()) return;
   for (let i = 0; i < 18; i++) {
     const el = document.createElement('div');
     el.className = 'emoji-rain';
@@ -401,16 +422,39 @@ $('accAvatarFile').addEventListener('change', async (e) => {
   if (!file) return;
   let dataUrl;
   try { dataUrl = await fileToAvatar(file); }
-  catch (err) { alert(err.message || '이미지 처리 실패'); return; }
+  catch (err) { toast(err.message || '이미지 처리 실패', 'error'); return; }
   socket.emit('setAvatar', { avatar: dataUrl }, (res) => {
-    if (!res || !res.ok) { alert((res && res.error) || '변경 실패'); return; }
+    if (!res || !res.ok) { toast((res && res.error) || '변경 실패', 'error'); return; }
     myProfile = res.profile; updateMeDisplay(); renderAccount();
   });
 });
 $('accClearAvatar').onclick = () => {
   socket.emit('setAvatar', { avatar: null }, (res) => {
-    if (!res || !res.ok) { alert((res && res.error) || '제거 실패'); return; }
+    if (!res || !res.ok) { toast((res && res.error) || '제거 실패', 'error'); return; }
     myProfile = res.profile; updateMeDisplay(); renderAccount();
+  });
+};
+// 비밀번호 변경
+$('accChangePw').onclick = () => { $('pwChangeRow').classList.toggle('hidden'); $('pwOld').value = ''; $('pwNew').value = ''; };
+$('pwSave').onclick = () => {
+  const oldPassword = $('pwOld').value, newPassword = $('pwNew').value;
+  if (!oldPassword || !newPassword) { toast('현재/새 비밀번호를 입력하세요', 'error'); return; }
+  socket.emit('changePassword', { oldPassword, newPassword }, (r) => {
+    if (!r || !r.ok) { toast((r && r.error) || '변경 실패', 'error'); return; }
+    setToken(r.token); $('pwOld').value = ''; $('pwNew').value = '';
+    $('pwChangeRow').classList.add('hidden');
+    toast('비밀번호가 변경되었습니다', 'ok');
+  });
+};
+// 로그아웃
+$('accLogout').onclick = () => {
+  if (!confirm('로그아웃할까요?')) return;
+  socket.emit('logout', {}, () => {
+    setToken(null); myProfile = null; myName = ''; myRoomCode = '';
+    ['accountPanel', 'game', 'waiting', 'lobby', 'finalScreen', 'signupPanel', 'onlinePanel', 'settingsPanel'].forEach((id) => { try { hide(id); } catch (e) {} });
+    show('gate');
+    $('authNick').value = ''; $('authPw').value = ''; $('gateError').textContent = '';
+    setTimeout(() => $('authNick') && $('authNick').focus(), 50);
   });
 };
 function renderAccount() {
@@ -597,7 +641,7 @@ function joinRoom(code, started) {
     if (res.lateJoin || started) {
       isSpectator = false;
       // 다음 핸드부터 합류된다는 안내(게임 화면은 state 수신 시 자동 표시)
-      setTimeout(() => alert('진행 중인 게임에 합류했습니다. 다음 핸드부터 참여합니다.'), 200);
+      setTimeout(() => toast('진행 중인 게임에 합류했습니다. 다음 핸드부터 참여합니다.', 'ok'), 200);
     }
   });
 }
@@ -669,13 +713,13 @@ $('copyCode').onclick = () => {
 
 $('startBtn').onclick = () => {
   socket.emit('start', {}, (res) => {
-    if (!res.ok) alert(res.error);
+    if (!res.ok) toast(res.error, 'error');
   });
 };
 
 // 대기 테이블 배너의 시작/복사 버튼
 $('wbStart').onclick = () => {
-  socket.emit('start', {}, (res) => { if (!res.ok) alert(res.error); });
+  socket.emit('start', {}, (res) => { if (!res.ok) toast(res.error, 'error'); });
 };
 $('wbCopy').onclick = () => {
   navigator.clipboard?.writeText(myRoomCode);
@@ -708,7 +752,7 @@ $('specJoinBtn').onclick = () => {
   if (!name) return;
   myName = name;
   socket.emit('join', { code: myRoomCode, name }, (res) => {
-    if (!res || !res.ok) { alert(res ? res.error : '참여 실패'); return; }
+    if (!res || !res.ok) { toast(res ? res.error : '참여 실패', 'error'); return; }
     myId = res.youId; isSpectator = false; // 다음 state부터 플레이어로 렌더
   });
 };
@@ -718,7 +762,7 @@ let currentHumanCount = 1;
 function setBots(n) {
   n = Math.max(0, Math.min(n, 9 - currentHumanCount));
   socket.emit('setBots', { count: n }, (res) => {
-    if (!res.ok) alert(res.error);
+    if (!res.ok) toast(res.error, 'error');
   });
 }
 $('botMinus').onclick = () => setBots(currentBotCount - 1);
@@ -853,10 +897,10 @@ function renderWaitingSeats(s) {
     seatsEl.appendChild(seat);
   }
   seatsEl.querySelectorAll('.seat-add').forEach((b) => {
-    b.onclick = () => socket.emit('addBot', { seat: Number(b.dataset.seat) }, (r) => { if (!r.ok) alert(r.error); });
+    b.onclick = () => socket.emit('addBot', { seat: Number(b.dataset.seat) }, (r) => { if (!r.ok) toast(r.error, 'error'); });
   });
   seatsEl.querySelectorAll('.bot-x').forEach((b) => {
-    b.onclick = () => socket.emit('removeBot', { id: b.dataset.bot }, (r) => { if (!r.ok) alert(r.error); });
+    b.onclick = () => socket.emit('removeBot', { id: b.dataset.bot }, (r) => { if (!r.ok) toast(r.error, 'error'); });
   });
 }
 
@@ -1190,6 +1234,7 @@ function showRecapToast(text) {
 // 화면(테이블) 흔들림 — 올인·대형 팟의 타격감
 let _shakeTimer = null;
 function screenShake(level = 'soft') {
+  if (lowFx()) return;
   const t = document.querySelector('.poker-table');
   if (!t) return;
   t.classList.remove('shake-soft', 'shake-hard');
@@ -1332,7 +1377,10 @@ function updateEquityBar(s) {
 }
 // 좌석 앞 칩 스택(상대 비교) — 칩 많을수록 높게
 let _maxChips = 1;
+let _seatCount = 0;
 function seatChipStackHtml(p) {
+  // 인원이 많으면(>6) 또는 연출 최소화 시 칩 스택 생략 → 좌석 정보 과밀 방지
+  if (_seatCount > 6 || lowFx()) return '';
   if (p.eliminated || !(p.chips > 0)) return '';
   const ratio = p.chips / (_maxChips || 1);
   const discs = Math.max(1, Math.min(8, Math.round(ratio * 8)));
@@ -1343,6 +1391,7 @@ function seatChipStackHtml(p) {
 
 // 핸드 시작: 중앙에서 카드를 셔플(리플)하는 모션
 function showShuffle() {
+  if (lowFx()) return;
   const table = document.querySelector('.poker-table');
   if (!table) return;
   const tr = table.getBoundingClientRect();
@@ -1381,6 +1430,7 @@ function slideDealerButton(fromId, toId) {
 }
 // 핸드 시작: 중앙 덱에서 각 좌석으로 카드가 날아가 꽂히는 딜링 모션
 function dealCardsFromDeck(s) {
+  if (lowFx()) return;
   const table = document.querySelector('.poker-table');
   if (!table) return;
   const tr = table.getBoundingClientRect();
@@ -1412,7 +1462,7 @@ function dealCardsFromDeck(s) {
 }
 // 폴드: 카드가 빙글 돌며 중앙으로 던져져(머크) 사라짐
 function muckFold(id) {
-  if (id === myId) return; // 내 카드는 이미 보임
+  if (lowFx() || id === myId) return; // 내 카드는 이미 보임
   const table = document.querySelector('.poker-table');
   const seat = document.querySelector(`.seat[data-pid="${cssEsc(id)}"]`);
   if (!table || !seat) return;
@@ -1498,6 +1548,7 @@ function renderSeats(s) {
   const players = s.players;
   const n = players.length;
   _maxChips = Math.max(1, ...players.map((p) => p.chips || 0)); // 칩 스택 상대 비교 기준
+  _seatCount = n;
   // 인원이 많을수록 좌석을 축소해 겹침 방지
   // 인원 많을수록 더 적극적으로 축소 → 겹침 방지
   seatsEl.style.setProperty('--seat-scale', n <= 3 ? '1' : n <= 5 ? '0.84' : n <= 7 ? '0.72' : '0.62');
