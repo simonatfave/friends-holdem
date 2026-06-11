@@ -1388,3 +1388,41 @@ body[data-theme=charcoal] { --felt: #46505e; --felt-dark: #232a33; }
 .theme-swatches { display: flex; gap: 6px; }
 .theme-swatches .sw { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #3a4756; cursor: pointer; padding: 0; }
 .theme-swatches .sw.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+
+/* ================= v79: 모바일 최적화 ================= */
+/* 모달이 작은 화면을 넘지 않게 */
+.overlay .settings-card, .overlay .final-card { max-height: 92vh; overflow-y: auto; }
+/* 채팅 토글·드로어 닫기 버튼은 모바일에서만 */
+#chatToggle { display: none; position: relative; }
+.chat-close { display: none; }
+
+@media (max-width: 640px) {
+  /* 채팅/기록 = 하단 슬라이드 드로어 (기존 display:none 대체) */
+  #chatToggle { display: inline-block; }
+  #chatToggle.has-unread::after {
+    content: ''; position: absolute; top: 3px; right: 4px; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px var(--panel);
+  }
+  .chat-close { display: inline-block; }
+  .sidepanel {
+    display: flex !important; flex-direction: column; gap: 8px;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 95;
+    height: 62vh; max-height: 62vh;
+    background: #0e1219; border-top: 1px solid #2a3340; border-radius: 16px 16px 0 0;
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+    box-shadow: 0 -10px 30px rgba(0,0,0,.6);
+    transform: translateY(103%); transition: transform .25s ease;
+  }
+  body.chat-open .sidepanel { transform: translateY(0); }
+  .sidepanel .log { flex: 0 0 36%; font-size: 13px; }
+  .sidepanel .chatbox { flex: 1 1 auto; }
+  .chat-input input { font-size: 16px; padding: 9px 12px; } /* iOS 포커스 줌 방지 */
+  .chat-messages { font-size: 14px; }
+  .qchat-btn { padding: 6px 12px; font-size: 13px; } /* 탭 영역 확보 */
+  /* 상단바: 한 줄 가로 스크롤로 줄바꿈 난잡함 방지 */
+  .topbar { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; gap: 6px; -webkit-overflow-scrolling: touch; }
+  .topbar::-webkit-scrollbar { display: none; }
+  .topbar .badge { flex: 0 0 auto; white-space: nowrap; }
+  /* 타임뱅크 버튼 모바일 탭 영역 */
+  .timebank-btn { padding: 9px 16px; font-size: 14px; }
+}

@@ -872,7 +872,7 @@ document.addEventListener('keydown', (e) => {
   else if (k === 'r') { const b = document.querySelector('.btn-raise'); if (b) { e.preventDefault(); b.click(); } }
 });
 function resetToLobby() {
-  document.body.classList.remove('waiting-mode', 'my-turn-glow');
+  document.body.classList.remove('waiting-mode', 'my-turn-glow', 'chat-open');
   $('waitBanner').classList.add('hidden');
   if (typeof clearTimeAlert === 'function') clearTimeAlert();
   lastState = null; prevSnap = null; myRoomCode = ''; isHost = false; isSpectator = false;
@@ -1002,6 +1002,9 @@ socket.on('chat', ({ name, text, system }) => {
   }
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
+  if (!system && !document.body.classList.contains('chat-open')) {
+    const ct = $('chatToggle'); if (ct) ct.classList.add('has-unread');
+  }
 });
 
 // ---------- 대기 모드: 게임 테이블을 그대로 띄우고 빈 자리에서 봇 추가 ----------
@@ -2202,6 +2205,16 @@ function openOppProfile(nick) {
   });
 }
 $('oppClose').onclick = () => hide('oppProfilePanel');
+
+// 모바일 채팅/기록 드로어 토글
+$('chatToggle').onclick = () => {
+  document.body.classList.toggle('chat-open');
+  $('chatToggle').classList.remove('has-unread');
+  if (document.body.classList.contains('chat-open')) {
+    const cm = $('chatMessages'); if (cm) cm.scrollTop = cm.scrollHeight;
+  }
+};
+$('chatDrawerClose').onclick = () => document.body.classList.remove('chat-open');
 function sendChat() {
   const t = $('chatInput').value.trim();
   if (!t) return;

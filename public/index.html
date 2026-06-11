@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=78" />
+  <link rel="stylesheet" href="style.css?v=79" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -271,6 +271,7 @@
       <span class="badge" id="potBadge">팟 0</span>
       <button class="badge" id="muteBtn" title="소리 켜기/끄기" style="cursor:pointer">🔊</button>
       <button class="badge" id="settingsBtn" title="설정" style="cursor:pointer">⚙️</button>
+      <button class="badge" id="chatToggle" title="채팅/기록" style="cursor:pointer">💬</button>
       <button class="badge hidden" id="sitOutBtn" title="자리 비움/복귀" style="cursor:pointer">💺 자리비움</button>
       <button class="badge hidden" id="specJoinBtn" title="게임 참여" style="cursor:pointer">➕ 참여</button>
       <button class="badge hidden" id="leaveBtn" title="나가기" style="cursor:pointer">🚪 나가기</button>
@@ -319,10 +320,11 @@
 
     <div class="sidepanel">
       <div class="log-head">
-        <span>게임 기록</span>
+        <span>게임 기록 · 채팅</span>
         <span class="log-head-btns">
           <button id="logView" class="ghost" title="전체 기록 보기">📋</button>
           <button id="logCopy" class="ghost" title="기록 복사">복사</button>
+          <button id="chatDrawerClose" class="ghost chat-close" title="닫기">✕</button>
         </span>
       </div>
       <div class="log" id="log"></div>
@@ -373,7 +375,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="util.js?v=78"></script>
-  <script src="client.js?v=78"></script>
+  <script src="util.js?v=79"></script>
+  <script src="client.js?v=79"></script>
 </body>
 </html>
