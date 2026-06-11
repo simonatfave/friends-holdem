@@ -241,6 +241,14 @@ function stateFor(room, viewerId) {
   st.isHost = room.hostId === viewerId;
   st.maxPlayers = room.maxPlayers || 9;
   st.secret = !!room.secret;
+  // 좌석에 프로필 아바타 표시용(계정 닉네임 기준)
+  if (st.players) {
+    for (const p of st.players) {
+      if (p.isBot) continue;
+      const acc = users.get(String(p.name || '').toLowerCase());
+      if (acc && acc.avatar) p.avatar = acc.avatar;
+    }
+  }
   return st;
 }
 function broadcast(code) {

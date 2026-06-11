@@ -148,6 +148,14 @@ const sfxFanfare = () => {
   seq.forEach((f, i) => tone(f, 0.32, 'triangle', 0.15, i * 0.14));
   [262, 330, 392].forEach((f) => tone(f, 1.0, 'sine', 0.08, 0.9));
 };
+// 족보 등급별 효과음(쇼다운) — 강할수록 화려
+const sfxRank = (tier) => {
+  if (!soundSettings.fx) return;
+  if (tier >= 5) { [523, 659, 784, 1046, 1318, 1568].forEach((f, i) => tone(f, 0.3, 'triangle', 0.14, i * 0.1)); tone(120, 0.6, 'sine', 0.16, 0.05); }
+  else if (tier === 4) { [392, 523, 659, 880].forEach((f, i) => tone(f, 0.26, 'triangle', 0.13, i * 0.09)); }
+  else if (tier === 3) { [440, 587, 740].forEach((f, i) => tone(f, 0.22, 'triangle', 0.12, i * 0.08)); }
+  else { tone(523, 0.18, 'sine', 0.1); }
+};
 // turn 카테고리(내 차례 알림)
 const sfxTurn = () => { if (soundSettings.turn) tone(680, 0.13, 'sine', 0.16); };
 const sfxTick = (urgent) => { if (soundSettings.turn) tone(urgent ? 1200 : 820, 0.06, 'square', 0.1); };
@@ -226,7 +234,32 @@ socket.on('reaction', ({ id, emoji }) => {
   inner.classList.add(fx);
   setTimeout(() => inner.classList.remove(fx), 1500);
   sfxEmoji();
+  // 3) 짧은 시간에 같은 이모지가 몰리면 → 화면에 이모지 비
+  noteReactionStorm(emoji);
 });
+// 리액션 폭주 감지 → 이모지 비
+let _reactWindow = [];
+let _rainUntil = 0;
+function noteReactionStorm(emoji) {
+  const now = Date.now();
+  _reactWindow = _reactWindow.filter((r) => now - r.t < 2500);
+  _reactWindow.push({ emoji, t: now });
+  const cnt = _reactWindow.filter((r) => r.emoji === emoji).length;
+  if (cnt >= 3 && now > _rainUntil) { _rainUntil = now + 3000; emojiRain(emoji); }
+}
+function emojiRain(emoji) {
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    el.className = 'emoji-rain';
+    el.textContent = emoji;
+    el.style.left = (Math.random() * 100) + 'vw';
+    el.style.fontSize = (22 + Math.random() * 26) + 'px';
+    el.style.animationDuration = (1.8 + Math.random() * 1.6) + 's';
+    el.style.animationDelay = (Math.random() * 0.6) + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3800);
+  }
+}
 
 // 서버는 무늬를 숫자 0~3으로 보냄: 0=♠,1=♥,2=♦,3=♣
 const SUIT_SYM = ['♠', '♥', '♦', '♣'];
@@ -876,8 +909,13 @@ function renderGame(s) {
         if (idx < s.community.length) {
           const el = cardEl(s.community[idx]);
           if (idx >= _newCommFrom) {
-            el.classList.add('flip-in');
-            el.style.animationDelay = ((idx - _newCommFrom) * 0.12) + 's';
+            // 리버(5번째 카드)는 한 장만 새로 열릴 때 슬로우모션으로 긴장감
+            if (idx === 4 && s.community.length === 5 && _newCommFrom === 4) {
+              el.classList.add('river-slow');
+            } else {
+              el.classList.add('flip-in');
+              el.style.animationDelay = ((idx - _newCommFrom) * 0.12) + 's';
+            }
           }
           comm.appendChild(el);
         } else {
@@ -899,6 +937,10 @@ function renderGame(s) {
   // 내 패 힌트
   const hint = $('myHandHint');
   if (hint) { hint.textContent = s.myHand ? `내 패: ${s.myHand}` : ''; hint.classList.toggle('hidden', !s.myHand); }
+  // 내 차례 화면 가장자리 글로우 / 몬스터 팟 / 헤드업 승률 바
+  document.body.classList.toggle('my-turn-glow', s.toActId === myId && !s.finished && !!s.phase && !isSpectator);
+  toggleMonsterPot(s);
+  updateEquityBar(s);
 
   handleFx(s, prev);
   _newHandPhasePrev = s.phase;
@@ -1002,7 +1044,7 @@ function rollNumber(el, from, to, dur = 600) {
 function handleFx(s, prev) {
   if (!prev) return; // 첫 렌더는 조용히
   const newHand = s.handNumber !== prev.handNumber;
-  if (newHand) { sfxDeal(); if (_lastHandRecap) showRecapToast(_lastHandRecap); }
+  if (newHand) { sfxDeal(); dealCardsFromDeck(s); if (_lastHandRecap) showRecapToast(_lastHandRecap); }
   else if (s.community.length > prev.commCount) sfxDeal();
 
   if (s.pot > prev.pot && !newHand) {
@@ -1018,7 +1060,10 @@ function handleFx(s, prev) {
   s.players.forEach((p) => {
     const nb = p.bet || 0;
     if (!newHand && nb > (pb[p.id] || 0)) flyBetToPot(p.id); // 베팅 증가 → 칩 슬라이드
-    if (p.lastAction && actKey(p.lastAction) !== (pla[p.id] || '')) showActionLabel(p.id, p.lastAction);
+    if (p.lastAction && actKey(p.lastAction) !== (pla[p.id] || '')) {
+      showActionLabel(p.id, p.lastAction);
+      if (p.lastAction.type === 'fold') muckFold(p.id); // 폴드 → 카드 던지기
+    }
   });
 
   // 블라인드(세션) 상승 알림
@@ -1037,7 +1082,7 @@ function handleFx(s, prev) {
     const hn = topAward && topAward.handName;
     if (hn && revealed >= 2) {
       const tier = rankTier(hn);
-      setTimeout(() => showHandRankPopup(hn, tier), 360);
+      setTimeout(() => { showHandRankPopup(hn, tier); sfxRank(tier); }, 360);
       if (tier >= 4) setTimeout(() => screenShake('hard'), 360);
       else if (tier >= 3) setTimeout(() => screenShake('soft'), 360);
     }
@@ -1245,6 +1290,104 @@ function flyPotToWinners(s) {
   });
 }
 
+// 몬스터 팟 배지: 팟이 BB의 40배 이상이면 표시
+function toggleMonsterPot(s) {
+  const table = document.querySelector('.poker-table');
+  if (!table) return;
+  let el = document.getElementById('monsterPot');
+  const bb = (s.blinds && s.blinds.bb) || 2;
+  const on = !!s.phase && !s.finished && s.pot >= bb * 40;
+  if (on) {
+    if (!el) { el = document.createElement('div'); el.id = 'monsterPot'; el.className = 'monster-pot'; el.textContent = '💰 MONSTER POT'; table.appendChild(el); }
+    el.classList.add('show');
+  } else if (el) { el.classList.remove('show'); }
+}
+// 헤드업 올인 승률 바: 런아웃 중 2인 승률을 가로 막대로 표시
+function updateEquityBar(s) {
+  const host = document.querySelector('.poker-table');
+  let bar = document.getElementById('equityBar');
+  const conts = (s.equity && s.phase === 'runout') ? s.players.filter((p) => s.equity[p.id] != null && !p.folded) : [];
+  if (conts.length !== 2 || !host) { if (bar) bar.classList.remove('show'); return; }
+  if (!bar) {
+    bar = document.createElement('div'); bar.id = 'equityBar'; bar.className = 'equity-bar';
+    bar.innerHTML = '<div class="eqb-track"><div class="eqb-fill-l"></div><div class="eqb-fill-r"></div></div><div class="eqb-labels"><span class="eqb-lbl-l"></span><span class="eqb-lbl-r"></span></div>';
+    host.appendChild(bar);
+  }
+  const [a, b] = conts;
+  const ea = s.equity[a.id] || 0, eb = s.equity[b.id] || 0;
+  bar.querySelector('.eqb-fill-l').style.width = ea + '%';
+  bar.querySelector('.eqb-fill-r').style.width = eb + '%';
+  bar.querySelector('.eqb-lbl-l').textContent = `${a.name} ${ea}%`;
+  bar.querySelector('.eqb-lbl-r').textContent = `${eb}% ${b.name}`;
+  bar.classList.add('show');
+}
+// 좌석 앞 칩 스택(상대 비교) — 칩 많을수록 높게
+let _maxChips = 1;
+function seatChipStackHtml(p) {
+  if (p.eliminated || !(p.chips > 0)) return '';
+  const ratio = p.chips / (_maxChips || 1);
+  const discs = Math.max(1, Math.min(8, Math.round(ratio * 8)));
+  let s = '';
+  for (let i = 0; i < discs; i++) s += '<span class="cs-disc"></span>';
+  return `<div class="chip-stack" title="${fmtAmt(p.chips)}">${s}</div>`;
+}
+
+// 핸드 시작: 중앙 덱에서 각 좌석으로 카드가 날아가 꽂히는 딜링 모션
+function dealCardsFromDeck(s) {
+  const table = document.querySelector('.poker-table');
+  if (!table) return;
+  const tr = table.getBoundingClientRect();
+  const cx = tr.left + tr.width / 2, cy = tr.top + tr.height * 0.4; // 덱 위치(중앙 살짝 위)
+  const players = s.players.filter((p) => !p.eliminated && !p.folded && !p.sittingOut);
+  if (!players.length) return;
+  let k = 0;
+  for (let round = 0; round < 2; round++) {
+    players.forEach((p) => {
+      const seat = document.querySelector(`.seat[data-pid="${cssEsc(p.id)}"]`);
+      if (!seat) return;
+      const sr = seat.getBoundingClientRect();
+      const dx = sr.left + sr.width / 2 - cx, dy = sr.top + sr.height / 2 - cy;
+      const card = document.createElement('div');
+      card.className = 'deal-card-fly';
+      card.style.left = cx + 'px'; card.style.top = cy + 'px';
+      card.style.transform = 'translate(-50%,-50%) scale(.5)';
+      document.body.appendChild(card);
+      const delay = k * 0.05;
+      requestAnimationFrame(() => {
+        card.style.transition = `transform .4s cubic-bezier(.3,.7,.3,1) ${delay}s, opacity .18s ${delay + 0.3}s`;
+        card.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.72) rotate(${(Math.random() * 24 - 12) | 0}deg)`;
+        card.style.opacity = '0';
+      });
+      setTimeout(() => card.remove(), (delay + 0.65) * 1000);
+      k++;
+    });
+  }
+}
+// 폴드: 카드가 빙글 돌며 중앙으로 던져져(머크) 사라짐
+function muckFold(id) {
+  if (id === myId) return; // 내 카드는 이미 보임
+  const table = document.querySelector('.poker-table');
+  const seat = document.querySelector(`.seat[data-pid="${cssEsc(id)}"]`);
+  if (!table || !seat) return;
+  const tr = table.getBoundingClientRect();
+  const cx = tr.left + tr.width / 2, cy = tr.top + tr.height * 0.45;
+  const sr = seat.getBoundingClientRect();
+  const sx = sr.left + sr.width / 2, sy = sr.top + sr.height / 2;
+  for (let k = 0; k < 2; k++) {
+    const card = document.createElement('div');
+    card.className = 'deal-card-fly muck';
+    card.style.left = sx + 'px'; card.style.top = sy + 'px';
+    card.style.transform = 'translate(-50%,-50%)';
+    document.body.appendChild(card);
+    requestAnimationFrame(() => {
+      card.style.transition = `transform .4s ease-in ${k * 0.05}s, opacity .4s ${k * 0.05}s`;
+      card.style.transform = `translate(calc(-50% + ${cx - sx}px), calc(-50% + ${cy - sy}px)) scale(.55) rotate(${(Math.random() * 200 - 100) | 0}deg)`;
+      card.style.opacity = '0';
+    });
+    setTimeout(() => card.remove(), 600);
+  }
+}
+
 // 베팅 칩이 좌석 → 중앙(팟)으로 슬라이드
 function flyBetToPot(id) {
   const table = document.querySelector('.poker-table');
@@ -1307,6 +1450,7 @@ function renderSeats(s) {
   const seatsEl = $('seats');
   const players = s.players;
   const n = players.length;
+  _maxChips = Math.max(1, ...players.map((p) => p.chips || 0)); // 칩 스택 상대 비교 기준
   // 인원이 많을수록 좌석을 축소해 겹침 방지
   // 인원 많을수록 더 적극적으로 축소 → 겹침 방지
   seatsEl.style.setProperty('--seat-scale', n <= 3 ? '1' : n <= 5 ? '0.84' : n <= 7 ? '0.72' : '0.62');
@@ -1350,13 +1494,15 @@ function renderSeats(s) {
       seat.innerHTML = `
         <div class="seat-inner">
           ${p.isButton ? '<div class="pbadges"><span class="dealer-btn">D</span></div>' : ''}
-          <div class="pname">${seatNameTags(p)}</div>
+          <div class="pname">${seatAvatarHtml(p)}${seatNameTags(p)}</div>
           <div class="pchips">${p.eliminated ? '탈락' : `<span class="chip-mini"></span><span class="amt">${fmtAmt(p.chips)}</span>`}</div>
+          ${seatChipStackHtml(p)}
           ${p.isToAct ? '<div class="seat-timerbar"><div class="seat-timerbar-fill"></div></div>' : ''}
           <div class="phole">${renderHole(p, i)}</div>
           <div class="hand-result">${result ? esc(result.handName) : ''}</div>
           ${seatResultBadge(s, p)}
           ${seatEquityHtml(s, p)}
+          ${p.eliminated ? '<div class="out-stamp">OUT</div>' : ''}
           ${p.bet > 0 ? `<div class="bet-chip">${fmtAmt(p.bet)}</div>` : ''}
         </div>`;
       seatsEl.appendChild(seat);
@@ -1368,6 +1514,11 @@ function renderSeats(s) {
   }
 }
 
+function seatAvatarHtml(p) {
+  if (p.avatar) return `<span class="seat-av avatar-pic has-img" style="background-image:url('${p.avatar}')"></span>`;
+  const initial = (p.name || '?').trim().charAt(0).toUpperCase();
+  return `<span class="seat-av avatar-pic">${esc(initial)}</span>`;
+}
 function seatNameTags(p) {
   const streak = _winStreak.get(p.id) || 0;
   const streakTag = (streak >= 2 && !p.eliminated) ? `<span class="tag streak">🔥${streak}</span>` : '';
@@ -1418,7 +1569,7 @@ function updateSeatInPlace(seat, p, s) {
   }
   // 이름/태그(올인·끊김) — 애니메이션 없음
   const pname = inner.querySelector('.pname');
-  if (pname) pname.innerHTML = seatNameTags(p);
+  if (pname) pname.innerHTML = seatAvatarHtml(p) + seatNameTags(p);
   // 타임바: 차례일 때만 표시
   let tb = inner.querySelector('.seat-timerbar');
   if (p.isToAct && !tb) {
