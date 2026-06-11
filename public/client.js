@@ -230,8 +230,8 @@ function showLobbyPane(which) {
   $('joinPane').classList.toggle('hidden', which !== 'join');
   $('lobbyError').textContent = '';
 }
-$('goCreate').onclick = () => { if (!getName()) return; showLobbyPane('create'); };
-$('goJoin').onclick = () => { if (!getName()) return; showLobbyPane('join'); refreshRooms(); };
+$('goCreate').onclick = () => { const n = getName(); if (!n) return; myName = n; identify(); showLobbyPane('create'); };
+$('goJoin').onclick = () => { const n = getName(); if (!n) return; myName = n; identify(); showLobbyPane('join'); refreshRooms(); };
 document.querySelectorAll('[data-back]').forEach((b) => (b.onclick = () => showLobbyPane('home')));
 
 // 세그먼트 토글: 최대 인원 / 공개 설정
@@ -246,21 +246,52 @@ $('segVis').querySelectorAll('.seg-btn').forEach((b) => (b.onclick = () => {
   $('secretCodeRow').classList.toggle('hidden', !createSecret);
 }));
 
-// 타이머 설정 팝업
-const timerSettings = { actionSeconds: 10, levelMinutes: 3 };
+// 타이머 / 세션별 블라인드 설정 팝업
+const timerSettings = { actionSeconds: 10 };
+let sessions = [];
+function defaultSessions(startBB) {
+  let bb = Math.max(2, parseInt(startBB, 10) || 2);
+  const out = [];
+  for (let i = 0; i < 6; i++) { out.push({ minutes: 5, bb }); bb *= 2; }
+  return out;
+}
+function renderSessions() {
+  const box = $('sessList'); box.innerHTML = '';
+  sessions.forEach((sx, i) => {
+    const row = document.createElement('div'); row.className = 'sess-row';
+    row.innerHTML =
+      `<span class="sess-i">${i + 1}</span>` +
+      `<input type="number" class="sess-min" min="1" max="240" value="${sx.minutes}">` +
+      `<input type="number" class="sess-bb" min="2" value="${sx.bb}">` +
+      `<button type="button" class="sess-del"${sessions.length <= 1 ? ' disabled' : ''}>×</button>`;
+    row.querySelector('.sess-min').oninput = (e) => (sx.minutes = e.target.value);
+    row.querySelector('.sess-bb').oninput = (e) => (sx.bb = e.target.value);
+    row.querySelector('.sess-del').onclick = () => { if (sessions.length > 1) { sessions.splice(i, 1); renderSessions(); } };
+    box.appendChild(row);
+  });
+}
 $('openTimer').onclick = () => {
+  if (!sessions.length) sessions = defaultSessions($('startBB').value);
   $('actionSeconds').value = timerSettings.actionSeconds;
-  $('levelMinutes').value = timerSettings.levelMinutes;
+  renderSessions();
   show('timerPopup');
 };
-$('timerClose').onclick = () => {
-  timerSettings.actionSeconds = $('actionSeconds').value;
-  timerSettings.levelMinutes = $('levelMinutes').value;
-  hide('timerPopup');
+$('addSess').onclick = () => {
+  const last = sessions[sessions.length - 1] || { minutes: 5, bb: 2 };
+  sessions.push({ minutes: parseInt(last.minutes, 10) || 5, bb: (parseInt(last.bb, 10) || 2) * 2 });
+  renderSessions();
 };
+$('timerClose').onclick = () => { timerSettings.actionSeconds = $('actionSeconds').value; hide('timerPopup'); };
 
-// 접속 인원 표시(봇 제외)
-socket.on('online', (n) => { const el = $('onlineCount'); if (el) el.textContent = n; });
+// 접속 인원 표시(봇 제외) + 호버 시 닉네임 목록
+function identify() { if (myName) socket.emit('identify', myName); }
+socket.on('online', (d) => {
+  const count = (d && typeof d === 'object') ? d.count : d;
+  const names = (d && d.names) || [];
+  const cEl = $('onlineCount'); if (cEl) cEl.textContent = count;
+  const nEl = $('onlineNames');
+  if (nEl) nEl.textContent = names.length ? names.join(', ') : '아직 닉네임을 정한 사람이 없어요';
+});
 
 // 시스템 안내(관전 입장 등) 토스트
 let _noticeTimer = null;
@@ -344,6 +375,8 @@ $('createBtn').onclick = () => {
   const sc = ($('secretCode').value || '').replace(/\D/g, '');
   if (createSecret && sc.length !== 4) return ($('lobbyError').textContent = '비밀방 코드는 숫자 4자리로 입력하세요');
   myName = name;
+  const bs = (sessions.length ? sessions : defaultSessions($('startBB').value))
+    .map((sx) => ({ minutes: parseInt(sx.minutes, 10) || 5, bb: parseInt(sx.bb, 10) || 2 }));
   socket.emit('create', {
     name,
     settings: {
@@ -351,8 +384,8 @@ $('createBtn').onclick = () => {
       startBB: $('startBB').value,
       secret: createSecret,
       password: createSecret ? sc : '',
-      levelMinutes: timerSettings.levelMinutes,
       actionSeconds: timerSettings.actionSeconds,
+      blindStructure: bs,
     },
   }, (res) => {
     if (!res.ok) return ($('lobbyError').textContent = res.error);
@@ -600,20 +633,29 @@ function renderGame(s) {
     : `레벨 ${s.level} · 다음까지 ${s.nextLevelIn + 1}핸드`;
   $('potBadge').textContent = `팟 ${fmtAmt(s.pot)}`;
 
-  // 커뮤니티 카드 (새로 깔린 카드는 플립 인 애니). 변화 없을 땐 DOM 유지 → 클릭마다 깜빡임 방지
+  // 커뮤니티 카드: 5칸 고정(중앙 정렬), 왼쪽부터 공개. 빈 칸은 자리만 유지 → 카드 위치 안 흔들림
   const comm = $('community');
-  const commSig = s.handNumber + '|' + s.community.map((c) => c.r + '-' + c.s).join(',');
+  const inHand = !!s.phase; // 핸드 진행 중이면 5칸 표시
+  const commSig = s.handNumber + '|' + s.phase + '|' + s.community.map((c) => c.r + '-' + c.s).join(',');
   if (commSig !== _commSig) {
     _commSig = commSig;
     comm.innerHTML = '';
-    s.community.forEach((c, idx) => {
-      const el = cardEl(c);
-      if (idx >= _newCommFrom) {
-        el.classList.add('flip-in');
-        el.style.animationDelay = ((idx - _newCommFrom) * 0.12) + 's';
+    if (inHand) {
+      for (let idx = 0; idx < 5; idx++) {
+        if (idx < s.community.length) {
+          const el = cardEl(s.community[idx]);
+          if (idx >= _newCommFrom) {
+            el.classList.add('flip-in');
+            el.style.animationDelay = ((idx - _newCommFrom) * 0.12) + 's';
+          }
+          comm.appendChild(el);
+        } else {
+          const ph = document.createElement('div');
+          ph.className = 'card cc-slot'; // 빈 슬롯(자리 유지)
+          comm.appendChild(ph);
+        }
       }
-      comm.appendChild(el);
-    });
+    }
   }
   $('potDisplay').textContent = s.pot > 0 ? `팟: ${fmtAmt(s.pot)}` : '';
   renderPotStack(s);
@@ -960,6 +1002,7 @@ function renderSeats(s) {
           ${p.isToAct ? '<div class="seat-timerbar"><div class="seat-timerbar-fill"></div></div>' : ''}
           <div class="phole">${renderHole(p, i)}</div>
           <div class="hand-result">${result ? esc(result.handName) : ''}</div>
+          ${seatResultBadge(s, p)}
           ${seatEquityHtml(s, p)}
           ${p.bet > 0 ? `<div class="bet-chip">${fmtAmt(p.bet)}</div>` : ''}
         </div>`;
@@ -976,8 +1019,9 @@ function seatNameTags(p) {
   return `${esc(p.name)} ${p.id === myId ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''} ${(!p.connected && !p.isBot) ? '<span class="tag off">끊김</span>' : ''} ${(p.sittingOut && !p.eliminated) ? '<span class="tag sitout">자리비움</span>' : ''} ${(p.penaltyShort && !p.eliminated) ? '<span class="tag short">⏱단축</span>' : ''} ${p.allIn ? '<span class="tag allin">ALL-IN</span>' : ''}`;
 }
 function seatClasses(s, p, isMe) {
-  const isWinner = s.results && s.phase === 'handComplete' &&
-    s.results.awards?.some((a) => a.winners.some((w) => w.id === p.id));
+  const done = s.phase === 'handComplete' && s.results;
+  const isWinner = done && s.results.awards?.some((a) => a.winners.some((w) => w.id === p.id));
+  const isLoser = done && !isWinner && s.results.reveal?.some((r) => r.id === p.id);
   return 'seat'
     + (p.isToAct ? ' active' : '')
     + (p.isToAct && isMe ? ' myturn' : '')
@@ -989,7 +1033,15 @@ function seatClasses(s, p, isMe) {
     + ((_recentJoiners.get(p.id) || 0) > Date.now() ? ' seat-joining' : '')
     + ((_recentAllIn.get(p.id) || 0) > Date.now() ? ' allin-fx' : '')
     + ((_recentBust.get(p.id) || 0) > Date.now() ? ' bust-fx' : '')
-    + (isWinner ? ' winner' : '');
+    + (isWinner ? ' winner' : '')
+    + (isLoser ? ' loser' : '');
+}
+function seatResultBadge(s, p) {
+  if (s.phase !== 'handComplete' || !s.results) return '';
+  const isWin = s.results.awards?.some((a) => a.winners.some((w) => w.id === p.id));
+  if (isWin) return '<div class="result-badge win">WIN 🏆</div>';
+  if (s.results.reveal?.some((r) => r.id === p.id)) return '<div class="result-badge lose">LOSE</div>';
+  return '';
 }
 function seatEquityHtml(s, p) {
   if (!s.equity || p.folded || s.equity[p.id] == null) return '';
@@ -1193,10 +1245,13 @@ function renderWinner(s) {
   const banner = $('winnerBanner');
   if (s.results && s.phase === 'handComplete') {
     const lines = s.results.awards.map((a) =>
-      `${a.winners.map((w) => esc(w.name)).join(', ')} +${fmtAmt(a.amount)}${a.handName ? ' · ' + esc(a.handName) : ''}`
+      `🏆 ${a.winners.map((w) => esc(w.name)).join(', ')} 승리!` +
+      ` <span class="wb-amt">+${fmtAmt(a.amount)}</span>` +
+      (a.handName ? ` <span class="wb-hand">${esc(a.handName)}</span>` : '')
     );
     banner.innerHTML = lines.join('<br>');
     banner.classList.remove('hidden');
+    banner.classList.remove('pop'); void banner.offsetWidth; banner.classList.add('pop');
   } else {
     banner.classList.add('hidden');
   }

@@ -25,7 +25,8 @@ export class Game {
   constructor(opts = {}) {
     this.startingChips = opts.startingChips ?? 320; // 블랙20·레드20·그린20
     this.handsPerLevel = opts.handsPerLevel ?? 8;
-    this.levelDurationSec = opts.levelDurationSec ?? 0; // >0 이면 시간 기반 블라인드 상승
+    this.levelDurationSec = opts.levelDurationSec ?? 0; // >0 이면 시간 기반 블라인드 상승(단일)
+    this.levelDurations = Array.isArray(opts.levelDurations) && opts.levelDurations.length ? opts.levelDurations : null; // 세션별 시간(초)
     this.blindSchedule = opts.blindSchedule ?? defaultBlindSchedule();
     this.actionTimeout = opts.actionTimeout ?? 0; // ms, 0=무제한
     this.startedAt = null;
@@ -93,6 +94,34 @@ export class Game {
     if (this.log.length > 60) this.log.shift();
   }
 
+  // 시간 기반 블라인드인가 (세션별 또는 단일)
+  isTimed() { return !!(this.levelDurations || this.levelDurationSec > 0); }
+  // 경과 시간(초)으로 현재 레벨 인덱스
+  levelAt(elapsed) {
+    if (this.levelDurations) {
+      let acc = 0;
+      for (let i = 0; i < this.levelDurations.length; i++) {
+        acc += this.levelDurations[i];
+        if (elapsed < acc) return i;
+      }
+      return this.levelDurations.length - 1; // 마지막 세션 유지
+    }
+    return Math.floor(elapsed / (this.levelDurationSec || 1e9));
+  }
+  // 다음 레벨까지 남은 초 (마지막이면 null)
+  secondsToNext(elapsed) {
+    if (this.levelDurations) {
+      let acc = 0;
+      for (let i = 0; i < this.levelDurations.length; i++) {
+        acc += this.levelDurations[i];
+        if (elapsed < acc) return Math.max(0, Math.ceil(acc - elapsed));
+      }
+      return null;
+    }
+    if (this.levelDurationSec > 0) return Math.max(0, Math.ceil(this.levelDurationSec - (elapsed % this.levelDurationSec)));
+    return null;
+  }
+
   // ---------- 토너먼트 시작 ----------
   start() {
     if (this.started) return { ok: false, error: '이미 시작됨' };
@@ -130,13 +159,10 @@ export class Game {
     }
     this.paused = false;
     this.handNumber++;
-    // 레벨 업: 시간 기반(levelDurationSec>0) 또는 핸드 기반
-    if (this.levelDurationSec > 0 && this.startedAt) {
+    // 레벨 업: 시간 기반(세션별/단일) 또는 핸드 기반
+    if (this.isTimed() && this.startedAt) {
       const elapsed = (Date.now() - this.startedAt) / 1000;
-      this.level = Math.min(
-        Math.floor(elapsed / this.levelDurationSec),
-        this.blindSchedule.length - 1
-      );
+      this.level = Math.min(this.levelAt(elapsed), this.blindSchedule.length - 1);
     } else {
       this.level = Math.min(
         Math.floor((this.handNumber - 1) / this.handsPerLevel),
@@ -784,10 +810,10 @@ export class Game {
 
     // 시간 기반 블라인드일 때 다음 레벨까지 남은 초
     let secondsToNextLevel = null;
-    if (this.levelDurationSec > 0 && this.startedAt && this.started && !this.finished
+    if (this.isTimed() && this.startedAt && this.started && !this.finished
         && this.level < this.blindSchedule.length - 1) {
       const elapsed = (Date.now() - this.startedAt) / 1000;
-      secondsToNextLevel = Math.max(0, Math.ceil(this.levelDurationSec - (elapsed % this.levelDurationSec)));
+      secondsToNextLevel = this.secondsToNext(elapsed);
     }
 
     return {
@@ -798,7 +824,7 @@ export class Game {
       level: this.level + 1,
       blinds,
       nextLevelIn: this.handsPerLevel - ((this.handNumber - 1) % this.handsPerLevel) - 1,
-      timedBlinds: this.levelDurationSec > 0,
+      timedBlinds: this.isTimed(),
       secondsToNextLevel,
       runout: !!h?.runout,
       equity: h?.equity ?? null,

@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=53" />
+  <link rel="stylesheet" href="style.css?v=54" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -51,7 +51,8 @@
         </svg>
       </div>
       <p class="sub">친구들과 즐기는 실시간 텍사스 홀덤 · 토너먼트</p>
-      <p class="online-line">🟢 접속 중 <b id="onlineCount">–</b>명</p>
+      <p class="online-line" id="onlineLine">🟢 접속 중 <b id="onlineCount">–</b>명
+        <span id="onlineNames" class="online-names"></span></p>
 
       <!-- 1단계: 시작 -->
       <div id="lobbyHome" class="pane">
@@ -105,14 +106,16 @@
     </div>
   </div>
 
-  <!-- 타이머 설정 팝업 -->
+  <!-- 타이머 / 블라인드 세션 설정 팝업 -->
   <div id="timerPopup" class="overlay hidden">
-    <div class="settings-card">
-      <h3>타이머 설정</h3>
+    <div class="settings-card timer-card">
+      <h3>타이머 · 블라인드 설정</h3>
       <label>각 턴 제한시간 (초, 0=무제한)</label>
       <input id="actionSeconds" type="number" value="10" min="0" max="120" />
-      <label>블라인드 상승 간격 (분)</label>
-      <input id="levelMinutes" type="number" value="3" min="1" max="60" />
+      <label>세션별 시간 · 최소 블라인드</label>
+      <div class="sess-head"><span>#</span><span>시간(분)</span><span>블라인드(BB)</span><span></span></div>
+      <div id="sessList" class="sess-list"></div>
+      <button id="addSess" type="button" class="ghost wide">+ 세션 추가</button>
       <button id="timerClose" class="primary">확인</button>
     </div>
   </div>
@@ -223,6 +226,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=53"></script>
+  <script src="client.js?v=54"></script>
 </body>
 </html>

@@ -58,6 +58,7 @@ function serializeRooms() {
       game: {
         startingChips: g.startingChips,
         levelDurationSec: g.levelDurationSec,
+        levelDurations: g.levelDurations,
         handsPerLevel: g.handsPerLevel,
         blindSchedule: g.blindSchedule,
         started: g.started,
@@ -93,6 +94,7 @@ function loadRooms() {
       const g = new Game({
         startingChips: rg.startingChips,
         levelDurationSec: rg.levelDurationSec,
+        levelDurations: rg.levelDurations,
         handsPerLevel: rg.handsPerLevel,
         blindSchedule: rg.blindSchedule,
       });
@@ -148,9 +150,10 @@ function broadcast(code) {
   }
   saveRoomsSoon(); // 상태 변화 시 디스크에 스냅샷(디바운스)
 }
-// 접속한 사람 수(봇 제외 = 소켓 수) 전체 브로드캐스트
+// 접속한 사람(봇 제외 = 소켓) 수 + 닉네임 목록 브로드캐스트
+const userNames = new Map(); // socketId -> 닉네임
 function broadcastOnline() {
-  io.emit('online', io.engine.clientsCount);
+  io.emit('online', { count: io.engine.clientsCount, names: [...userNames.values()].filter(Boolean) });
 }
 
 // 자리 비움/합류 후 진행 인원이 다시 충분해지면 일시정지 해제하고 새 핸드 시작
@@ -289,7 +292,12 @@ io.on('connection', (socket) => {
   let roomCode = null;
   let playerId = socket.id;
   broadcastOnline(); // 새 접속 → 인원 수 갱신
-  socket.emit('online', io.engine.clientsCount);
+  socket.emit('online', { count: io.engine.clientsCount, names: [...userNames.values()].filter(Boolean) });
+  // 닉네임 등록(로비에서 닉 입력 후) → 접속자 목록에 반영
+  socket.on('identify', (name) => {
+    const nm = String(name || '').slice(0, 16).trim();
+    if (nm) { userNames.set(socket.id, nm); broadcastOnline(); }
+  });
 
   socket.on('create', ({ name, settings }, cb) => {
     const secret = !!settings?.secret;
@@ -302,23 +310,35 @@ io.on('connection', (socket) => {
     } else {
       code = makeRoomCode();
     }
-    const levelMinutes = clampInt(settings?.levelMinutes, 1, 60, 3);
-    // 방장이 정한 시작 빅블라인드로 블라인드 곡선 스케일
-    const startBB = clampInt(settings?.startBB, 2, 1000, 2);
-    const sb1 = Math.max(1, Math.round(startBB / 2));
-    const ratio = startBB / 2; // 기본 곡선 레벨1 BB=2 기준
-    const blindSchedule = defaultBlindSchedule().map((l, i) =>
-      i === 0
-        ? { sb: sb1, bb: startBB, ante: 0 }
-        : {
-            sb: Math.max(1, Math.round(l.sb * ratio)),
-            bb: Math.max(2, Math.round(l.bb * ratio)),
-            ante: Math.round(l.ante * ratio),
-          }
-    );
+    // 세션별 블라인드 구조 [{minutes, bb}] 우선, 없으면 시작BB+상승간격 폴백
+    const struct = Array.isArray(settings?.blindStructure) ? settings.blindStructure.slice(0, 30) : null;
+    let blindSchedule, levelDurations = null, levelDurationSec = 0;
+    if (struct && struct.length) {
+      blindSchedule = struct.map((s) => {
+        const bb = clampInt(s.bb, 2, 1000000, 2);
+        return { sb: Math.max(1, Math.round(bb / 2)), bb, ante: 0 };
+      });
+      levelDurations = struct.map((s) => clampInt(s.minutes, 1, 240, 5) * 60);
+    } else {
+      const levelMinutes = clampInt(settings?.levelMinutes, 1, 60, 3);
+      const startBB = clampInt(settings?.startBB, 2, 1000, 2);
+      const sb1 = Math.max(1, Math.round(startBB / 2));
+      const ratio = startBB / 2;
+      blindSchedule = defaultBlindSchedule().map((l, i) =>
+        i === 0
+          ? { sb: sb1, bb: startBB, ante: 0 }
+          : {
+              sb: Math.max(1, Math.round(l.sb * ratio)),
+              bb: Math.max(2, Math.round(l.bb * ratio)),
+              ante: Math.round(l.ante * ratio),
+            }
+      );
+      levelDurationSec = levelMinutes * 60;
+    }
     const game = new Game({
       startingChips: 320, // 친목용: 블랙20·레드20·그린20 고정
-      levelDurationSec: levelMinutes * 60, // 시간 기반 블라인드 상승
+      levelDurationSec,
+      levelDurations,
       blindSchedule,
     });
     game.addPlayer(playerId, name);
@@ -580,6 +600,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    userNames.delete(socket.id);
     setTimeout(broadcastOnline, 50); // 접속 종료 → 인원 수 갱신(모든 경우)
     const room = rooms.get(roomCode);
     if (!room) return;
