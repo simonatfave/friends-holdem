@@ -691,9 +691,11 @@ button { font-family: inherit; }
 /* 카드 크기는 :root의 반응형 값(vh·vw 비례)이 모든 화면을 처리 */
 /* 휴대폰 (가로 폭 기준) */
 @media (max-width: 640px) {
-  /* 세로 화면에선 테이블을 세로로 긴 형태로 — 세로 공간을 더 채우게 크게 */
-  .poker-table { width: min(96vw, 50vh); height: calc(min(96vw, 50vh) * 7 / 5); aspect-ratio: 5 / 7; border-width: 9px; }
-  .table-wrap { padding-bottom: 16px; }
+  /* 세로 테이블: 사용 가능한 '세로 공간' 기준으로 크기 결정(짧은 폰에선 잘리지 않게) */
+  .poker-table { height: min(60vh, 132vw); width: calc(min(60vh, 132vw) * 5 / 7); aspect-ratio: 5 / 7; border-width: 9px; }
+  .table-wrap { padding-bottom: 26px; }
+  /* 타임뱅크: 모바일은 테이블 하단 중앙(내 카드 아래)에 배치해 카드와 안 겹치게 */
+  .timebank-btn { left: 50%; right: auto; bottom: 0; transform: translateX(-50%); padding: 6px 13px; font-size: 12px; }
   .community { gap: 5px; top: 47%; }
   .pot-display { top: 63%; }
   .seat-inner { padding: 4px 5px; }
