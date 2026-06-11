@@ -93,6 +93,7 @@ function makeAccount(nick, pw) {
   const salt = randomBytes(12).toString('hex');
   return {
     nick, salt, hash: hashPw(pw, salt), createdAt: Date.now(),
+    avatar: null, // 프로필 이미지(data URL, 작게 리사이즈됨)
     balance: 1000, // 시작 포인트(밸런스)
     stats: { games: 0, wins: 0, handsWon: 0, biggestPot: 0, bestPlace: null },
     history: [], // 최근 게임 결과(최신이 앞)
@@ -106,7 +107,12 @@ function verifyPw(acc, pw) {
   } catch (e) { return false; }
 }
 function profileOf(acc) {
-  return { nick: acc.nick, balance: acc.balance, stats: acc.stats, history: acc.history.slice(0, 20) };
+  return { nick: acc.nick, avatar: acc.avatar || null, balance: acc.balance, stats: acc.stats, history: acc.history.slice(0, 20) };
+}
+// 프로필 이미지 검증(작은 data URL만 허용)
+const AVATAR_MAX = 200000; // ~200KB
+function validAvatar(av) {
+  return typeof av === 'string' && av.length <= AVATAR_MAX && /^data:image\/(png|jpeg|webp);base64,/.test(av);
 }
 
 // ---------- 방 관리 ----------
@@ -242,8 +248,18 @@ function broadcast(code) {
 // 닉네임을 입력해 '로그인 완료'한 사람만 접속 수로 집계 (봇 제외)
 const userNames = new Map(); // socketId -> 닉네임
 function broadcastOnline() {
-  const names = [...userNames.values()].filter(Boolean);
-  io.emit('online', { count: names.length, names });
+  // 같은 닉네임(여러 기기) 중복 제거, 아바타 포함
+  const seen = new Set();
+  const list = [];
+  for (const nm of userNames.values()) {
+    if (!nm) continue;
+    const key = nm.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const acc = users.get(key);
+    list.push({ nick: nm, avatar: (acc && acc.avatar) || null });
+  }
+  io.emit('online', { count: list.length, users: list, names: list.map((u) => u.nick) });
 }
 // 핸드 종료 시 승자 통계 누적(중복 방지)
 function tallyHand(code) {
@@ -434,12 +450,13 @@ io.on('connection', (socket) => {
   });
 
   // ---------- 회원가입 / 로그인 / 프로필 ----------
-  socket.on('signup', ({ nick, password } = {}, cb) => {
+  socket.on('signup', ({ nick, password, avatar } = {}, cb) => {
     nick = String(nick || '').trim().slice(0, 16);
     if (nick.length < 2) return cb?.({ ok: false, error: '닉네임은 2자 이상이어야 합니다' });
     if (!password || String(password).length < 4) return cb?.({ ok: false, error: '비밀번호는 4자 이상이어야 합니다' });
     if (users.has(nick.toLowerCase())) return cb?.({ ok: false, error: '이미 사용 중인 닉네임입니다' });
     const acc = makeAccount(nick, password);
+    if (avatar && validAvatar(avatar)) acc.avatar = avatar;
     users.set(nick.toLowerCase(), acc);
     saveUser(acc);
     socket.account = nick;
@@ -457,6 +474,21 @@ io.on('connection', (socket) => {
   socket.on('getProfile', (_d, cb) => {
     const acc = socket.account && users.get(socket.account.toLowerCase());
     cb?.(acc ? { ok: true, profile: profileOf(acc) } : { ok: false });
+  });
+  // 프로필 이미지 등록/변경/삭제(로그인 후)
+  socket.on('setAvatar', ({ avatar } = {}, cb) => {
+    const acc = socket.account && users.get(socket.account.toLowerCase());
+    if (!acc) return cb?.({ ok: false, error: '로그인이 필요합니다' });
+    if (avatar == null || avatar === '') {
+      acc.avatar = null;
+    } else if (validAvatar(avatar)) {
+      acc.avatar = avatar;
+    } else {
+      return cb?.({ ok: false, error: '이미지 형식이 올바르지 않거나 너무 큽니다' });
+    }
+    saveUser(acc);
+    broadcastOnline();
+    cb?.({ ok: true, profile: profileOf(acc) });
   });
 
   socket.on('create', ({ name, settings }, cb) => {

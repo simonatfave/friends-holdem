@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=60" />
+  <link rel="stylesheet" href="style.css?v=61" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -40,13 +40,46 @@
     </div>
   </div>
 
+  <!-- 회원가입 모달 -->
+  <div id="signupPanel" class="overlay hidden">
+    <div class="settings-card signup-card">
+      <h3>회원가입</h3>
+      <div class="su-avatar-row">
+        <div class="avatar-pic lg" id="suAvatarPreview">🙂</div>
+        <div class="su-avatar-actions">
+          <button type="button" id="suPickAvatar" class="ghost">프로필 이미지 선택</button>
+          <button type="button" id="suClearAvatar" class="ghost su-clear hidden">제거</button>
+          <p class="su-avatar-hint">선택 사항 · 정사각형 권장</p>
+        </div>
+        <input type="file" id="suAvatarFile" accept="image/*" class="hidden" />
+      </div>
+      <label>닉네임</label>
+      <input id="suNick" maxlength="16" autocomplete="off" placeholder="닉네임 (2자 이상)" />
+      <label>비밀번호</label>
+      <input id="suPw" type="password" autocomplete="new-password" placeholder="비밀번호 (4자 이상)" maxlength="32" />
+      <label>비밀번호 확인</label>
+      <input id="suPw2" type="password" autocomplete="new-password" placeholder="비밀번호 다시 입력" maxlength="32" />
+      <p id="suError" class="error"></p>
+      <button id="suSubmit" class="primary">가입하고 시작</button>
+      <button id="suCancel" class="ghost wide">취소</button>
+    </div>
+  </div>
+
   <!-- 내 계정 (잔고 · 통계 · 히스토리) -->
   <div id="accountPanel" class="overlay hidden">
     <div class="settings-card account-card">
       <h3>내 계정</h3>
       <div class="acc-head">
-        <span id="accNick" class="acc-nick">–</span>
+        <div class="acc-id">
+          <div class="avatar-pic md" id="accAvatar">🙂</div>
+          <span id="accNick" class="acc-nick">–</span>
+        </div>
         <span class="acc-balance">💰 <b id="accBalance">0</b></span>
+      </div>
+      <div class="acc-avatar-actions">
+        <button type="button" id="accPickAvatar" class="ghost">📷 프로필 이미지 변경</button>
+        <button type="button" id="accClearAvatar" class="ghost hidden">제거</button>
+        <input type="file" id="accAvatarFile" accept="image/*" class="hidden" />
       </div>
       <div class="acc-stats" id="accStats"></div>
       <h4 class="acc-h4">최근 게임</h4>
@@ -70,12 +103,12 @@
         </svg>
       </div>
       <p class="sub">친구들과 즐기는 실시간 텍사스 홀덤 · 토너먼트</p>
-      <p class="online-line" id="onlineLine">🟢 접속 중 <b id="onlineCount">–</b>명
-        <span id="onlineNames" class="online-names"></span></p>
+      <button type="button" class="online-line" id="onlineLine">🟢 접속 중 <b id="onlineCount">–</b>명 <span class="online-caret">›</span></button>
 
       <!-- 1단계: 시작 -->
       <div id="lobbyHome" class="pane">
         <div class="me-row">
+          <div class="avatar-pic sm" id="meAvatar">🙂</div>
           <span class="me-nick" id="meNick">–</span>
           <span class="me-balance">💰 <b id="meBalance">0</b></span>
         </div>
@@ -126,6 +159,15 @@
       </div>
 
       <p id="lobbyError" class="error"></p>
+    </div>
+  </div>
+
+  <!-- 접속 중인 사용자 목록 -->
+  <div id="onlinePanel" class="overlay hidden">
+    <div class="settings-card online-card">
+      <h3>🟢 접속 중 <span id="onlinePanelCount">0</span>명</h3>
+      <div id="onlineUserList" class="online-user-list"></div>
+      <button id="onlineClose" class="primary">닫기</button>
     </div>
   </div>
 
@@ -250,6 +292,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js?v=60"></script>
+  <script src="client.js?v=61"></script>
 </body>
 </html>

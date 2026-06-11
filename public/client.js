@@ -213,7 +213,47 @@ function updateMeDisplay() {
   if (!myProfile) return;
   $('meNick').textContent = myProfile.nick;
   $('meBalance').textContent = myProfile.balance;
+  paintAvatar($('meAvatar'), myProfile.avatar, myProfile.nick);
 }
+// 아바타 이미지를 보여주는 헬퍼 (data URL 있으면 <img>, 없으면 이모지/이니셜)
+function paintAvatar(el, avatar, nick) {
+  if (!el) return;
+  if (avatar) {
+    el.style.backgroundImage = `url("${avatar}")`;
+    el.classList.add('has-img');
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = '';
+    el.classList.remove('has-img');
+    el.textContent = nick ? nick.trim().charAt(0).toUpperCase() : '🙂';
+  }
+}
+// 파일 → 정사각형 128px data URL(JPEG)로 리사이즈
+function fileToAvatar(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) return reject(new Error('이미지 파일을 선택하세요'));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('파일을 읽지 못했습니다'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('이미지를 불러오지 못했습니다'));
+      img.onload = () => {
+        const S = 128;
+        const canvas = document.createElement('canvas');
+        canvas.width = S; canvas.height = S;
+        const ctx = canvas.getContext('2d');
+        // 가운데를 정사각형으로 크롭
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, S, S);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function onLoggedIn(profile) {
   myProfile = profile;
   myName = profile.nick;
@@ -233,9 +273,56 @@ function doAuth(kind) {
   });
 }
 $('loginBtn').onclick = () => doAuth('login');
-$('signupBtn').onclick = () => doAuth('signup');
 $('authPw').addEventListener('keydown', (e) => { if (e.key === 'Enter') doAuth('login'); });
+$('authNick').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('authPw').focus(); });
 setTimeout(() => $('authNick') && $('authNick').focus(), 50);
+
+// ---------- 회원가입 모달 ----------
+let suAvatar = null; // 가입 시 선택한 아바타 data URL
+function openSignup() {
+  $('suNick').value = $('authNick').value.trim();
+  $('suPw').value = ''; $('suPw2').value = '';
+  $('suError').textContent = '';
+  suAvatar = null;
+  paintAvatar($('suAvatarPreview'), null, $('suNick').value);
+  $('suClearAvatar').classList.add('hidden');
+  show('signupPanel');
+  setTimeout(() => $('suNick').focus(), 50);
+}
+$('signupBtn').onclick = openSignup;
+$('suCancel').onclick = () => hide('signupPanel');
+$('suPickAvatar').onclick = () => $('suAvatarFile').click();
+$('suAvatarFile').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    suAvatar = await fileToAvatar(file);
+    paintAvatar($('suAvatarPreview'), suAvatar, $('suNick').value);
+    $('suClearAvatar').classList.remove('hidden');
+  } catch (err) { $('suError').textContent = err.message || '이미지 처리 실패'; }
+});
+$('suClearAvatar').onclick = () => {
+  suAvatar = null;
+  paintAvatar($('suAvatarPreview'), null, $('suNick').value);
+  $('suClearAvatar').classList.add('hidden');
+};
+$('suNick').addEventListener('input', () => { if (!suAvatar) paintAvatar($('suAvatarPreview'), null, $('suNick').value); });
+function submitSignup() {
+  const nick = $('suNick').value.trim();
+  const pw = $('suPw').value, pw2 = $('suPw2').value;
+  if (nick.length < 2) { $('suError').textContent = '닉네임은 2자 이상이어야 합니다'; return; }
+  if (pw.length < 4) { $('suError').textContent = '비밀번호는 4자 이상이어야 합니다'; return; }
+  if (pw !== pw2) { $('suError').textContent = '비밀번호가 일치하지 않습니다'; return; }
+  $('suError').textContent = '';
+  socket.emit('signup', { nick, password: pw, avatar: suAvatar }, (res) => {
+    if (!res || !res.ok) { $('suError').textContent = (res && res.error) || '가입에 실패했습니다'; return; }
+    hide('signupPanel');
+    onLoggedIn(res.profile);
+  });
+}
+$('suSubmit').onclick = submitSignup;
+$('suPw2').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitSignup(); });
 
 // 게임 종료 후 서버가 보내는 프로필 갱신
 socket.on('profile', (p) => { myProfile = p; updateMeDisplay(); if (!$('accountPanel').classList.contains('hidden')) renderAccount(); });
@@ -243,10 +330,32 @@ socket.on('profile', (p) => { myProfile = p; updateMeDisplay(); if (!$('accountP
 // 내 계정 보기
 $('accBtn').onclick = () => { renderAccount(); show('accountPanel'); };
 $('accClose').onclick = () => hide('accountPanel');
+// 계정 화면에서 프로필 이미지 변경/제거
+$('accPickAvatar').onclick = () => $('accAvatarFile').click();
+$('accAvatarFile').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  let dataUrl;
+  try { dataUrl = await fileToAvatar(file); }
+  catch (err) { alert(err.message || '이미지 처리 실패'); return; }
+  socket.emit('setAvatar', { avatar: dataUrl }, (res) => {
+    if (!res || !res.ok) { alert((res && res.error) || '변경 실패'); return; }
+    myProfile = res.profile; updateMeDisplay(); renderAccount();
+  });
+});
+$('accClearAvatar').onclick = () => {
+  socket.emit('setAvatar', { avatar: null }, (res) => {
+    if (!res || !res.ok) { alert((res && res.error) || '제거 실패'); return; }
+    myProfile = res.profile; updateMeDisplay(); renderAccount();
+  });
+};
 function renderAccount() {
   if (!myProfile) return;
   $('accNick').textContent = myProfile.nick;
   $('accBalance').textContent = myProfile.balance;
+  paintAvatar($('accAvatar'), myProfile.avatar, myProfile.nick);
+  $('accClearAvatar').classList.toggle('hidden', !myProfile.avatar);
   const st = myProfile.stats || {};
   const rows = [
     ['게임 수', st.games || 0], ['우승', st.wins || 0],
@@ -331,15 +440,37 @@ $('addSess').onclick = () => {
 };
 $('timerClose').onclick = () => { timerSettings.actionSeconds = $('actionSeconds').value; hide('timerPopup'); };
 
-// 접속 인원 표시(봇 제외) + 호버 시 닉네임 목록
+// 접속 인원 표시(봇 제외) + 클릭 시 아바타 목록 패널
 function identify() { if (myName) socket.emit('identify', myName); }
+let onlineUsers = [];
+function renderOnlineList() {
+  $('onlinePanelCount').textContent = onlineUsers.length;
+  const box = $('onlineUserList');
+  if (!onlineUsers.length) { box.innerHTML = '<div class="room-empty">접속 중인 사용자가 없어요</div>'; return; }
+  box.innerHTML = '';
+  onlineUsers.forEach((u) => {
+    const row = document.createElement('div');
+    row.className = 'online-user' + (myProfile && u.nick.toLowerCase() === myProfile.nick.toLowerCase() ? ' me' : '');
+    const av = document.createElement('div');
+    av.className = 'avatar-pic sm';
+    paintAvatar(av, u.avatar, u.nick);
+    const nm = document.createElement('span');
+    nm.className = 'ou-nick'; nm.textContent = u.nick;
+    row.appendChild(av); row.appendChild(nm);
+    if (myProfile && u.nick.toLowerCase() === myProfile.nick.toLowerCase()) {
+      const tag = document.createElement('span'); tag.className = 'ou-me'; tag.textContent = '나'; row.appendChild(tag);
+    }
+    box.appendChild(row);
+  });
+}
 socket.on('online', (d) => {
   const count = (d && typeof d === 'object') ? d.count : d;
-  const names = (d && d.names) || [];
+  onlineUsers = (d && d.users) || ((d && d.names) ? d.names.map((n) => ({ nick: n, avatar: null })) : []);
   const cEl = $('onlineCount'); if (cEl) cEl.textContent = count;
-  const nEl = $('onlineNames');
-  if (nEl) nEl.textContent = names.length ? names.join(', ') : '아직 닉네임을 정한 사람이 없어요';
+  if (!$('onlinePanel').classList.contains('hidden')) renderOnlineList();
 });
+$('onlineLine').onclick = () => { renderOnlineList(); show('onlinePanel'); };
+$('onlineClose').onclick = () => hide('onlinePanel');
 
 // 시스템 안내(관전 입장 등) 토스트
 let _noticeTimer = null;

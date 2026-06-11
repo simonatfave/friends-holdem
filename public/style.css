@@ -66,17 +66,44 @@ input:focus { border-color: var(--accent); }
 .tab.active { background: var(--panel-light); color: var(--text); border-color: var(--accent); }
 
 /* ---------- 새 로비(시작/방만들기/참여하기) ---------- */
-.online-line { text-align: center; font-size: 13px; color: var(--green); margin: -8px 0 14px; position: relative; cursor: default; }
-.online-line b { color: var(--text); font-size: 15px; }
-.online-names {
-  display: none; position: absolute; left: 50%; transform: translateX(-50%);
-  top: 100%; margin-top: 5px; z-index: 50;
-  background: rgba(20,26,34,.97); border: 1px solid #33404f; border-radius: 10px;
-  padding: 8px 12px; font-size: 12px; color: var(--text);
-  width: max-content; max-width: 280px; line-height: 1.5; white-space: normal;
-  box-shadow: 0 6px 18px rgba(0,0,0,.5);
+.online-line {
+  display: block; margin: -8px auto 14px; padding: 6px 14px; border-radius: 999px;
+  background: rgba(46,164,109,.12); border: 1px solid rgba(46,164,109,.35);
+  text-align: center; font-size: 13px; color: var(--green); cursor: pointer;
+  font-family: inherit; transition: filter .15s;
 }
-.online-line:hover .online-names { display: block; }
+.online-line:hover { filter: brightness(1.18); }
+.online-line:active { transform: translateY(1px); }
+.online-line b { color: var(--text); font-size: 15px; }
+.online-caret { color: var(--muted); font-weight: 700; margin-left: 2px; }
+/* 접속자 목록 패널 */
+.online-card { max-width: 340px; width: 90vw; }
+.online-user-list { display: flex; flex-direction: column; gap: 7px; max-height: 50vh; overflow-y: auto; margin-bottom: 14px; }
+.online-user { display: flex; align-items: center; gap: 11px; background: #161c25; border: 1px solid #2a3340; border-radius: 11px; padding: 8px 12px; }
+.online-user.me { border-color: var(--gold); background: rgba(232,196,102,.08); }
+.online-user .ou-nick { flex: 1; font-weight: 700; font-size: 15px; color: var(--text); }
+.online-user .ou-me { font-size: 11px; color: var(--gold); border: 1px solid var(--gold); border-radius: 6px; padding: 1px 6px; }
+
+/* ---------- 아바타 ---------- */
+.avatar-pic {
+  flex: 0 0 auto; border-radius: 50%; background: #2a3340 center/cover no-repeat;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gold); font-weight: 800; border: 2px solid #3a4756; overflow: hidden;
+}
+.avatar-pic.has-img { color: transparent; }
+.avatar-pic.sm { width: 38px; height: 38px; font-size: 16px; }
+.avatar-pic.md { width: 52px; height: 52px; font-size: 22px; }
+.avatar-pic.lg { width: 84px; height: 84px; font-size: 34px; }
+
+/* ---------- 회원가입 모달 ---------- */
+.signup-card { max-width: 360px; width: 92vw; }
+.su-avatar-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.su-avatar-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.su-avatar-actions .ghost { margin: 0; }
+.su-avatar-hint { color: var(--muted); font-size: 11px; margin: 0; }
+.su-clear { border-color: #5b3a3a !important; color: #f0a0a0 !important; }
+.acc-id { display: flex; align-items: center; gap: 11px; }
+.acc-avatar-actions { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
 .pane-title { color: var(--gold); text-align: center; margin: 0 0 12px; font-size: 21px; }
 .primary.alt { background: linear-gradient(180deg, #5a9bff, #3f78d8); color: #fff; }
 .ghost.wide { width: 100%; margin-top: 10px; padding: 11px; border-radius: 10px; text-align: center; }
