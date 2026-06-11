@@ -1352,3 +1352,25 @@ body:not(.waiting-mode) .action-timer.hidden { display: block !important; visibi
 /* 시스템(입퇴장) 채팅 메시지 */
 .chat-sys { color: var(--muted); font-size: 12px; font-style: italic; opacity: .92; }
 .chat-sys-dot { color: var(--accent); font-style: normal; }
+
+/* ================= v75: 기록·빠른채팅·볼륨·상대프로필 ================= */
+/* 게임 기록 헤더 */
+.log-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 4px; color: var(--muted); font-size: 12px; }
+.log-head-btns { display: flex; gap: 6px; }
+.log-head-btns .ghost { padding: 3px 9px; font-size: 12px; }
+/* 전체 기록 모달 */
+.log-card { max-width: 460px; width: 92vw; }
+.log-full { background: #0e1219; border: 1px solid #2a3340; border-radius: 10px; padding: 12px; max-height: 60vh; overflow: auto; font-size: 12px; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-word; margin-bottom: 12px; }
+
+/* 빠른 채팅 프리셋 */
+.quick-chat { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 0; }
+.qchat-btn { padding: 4px 10px; border-radius: 999px; border: 1px solid #3a4756; background: var(--panel-light); color: var(--text); font-size: 12px; cursor: pointer; }
+.qchat-btn:hover { filter: brightness(1.15); }
+.qchat-btn:active { transform: translateY(1px); }
+
+/* 볼륨 슬라이더 */
+.toggle-row input[type=range] { width: 130px; accent-color: var(--gold); }
+
+/* 상대 프로필 모달 */
+.opp-card { max-width: 340px; width: 90vw; }
+.lb-row:hover, .online-user:hover { filter: brightness(1.12); }

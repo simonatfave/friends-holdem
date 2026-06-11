@@ -976,6 +976,12 @@ io.on('connection', (socket) => {
     list.sort((a, b) => b.wins - a.wins || b.balance - a.balance || b.handsWon - a.handsWon);
     cb?.({ ok: true, top: list.slice(0, 50) });
   });
+  // 상대 프로필 보기(공개 정보만 — 히스토리 제외)
+  socket.on('profileByNick', ({ nick } = {}, cb) => {
+    const acc = nick && users.get(String(nick).toLowerCase());
+    if (!acc) return cb?.({ ok: false });
+    cb?.({ ok: true, profile: { nick: acc.nick, avatar: acc.avatar || null, balance: acc.balance || 0, stats: acc.stats || {} } });
+  });
   socket.on('react', ({ emoji }) => {
     if (!rateOk('react:' + socket.id, 500)) return; // 도배 방지
     const room = rooms.get(roomCode);

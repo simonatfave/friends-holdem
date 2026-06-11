@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=74" />
+  <link rel="stylesheet" href="style.css?v=75" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -181,6 +181,33 @@
     </div>
   </div>
 
+  <!-- 전체 게임 기록 보기 -->
+  <div id="logPanel" class="overlay hidden">
+    <div class="settings-card log-card">
+      <h3>📋 게임 기록</h3>
+      <pre id="logFull" class="log-full"></pre>
+      <div class="acc-actions">
+        <button id="logFullCopy" class="ghost">복사</button>
+        <button id="logClose" class="primary">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상대 프로필 보기 -->
+  <div id="oppProfilePanel" class="overlay hidden">
+    <div class="settings-card opp-card">
+      <div class="acc-head">
+        <div class="acc-id">
+          <div class="avatar-pic md" id="oppAvatar">🙂</div>
+          <span id="oppNick" class="acc-nick">–</span>
+        </div>
+        <span class="acc-balance">💰 <b id="oppBalance">0</b></span>
+      </div>
+      <div class="acc-stats" id="oppStats"></div>
+      <button id="oppClose" class="primary">닫기</button>
+    </div>
+  </div>
+
   <!-- 리더보드 -->
   <div id="leaderboardPanel" class="overlay hidden">
     <div class="settings-card lb-card">
@@ -278,9 +305,17 @@
     <div class="emoji-bar" id="emojiBar"></div>
 
     <div class="sidepanel">
+      <div class="log-head">
+        <span>게임 기록</span>
+        <span class="log-head-btns">
+          <button id="logView" class="ghost" title="전체 기록 보기">📋</button>
+          <button id="logCopy" class="ghost" title="기록 복사">복사</button>
+        </span>
+      </div>
       <div class="log" id="log"></div>
       <div class="chatbox">
         <div id="chatMessages" class="chat-messages"></div>
+        <div class="quick-chat" id="quickChat"></div>
         <div class="chat-input">
           <input id="chatInput" maxlength="200" placeholder="메시지..." />
           <button id="chatSend" class="ghost">전송</button>
@@ -292,6 +327,7 @@
       <div class="settings-card">
         <h3>설정</h3>
         <label class="toggle-row"><span>전체 소리</span><input type="checkbox" id="optMaster" checked /></label>
+        <label class="toggle-row"><span>소리 크기</span><input type="range" id="optVolume" min="0" max="100" value="100" /></label>
         <label class="toggle-row"><span>내 차례 알림음</span><input type="checkbox" id="optTurn" checked /></label>
         <label class="toggle-row"><span>효과음(카드·칩·승리)</span><input type="checkbox" id="optFx" checked /></label>
         <label class="toggle-row"><span>연출 줄이기 (흔들림·딜링·이모지비 끄기)</span><input type="checkbox" id="optReduceMotion" /></label>
@@ -314,7 +350,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="util.js?v=74"></script>
-  <script src="client.js?v=74"></script>
+  <script src="util.js?v=75"></script>
+  <script src="client.js?v=75"></script>
 </body>
 </html>

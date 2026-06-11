@@ -70,7 +70,7 @@ socket.on('connect', () => clearTimeout(_coldTimer));
 // 모달 ESC로 닫기(게임 진행에 영향 없는 오버레이만)
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  ['accountPanel', 'signupPanel', 'onlinePanel', 'settingsPanel', 'timerPopup'].forEach((id) => {
+  ['accountPanel', 'signupPanel', 'onlinePanel', 'settingsPanel', 'timerPopup', 'leaderboardPanel', 'logPanel', 'oppProfilePanel'].forEach((id) => {
     const el = $(id); if (el && !el.classList.contains('hidden')) hide(id);
   });
 });
@@ -86,7 +86,7 @@ document.addEventListener('keydown', (e) => {
 // ---------- 효과음 (Web Audio, 에셋 없이 생성) + 설정 ----------
 function loadSound() {
   const prefRM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const base = { master: true, turn: true, fx: true, bbUnits: false, reduceMotion: prefRM };
+  const base = { master: true, turn: true, fx: true, bbUnits: false, reduceMotion: prefRM, volume: 1 };
   try { return Object.assign(base, JSON.parse(localStorage.getItem('dice_sound') || '{}')); }
   catch (e) { return base; }
 }
@@ -112,8 +112,10 @@ function ac() {
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
+const volMul = () => (soundSettings.volume == null ? 1 : Math.max(0, Math.min(1, soundSettings.volume)));
 function tone(freq, dur, type = 'sine', vol = 0.15, when = 0) {
   if (!soundSettings.master) return;
+  vol *= volMul(); if (vol <= 0.0002) return;
   const c = ac(); if (!c) return;
   const o = c.createOscillator(), g = c.createGain();
   o.type = type; o.frequency.value = freq;
@@ -127,6 +129,7 @@ function tone(freq, dur, type = 'sine', vol = 0.15, when = 0) {
 // 화이트노이즈 버스트(필터+엔벨로프) — 실제 카드/칩 질감 합성
 function noise(dur, vol, when = 0, filterType = 'highpass', freq = 2000, q = 0) {
   if (!soundSettings.master) return;
+  vol *= volMul(); if (vol <= 0.0002) return;
   const c = ac(); if (!c) return;
   const len = Math.max(1, Math.floor(c.sampleRate * dur));
   const buf = c.createBuffer(1, len, c.sampleRate);
@@ -206,6 +209,7 @@ $('settingsBtn').onclick = () => {
   $('optTurn').checked = soundSettings.turn;
   $('optFx').checked = soundSettings.fx;
   if ($('optReduceMotion')) $('optReduceMotion').checked = !!soundSettings.reduceMotion;
+  if ($('optVolume')) $('optVolume').value = Math.round((soundSettings.volume == null ? 1 : soundSettings.volume) * 100);
   show('settingsPanel');
 };
 $('settingsClose').onclick = () => hide('settingsPanel');
@@ -213,6 +217,14 @@ $('optMaster').onchange = (e) => { soundSettings.master = e.target.checked; save
 $('optTurn').onchange = (e) => { soundSettings.turn = e.target.checked; saveSound(); };
 $('optFx').onchange = (e) => { soundSettings.fx = e.target.checked; saveSound(); };
 if ($('optReduceMotion')) $('optReduceMotion').onchange = (e) => { soundSettings.reduceMotion = e.target.checked; saveSound(); applyMotionPref(); };
+if ($('optVolume')) {
+  let _volSfxT = null;
+  $('optVolume').oninput = (e) => {
+    soundSettings.volume = Math.max(0, Math.min(1, Number(e.target.value) / 100));
+    saveSound();
+    clearTimeout(_volSfxT); _volSfxT = setTimeout(() => { if (soundSettings.master) sfxChip(); }, 120); // 미리듣기
+  };
+}
 $('optBBUnits').checked = !!soundSettings.bbUnits;
 $('optBBUnits').onchange = (e) => { soundSettings.bbUnits = e.target.checked; saveSound(); if (lastState) renderGame(lastState); };
 // 자리 비움 토글(상단바 버튼) — 현재 상태는 _amSittingOut에 보관
@@ -458,6 +470,8 @@ function renderLeaderboard(top) {
     row.appendChild(id);
     const w = document.createElement('span'); w.className = 'lb-wins'; w.textContent = u.wins; row.appendChild(w);
     const b = document.createElement('span'); b.className = 'lb-bal'; b.textContent = u.balance; row.appendChild(b);
+    row.style.cursor = 'pointer';
+    row.onclick = () => openOppProfile(u.nick);
     box.appendChild(row);
   });
 }
@@ -621,6 +635,8 @@ function renderOnlineList() {
     if (myProfile && u.nick.toLowerCase() === myProfile.nick.toLowerCase()) {
       const tag = document.createElement('span'); tag.className = 'ou-me'; tag.textContent = '나'; row.appendChild(tag);
     }
+    row.style.cursor = 'pointer';
+    row.onclick = () => openOppProfile(u.nick);
     box.appendChild(row);
   });
 }
@@ -2064,6 +2080,45 @@ $('chatSend').onclick = sendChat;
 $('chatInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) sendChat();
 });
+
+// 빠른 채팅 프리셋
+const QUICK_CHATS = ['gg', '굿럭', '나이스!', '한판 더', '아쉽다', 'ㅋㅋㅋ'];
+(function buildQuickChat() {
+  const box = $('quickChat'); if (!box) return;
+  QUICK_CHATS.forEach((t) => {
+    const b = document.createElement('button');
+    b.className = 'qchat-btn'; b.textContent = t;
+    b.onclick = () => socket.emit('chat', { text: t });
+    box.appendChild(b);
+  });
+})();
+
+// 게임 기록 복사 / 전체 보기
+function gameLogText() { return ($('log').innerText || '').trim(); }
+$('logCopy').onclick = () => { navigator.clipboard?.writeText(gameLogText()); toast('기록을 복사했습니다', 'ok'); };
+$('logView').onclick = () => { $('logFull').textContent = gameLogText() || '아직 기록이 없습니다'; show('logPanel'); };
+$('logClose').onclick = () => hide('logPanel');
+$('logFullCopy').onclick = () => { navigator.clipboard?.writeText(gameLogText()); toast('기록을 복사했습니다', 'ok'); };
+
+// 상대 프로필 보기
+function openOppProfile(nick) {
+  if (!nick) return;
+  socket.emit('profileByNick', { nick }, (r) => {
+    if (!r || !r.ok) { toast('프로필을 찾을 수 없습니다', 'error'); return; }
+    const p = r.profile, st = p.stats || {};
+    $('oppNick').textContent = p.nick;
+    $('oppBalance').textContent = p.balance;
+    paintAvatar($('oppAvatar'), p.avatar, p.nick);
+    const rows = [
+      ['게임 수', st.games || 0], ['우승', st.wins || 0],
+      ['승률', (st.games ? Math.round((st.wins / st.games) * 100) : 0) + '%'],
+      ['핸드 승', st.handsWon || 0], ['최고 순위', st.bestPlace ? st.bestPlace + '위' : '-'], ['최대 팟', st.biggestPot || 0],
+    ];
+    $('oppStats').innerHTML = rows.map(([k, v]) => `<div class="acc-stat"><span class="acc-k">${k}</span><span class="acc-v">${v}</span></div>`).join('');
+    show('oppProfilePanel');
+  });
+}
+$('oppClose').onclick = () => hide('oppProfilePanel');
 function sendChat() {
   const t = $('chatInput').value.trim();
   if (!t) return;
