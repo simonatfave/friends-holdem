@@ -667,15 +667,17 @@ function refreshRooms() {
       const btnWrap = document.createElement('div');
       btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
       if (!r.finished) {
-        if (!r.full) { // 자리 있으면 참여(진행 중이면 다음 핸드부터 중간 합류)
+        if (!r.started && !r.full) {
+          // 대기방: 바로 참여
           const j = document.createElement('button');
-          j.className = 'join-btn'; j.textContent = r.started ? '중간 참여' : '참여';
-          j.onclick = () => joinRoom(r.code, r.started);
+          j.className = 'join-btn'; j.textContent = '참여';
+          j.onclick = () => joinRoom(r.code, false);
           btnWrap.appendChild(j);
-        }
-        if (r.started || r.full) { // 진행 중이거나 가득 찬 방은 관전
+        } else {
+          // 진행 중(또는 가득 찬) 방: 먼저 관전으로 입장 → 테이블에서 [➕ 참여] 버튼으로 합류
           const sp = document.createElement('button');
-          sp.className = 'spec-btn'; sp.textContent = '관전';
+          sp.className = 'spec-btn';
+          sp.textContent = (r.started && !r.full) ? '입장 (관전→참여)' : '관전';
           sp.onclick = () => spectateRoom(r.code);
           btnWrap.appendChild(sp);
         }
@@ -780,31 +782,35 @@ $('wbCopy').onclick = () => {
   $('wbCopy').textContent = '복사됨!';
   setTimeout(() => ($('wbCopy').textContent = '복사'), 1500);
 };
+function resetToLobby() {
+  document.body.classList.remove('waiting-mode', 'my-turn-glow');
+  $('waitBanner').classList.add('hidden');
+  if (typeof clearTimeAlert === 'function') clearTimeAlert();
+  lastState = null; prevSnap = null; myRoomCode = ''; isHost = false; isSpectator = false;
+  _seatSig = ''; _commSig = ''; _seenPlayerIds = new Set(); _playersInit = false;
+  _recentJoiners.clear(); _recentAllIn.clear(); _recentBust.clear();
+  $('leaveBtn').classList.add('hidden'); $('sitOutBtn').classList.add('hidden');
+  hide('finalScreen'); hide('game'); hide('waiting'); show('lobby'); showLobbyPane('home');
+  $('versionBadge').classList.remove('hidden');
+  if (myProfile) socket.emit('getProfile', {}, (r) => { if (r && r.ok) { myProfile = r.profile; updateMeDisplay(); } });
+}
 function doLeaveToLobby(confirmMsg) {
   if (confirmMsg && !confirm(confirmMsg)) return;
-  socket.emit('leave', {}, () => {
-    document.body.classList.remove('waiting-mode');
-    $('waitBanner').classList.add('hidden');
-    if (typeof clearTimeAlert === 'function') clearTimeAlert();
-    lastState = null; prevSnap = null; myRoomCode = ''; isHost = false; isSpectator = false;
-    _seatSig = ''; _commSig = ''; _seenPlayerIds = new Set(); _playersInit = false;
-    _recentJoiners.clear(); _recentAllIn.clear(); _recentBust.clear();
-    $('leaveBtn').classList.add('hidden');
-    hide('finalScreen'); hide('game'); hide('waiting'); show('lobby'); showLobbyPane('home');
-    $('versionBadge').classList.remove('hidden');
-    if (myProfile) socket.emit('getProfile', {}, (r) => { if (r && r.ok) { myProfile = r.profile; updateMeDisplay(); } });
-  });
+  socket.emit('leave', {}, () => resetToLobby());
 }
+// 진행 중이던 핸드가 끝나 서버가 로비로 보낼 때
+socket.on('leftToLobby', () => { resetToLobby(); toast('로비로 나왔습니다', 'ok'); });
 // 최종 화면: '로비로 이동'(로그인 세션 유지, 새로고침 없음)
 $('finalToLobby').onclick = () => doLeaveToLobby();
 $('wbLeave').onclick = () => doLeaveToLobby('대기 중인 방에서 나갈까요?');
 $('leaveBtn').onclick = () => {
-  if (isSpectator) { doLeaveToLobby('관전을 종료할까요?'); return; } // 관전자는 로비로(세션 유지)
-  // 플레이어 나가기: 전적 기록 + 게임/세션 종료(로그아웃)
-  if (!confirm('게임에서 나가시겠어요?\n진행 중이면 전적에 기록되고 로그아웃됩니다.')) return;
-  socket.emit('quit', {}, (r) => {
-    if (r && r.profile) myProfile = r.profile;
-    logoutToGate();
+  if (isSpectator) { doLeaveToLobby('관전을 종료할까요?'); return; } // 관전자는 바로 로비로
+  // 플레이어 나가기: 전적 기록 후, 진행 중이면 이번 핸드 끝나고 로비로(세션 유지)
+  if (!confirm('게임에서 나가시겠어요?\n진행 중이면 이번 핸드가 끝난 뒤 로비로 나갑니다.')) return;
+  socket.emit('leaveGame', {}, (r) => {
+    if (r && r.profile) { myProfile = r.profile; updateMeDisplay(); }
+    if (r && r.deferred) toast('이번 핸드가 끝나면 로비로 나갑니다', 'ok');
+    else resetToLobby();
   });
 };
 // 관전 중 게임 참여
@@ -847,8 +853,8 @@ socket.on('state', (s) => {
   renderGame(s);
   const meNow = s.players.find((p) => p.id === myId);
   const amBusted = !!(meNow && meNow.eliminated);
-  // 관전자 또는 탈락자에게 나가기 버튼 / 관전자에게만 참여 버튼
-  $('leaveBtn').classList.toggle('hidden', !(isSpectator || amBusted));
+  // 나가기 버튼: 게임 진행/대기 중엔 누구나(관전·탈락·플레이어) 표시(종료 화면 제외)
+  $('leaveBtn').classList.toggle('hidden', !!s.finished);
   $('specJoinBtn').classList.toggle('hidden', !(isSpectator && !s.finished && s.players.length < (s.maxPlayers || 9)));
   // 자리 비움 버튼: 진행 중 게임의 활성 플레이어에게만 표시
   const canSitOut = !!(meNow && !amBusted && !isSpectator && s.started && !s.finished);
@@ -1626,7 +1632,7 @@ function renderSeats(s) {
   if (_playersInit) {
     currentIds.forEach((id) => {
       if (!_seenPlayerIds.has(id)) {
-        _recentJoiners.set(id, Date.now() + 1500);
+        _recentJoiners.set(id, Date.now() + 4500); // 신규 입장 빨간 강조 표시 시간
         const jp = players.find((p) => p.id === id);
         if (jp && id !== myId) showJoinToast(jp.name);
       }

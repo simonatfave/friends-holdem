@@ -904,14 +904,23 @@ body.time-critical-strong::after {
   100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
 }
 .seat.seat-joining .seat-inner {
-  border-color: var(--green) !important;
-  box-shadow: 0 0 26px 5px rgba(62,201,122,.9);
-  animation: joinGlow 1.2s ease 2;
+  border-color: #ff5a5a !important;
+  box-shadow: 0 0 26px 6px rgba(255,70,70,.95);
+  animation: joinGlow 1s ease infinite;
+  position: relative;
 }
 @keyframes joinGlow {
-  0%,100% { box-shadow: 0 0 10px 1px rgba(62,201,122,.5); }
-  50% { box-shadow: 0 0 30px 7px rgba(62,201,122,1); }
+  0%,100% { box-shadow: 0 0 12px 2px rgba(255,70,70,.6); }
+  50% { box-shadow: 0 0 34px 9px rgba(255,70,70,1); }
 }
+/* 신규 입장 NEW 뱃지 */
+.seat.seat-joining .seat-inner::before {
+  content: 'NEW'; position: absolute; top: -10px; right: -8px; z-index: 9;
+  background: #e2342f; color: #fff; font-size: 10px; font-weight: 900; letter-spacing: .5px;
+  padding: 2px 6px; border-radius: 7px; box-shadow: 0 2px 6px rgba(0,0,0,.5);
+  animation: newBadgePop .4s cubic-bezier(.2,.8,.3,1.6);
+}
+@keyframes newBadgePop { from { transform: scale(0); } to { transform: scale(1); } }
 .join-toast { top: 92px; border-color: #2f6f4a; }
 .join-toast .join-label { color: var(--green); font-weight: 700; margin-right: 6px; }
 
@@ -1297,13 +1306,17 @@ body.reduce-motion.my-turn-glow::after { animation: none !important; }
 .app-toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
 
 /* ================= v69: 타임뱅크 / 리더보드 / 자리비움 / 시스템 채팅 ================= */
-/* 타임뱅크 버튼 */
+/* 타임뱅크 버튼 — 테이블 하단에 절대배치(레이아웃 흔들림 방지) */
 .timebank-btn {
-  display: block; margin: 4px auto 0; padding: 7px 16px; border-radius: 999px; cursor: pointer;
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 31; margin: 0;
+  padding: 7px 16px; border-radius: 999px; cursor: pointer;
   border: 1px solid #b8932f; background: linear-gradient(180deg,#3a3526,#2a2618); color: var(--gold);
   font-weight: 800; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.4);
   animation: tbPulse 1.2s ease-in-out infinite;
 }
+.timebank-btn.hidden { display: none !important; }
+/* 액션 타이머 바: (대기모드 외) 숨겨도 7px 공간 유지 → 테이블 비율 고정 */
+body:not(.waiting-mode) .action-timer.hidden { display: block !important; visibility: hidden; }
 .timebank-btn:active { transform: translateY(1px); }
 @keyframes tbPulse { 0%,100%{ box-shadow: 0 2px 8px rgba(0,0,0,.4); } 50%{ box-shadow: 0 2px 14px rgba(232,196,102,.6); } }
 

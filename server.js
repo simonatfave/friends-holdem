@@ -384,6 +384,55 @@ function resumePausedGame(code) {
   }
 }
 
+// 자진 퇴장 전적 기록(진행 중 & 살아있는 플레이어 1회) → 프로필 반환
+function recordForfeit(code, pid) {
+  const room = rooms.get(code);
+  if (!room) return null;
+  const g = room.game;
+  const p = g.getPlayer(pid);
+  if (!p || p.isBot || p.forfeitRecorded) return null;
+  if (!(g.started && !p.eliminated)) return null;
+  const acc = users.get(String(p.name).toLowerCase());
+  if (!acc) return null;
+  const humanCount = g.players.filter((x) => !x.isBot).length;
+  const aliveAfter = g.players.filter((x) => !x.eliminated && x.id !== pid).length;
+  const place = Math.max(2, aliveAfter + 1);
+  acc.stats.games++;
+  acc.balance = Math.max(0, acc.balance - 50);
+  acc.history.unshift({ at: Date.now(), code, place, players: humanCount, win: false });
+  if (acc.history.length > 50) acc.history.length = 50;
+  saveUser(acc);
+  p.forfeitRecorded = true;
+  return profileOf(acc);
+}
+// 플레이어를 게임에서 제거(방장 위임·빈 방 정리 포함)
+function finalizeLeave(code, pid) {
+  const room = rooms.get(code);
+  if (!room) return;
+  const g = room.game;
+  const btnId = g.players[g.button] ? g.players[g.button].id : null;
+  g.removePlayer(pid);
+  if (btnId != null && btnId !== pid) g.button = Math.max(0, g.players.findIndex((x) => x.id === btnId));
+  if (room.hostId === pid && g.players.length) room.hostId = (g.players.find((x) => !x.isBot) || g.players[0]).id;
+  if (g.players.filter((x) => !x.isBot).length === 0) { clearRoomTimers(room); rooms.delete(code); return; }
+  broadcast(code);
+  saveRoomsSoon();
+}
+// 이번 핸드 종료 시점: '이번 핸드 후 나가기' 표시된 플레이어를 로비로 보내고 제거
+function processPendingLeaves(code) {
+  const room = rooms.get(code);
+  if (!room) return;
+  const g = room.game;
+  const leaving = g.players.filter((p) => p.pendingLeave);
+  if (!leaving.length) return;
+  for (const p of leaving) { if (p.socketId) io.to(p.socketId).emit('leftToLobby'); }
+  const btnId = g.players[g.button] ? g.players[g.button].id : null;
+  const leavingIds = new Set(leaving.map((p) => p.id));
+  g.players = g.players.filter((p) => !p.pendingLeave);
+  if (btnId != null && !leavingIds.has(btnId)) g.button = Math.max(0, g.players.findIndex((x) => x.id === btnId));
+  if (g.players.filter((x) => !x.isBot).length === 0) { clearRoomTimers(room); rooms.delete(code); }
+}
+
 // 핸드 종료 후 자동 진행
 function scheduleNextHand(code) {
   const room = rooms.get(code);
@@ -394,6 +443,8 @@ function scheduleNextHand(code) {
   const delay = game.finished ? 0 : 6000;
   room.timer = setTimeout(() => {
     if (!rooms.has(code)) return;
+    processPendingLeaves(code); // '이번 핸드 후 나가기' 처리
+    if (!rooms.has(code)) return; // 모두 나가 방이 정리됐으면 종료
     game.nextHand();
     startActionTimer(code);
     broadcast(code);
@@ -466,6 +517,13 @@ function startActionTimer(code) {
         driveRunout(code);
       }
     }, grace);
+    return;
+  }
+  // '이번 핸드 후 나가기' 표시 플레이어는 차례가 오면 짧게(2초) 자동 폴드 → 핸드 진행
+  if (p.pendingLeave) {
+    room.actionLimitEffective = 2000;
+    room.actionDeadline = Date.now() + 2000;
+    room.actionTimer = setTimeout(() => fireActionTimeout(code, seat.id), 2000);
     return;
   }
   // 직전에 무액션 타임아웃한 플레이어는 이번 차례 시간 1/3(최소 3초)
@@ -856,7 +914,7 @@ io.on('connection', (socket) => {
         started: g.started,
         finished: g.finished,
         handNumber: g.handNumber,
-        hostName: (g.players.find((p) => p.id === room.hostId) || {}).name || '',
+        hostName: (g.players.find((p) => p.id === room.hostId) || g.players.find((p) => !p.isBot) || g.players[0] || {}).name || '방장',
         blinds: g.started && !g.finished ? g.currentBlinds() : null,
       });
     }
@@ -980,52 +1038,31 @@ io.on('connection', (socket) => {
     cb?.({ ok: true });
   });
 
-  // 플레이어 '나가기': 전적 기록(자진 퇴장=1게임 패배) + 게임 퇴장 + 세션 종료(로그아웃)
-  socket.on('quit', (_d, cb) => {
+  // 플레이어 '나가기': 전적 기록 후, 진행 중이면 이번 핸드 종료 시 로비로(로그인 세션은 유지)
+  socket.on('leaveGame', (_d, cb) => {
     const room = rooms.get(roomCode);
-    let profile = null;
-    if (room) {
-      const g = room.game;
-      const p = g.getPlayer(playerId);
-      if (p && !p.isBot) {
-        // 진행 중 & 아직 살아있는 플레이어가 나가면 전적에 1게임(패배)으로 기록
-        if (g.started && !p.eliminated) {
-          const acc = users.get(String(p.name).toLowerCase());
-          if (acc) {
-            const humanCount = g.players.filter((x) => !x.isBot).length;
-            const aliveAfter = g.players.filter((x) => !x.eliminated && x.id !== playerId).length;
-            const place = Math.max(2, aliveAfter + 1); // 중도 포기 순위
-            acc.stats.games++;
-            acc.balance = Math.max(0, acc.balance - 50);
-            acc.history.unshift({ at: Date.now(), code: roomCode, place, players: humanCount, win: false });
-            if (acc.history.length > 50) acc.history.length = 50;
-            saveUser(acc);
-            profile = profileOf(acc);
-          }
-        }
-        sysChat(roomCode, `👋 ${p.name} 님이 게임에서 나갔습니다`);
-        p.connected = false; p.sittingOut = true; // 진행 중이면 다음 핸드부터 빠짐(현재 턴이면 유예 자동폴드)
-      }
-      if (!g.started) {
-        g.removePlayer(playerId);
-        if (room.hostId === playerId && g.players.length) room.hostId = g.players[0].id;
-        if (g.players.filter((x) => !x.isBot).length === 0) { clearRoomTimers(room); rooms.delete(roomCode); }
-        else broadcast(roomCode);
-      } else {
-        // 현재 턴이면 유예 타이머로 즉시 진행되도록
-        const seat = g.hand && g.hand.phase !== 'handComplete' ? g.hand.seats[g.hand.toActIndex] : null;
-        if (seat && seat.id === playerId) startActionTimer(roomCode);
-        broadcast(roomCode);
-      }
-      socket.leave(roomCode);
+    if (!room) { roomCode = null; return cb?.({ ok: true, deferred: false }); }
+    const g = room.game;
+    const p = g.getPlayer(playerId);
+    // 진행 중 핸드에 참여 중인 살아있는 플레이어 → 이번 핸드 끝나고 퇴장
+    const inLiveHand = g.started && g.hand && g.hand.phase !== 'handComplete' && p && !p.eliminated && !p.isBot;
+    const profile = recordForfeit(roomCode, playerId);
+    if (inLiveHand) {
+      p.pendingLeave = true; p.sittingOut = true;
+      sysChat(roomCode, `👋 ${p.name} 님이 이번 핸드 후 나갑니다`);
+      // 현재 턴이면 즉시 폴드시켜 핸드 진행
+      const seat = g.hand.seats[g.hand.toActIndex];
+      if (seat && seat.id === playerId) { g.handleAction(playerId, 'fold'); startActionTimer(roomCode); }
+      broadcast(roomCode);
+      scheduleNextHand(roomCode);
+      return cb?.({ ok: true, deferred: true, profile });
     }
-    // 세션 종료(로그아웃)
-    const acc2 = socket.account && users.get(socket.account.toLowerCase());
-    if (acc2) { revokeToken(acc2); saveUser(acc2); }
-    socket.account = null;
-    userNames.delete(socket.id); broadcastOnline();
+    // 대기 중이거나 핸드 사이 → 즉시 퇴장
+    if (p) sysChat(roomCode, `👋 ${p.name} 님이 방을 나갔습니다`);
+    finalizeLeave(roomCode, playerId);
+    socket.leave(roomCode);
     roomCode = null;
-    cb?.({ ok: true, profile });
+    cb?.({ ok: true, deferred: false, profile });
   });
 
   socket.on('disconnect', () => {
