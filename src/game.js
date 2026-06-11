@@ -584,7 +584,7 @@ export class Game {
     const base = [0.18, 0.40, 0.55, 0.70, 0.82, 0.90, 0.95, 0.98, 1.0];
     return base[score[0]] ?? 0.3;
   }
-  botDecision(id) {
+  botDecision(id, level = 'normal') {
     const h = this.hand;
     const legal = this.legalActions(id);
     if (!legal) return { type: 'fold' };
@@ -599,16 +599,22 @@ export class Game {
     const rnd = Math.random();
     const potOdds = toCall > 0 ? toCall / (pot + toCall) : 0;
     const clampRaise = (frac) => Math.min(raise.max, Math.max(raise.min, Math.round(pot * frac)));
+    // 난이도별 성향: easy=수동적 콜링스테이션, normal=균형, hard=타이트·공격적
+    const cfg = ({
+      easy:   { valueRaise: 0.80, bluff: 0.02, raiseFaced: 0.90, callMargin: -0.06, randCall: 0.28 },
+      normal: { valueRaise: 0.62, bluff: 0.08, raiseFaced: 0.80, callMargin: 0.08,  randCall: 0.10 },
+      hard:   { valueRaise: 0.55, bluff: 0.14, raiseFaced: 0.70, callMargin: 0.04,  randCall: 0.05 },
+    })[level] || { valueRaise: 0.62, bluff: 0.08, raiseFaced: 0.80, callMargin: 0.08, randCall: 0.10 };
     if (check) {
       // 베팅 없음: 강하면 밸류벳, 가끔 블러프
-      if (raise && (strength > 0.62 || rnd < 0.08)) return { type: 'raise', amount: clampRaise(strength > 0.8 ? 0.75 : 0.5) };
+      if (raise && (strength > cfg.valueRaise || rnd < cfg.bluff)) return { type: 'raise', amount: clampRaise(strength > 0.8 ? 0.75 : 0.5) };
       return { type: 'check' };
     }
     // 베팅에 직면
-    if (raise && strength > 0.8 && rnd < 0.7) return { type: 'raise', amount: clampRaise(0.7) };
+    if (raise && strength > cfg.raiseFaced && rnd < 0.7) return { type: 'raise', amount: clampRaise(0.7) };
     if (call) {
-      if (strength >= potOdds + 0.08 || (strength > 0.45 && potOdds < 0.3)) return { type: 'call' };
-      if (rnd < 0.1 && potOdds < 0.25) return { type: 'call' }; // 가끔 콜
+      if (strength >= potOdds + cfg.callMargin || (strength > 0.45 && potOdds < 0.3)) return { type: 'call' };
+      if (rnd < cfg.randCall && potOdds < 0.3) return { type: 'call' }; // 가끔 콜
       return { type: 'fold' };
     }
     return { type: 'fold' };

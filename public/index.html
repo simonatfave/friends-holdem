@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=77" />
+  <link rel="stylesheet" href="style.css?v=78" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -138,6 +138,18 @@
         </div>
         <label>시작 블라인드 (BB)</label>
         <input id="startBB" type="number" value="2" min="2" max="100" step="1" />
+        <label>블라인드 속도</label>
+        <div class="seg" id="segBlindPreset">
+          <button type="button" class="seg-btn" data-preset="turbo">터보</button>
+          <button type="button" class="seg-btn active" data-preset="normal">일반</button>
+          <button type="button" class="seg-btn" data-preset="slow">슬로우</button>
+        </div>
+        <label>봇 난이도</label>
+        <div class="seg" id="segBotLevel">
+          <button type="button" class="seg-btn" data-bot="easy">쉬움</button>
+          <button type="button" class="seg-btn active" data-bot="normal">보통</button>
+          <button type="button" class="seg-btn" data-bot="hard">어려움</button>
+        </div>
         <label>공개 설정</label>
         <div class="seg" id="segVis">
           <button type="button" class="seg-btn active" data-secret="0">오픈방</button>
@@ -354,13 +366,14 @@
         <div id="champName" class="champ-name"></div>
         <div class="champ-sub">토너먼트 우승!</div>
         <ol id="finalRanks"></ol>
-        <button id="finalToLobby" class="primary">로비로 이동</button>
+        <button id="rematchBtn" class="primary hidden">🔄 같은 멤버로 한판 더</button>
+        <button id="finalToLobby" class="primary alt">로비로 이동</button>
       </div>
     </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="util.js?v=77"></script>
-  <script src="client.js?v=77"></script>
+  <script src="util.js?v=78"></script>
+  <script src="client.js?v=78"></script>
 </body>
 </html>

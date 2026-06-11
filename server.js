@@ -580,7 +580,7 @@ function maybeBotAct(code) {
     if (!rooms.has(code)) return;
     const legal = g.legalActions(seat.id);
     if (!legal) return;
-    const action = g.botDecision(seat.id); // 핸드 강도·팟오즈 기반 의사결정
+    const action = g.botDecision(seat.id, room.botLevel || 'normal'); // 난이도 반영 의사결정
     const res = g.handleAction(seat.id, action.type, action.amount);
     if (res.ok) {
       startActionTimer(code);
@@ -738,10 +738,11 @@ io.on('connection', (socket) => {
     game.getPlayer(playerId).socketId = socket.id;
     const actionSec = clampInt(settings?.actionSeconds, 0, 120, 10);
     const maxPlayers = settings?.maxPlayers === 6 ? 6 : 9; // 최대 인원 6 또는 9
+    const botLevel = ['easy', 'normal', 'hard'].includes(settings?.botLevel) ? settings.botLevel : 'normal';
     rooms.set(code, {
       game, hostId: playerId,
       actionLimit: actionSec > 0 ? actionSec * 1000 : 0,
-      maxPlayers, secret,
+      maxPlayers, secret, botLevel,
     });
     roomCode = code;
     socket.join(code);
@@ -829,6 +830,32 @@ io.on('connection', (socket) => {
     scheduleNextHand(roomCode);
     maybeBotAct(roomCode);
     driveRunout(roomCode);
+  });
+
+  // 토너먼트 종료 후 같은 멤버로 다시 시작(리매치)
+  socket.on('rematch', (_d, cb) => {
+    const room = rooms.get(roomCode);
+    if (!room) return cb?.({ ok: false, error: '방 없음' });
+    if (room.hostId !== playerId) return cb?.({ ok: false, error: '방장만 다시 시작할 수 있습니다' });
+    const old = room.game;
+    if (!old.finished) return cb?.({ ok: false, error: '게임이 끝난 뒤에 가능합니다' });
+    const g = new Game({
+      startingChips: old.startingChips, levelDurationSec: old.levelDurationSec,
+      levelDurations: old.levelDurations, handsPerLevel: old.handsPerLevel, blindSchedule: old.blindSchedule,
+    });
+    for (const p of old.players) {
+      if (p.isBot) g.addPlayer(p.id, p.name, true, p.chair);
+      else if (p.connected) { g.addPlayer(p.id, p.name, false, p.chair); const np = g.getPlayer(p.id); if (np) np.socketId = p.socketId; }
+    }
+    if (g.players.length < 2) return cb?.({ ok: false, error: '다시 시작하려면 2명 이상이어야 합니다' });
+    room.game = g;
+    if (!g.getPlayer(room.hostId)) room.hostId = (g.players.find((x) => !x.isBot) || g.players[0]).id;
+    clearRoomTimers(room);
+    const r = g.start();
+    sysChat(roomCode, '🔄 같은 멤버로 한판 더 시작!');
+    cb?.(r);
+    startActionTimer(roomCode); broadcast(roomCode); scheduleNextHand(roomCode); maybeBotAct(roomCode); driveRunout(roomCode);
+    saveRoomsSoon();
   });
 
   // 방장이 테스트 봇 수를 직접 설정 (목표 개수에 맞춰 추가/제거)

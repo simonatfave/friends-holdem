@@ -613,6 +613,27 @@ $('segVis').querySelectorAll('.seg-btn').forEach((b) => (b.onclick = () => {
   b.classList.add('active'); createSecret = b.dataset.secret === '1';
   $('secretCodeRow').classList.toggle('hidden', !createSecret);
 }));
+// 봇 난이도 세그먼트
+let createBotLevel = 'normal';
+$('segBotLevel') && $('segBotLevel').querySelectorAll('.seg-btn').forEach((b) => (b.onclick = () => {
+  $('segBotLevel').querySelectorAll('.seg-btn').forEach((x) => x.classList.remove('active'));
+  b.classList.add('active'); createBotLevel = b.dataset.bot;
+}));
+// 블라인드 속도 프리셋: 선택 시 세션 구조와 액션 시간을 한 번에 세팅
+let createPreset = 'normal';
+function presetSessions(kind, startBB) {
+  let bb = Math.max(2, parseInt(startBB, 10) || 2);
+  const conf = kind === 'turbo' ? { n: 6, min: 3, mul: 2 } : kind === 'slow' ? { n: 8, min: 8, mul: 1.5 } : { n: 6, min: 5, mul: 2 };
+  const out = [];
+  for (let i = 0; i < conf.n; i++) { out.push({ minutes: conf.min, bb: Math.round(bb) }); bb *= conf.mul; }
+  return out;
+}
+$('segBlindPreset') && $('segBlindPreset').querySelectorAll('.seg-btn').forEach((b) => (b.onclick = () => {
+  $('segBlindPreset').querySelectorAll('.seg-btn').forEach((x) => x.classList.remove('active'));
+  b.classList.add('active'); createPreset = b.dataset.preset;
+  sessions = presetSessions(createPreset, $('startBB').value);
+  timerSettings.actionSeconds = createPreset === 'turbo' ? 8 : createPreset === 'slow' ? 15 : 10;
+}));
 
 // 타이머 / 세션별 블라인드 설정 팝업
 const timerSettings = { actionSeconds: 10 };
@@ -781,6 +802,7 @@ $('createBtn').onclick = () => {
     name,
     settings: {
       maxPlayers: createMax,
+      botLevel: createBotLevel,
       startBB: $('startBB').value,
       secret: createSecret,
       password: createSecret ? sc : '',
@@ -1144,6 +1166,7 @@ function renderGame(s) {
   };
 
   if (s.finished && s.finalResults) renderFinal(s);
+  else if (!s.finished) { hide('finalScreen'); finalShown = false; } // 리매치 등 새 게임 시작 시 종료화면 정리
 }
 let _revealFlip = false;
 let _newHandPhasePrev = null;
@@ -2039,6 +2062,8 @@ function renderFinal(s) {
       <span class="rank-place">${placeTxt}</span>
     </li>`;
   }).join('');
+  // 방장에게만 리매치 버튼
+  $('rematchBtn').classList.toggle('hidden', !s.isHost);
   show('finalScreen');
   if (!finalShown) {
     finalShown = true;
@@ -2046,6 +2071,12 @@ function renderFinal(s) {
     sfxFanfare();
   }
 }
+$('rematchBtn').onclick = () => {
+  socket.emit('rematch', {}, (r) => {
+    if (!r || !r.ok) { toast((r && r.error) || '다시 시작하지 못했습니다', 'error'); return; }
+    finalShown = false; hide('finalScreen');
+  });
+};
 
 function launchConfetti() {
   const c = $('confetti');
