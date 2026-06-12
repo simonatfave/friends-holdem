@@ -575,7 +575,7 @@ button { font-family: inherit; }
 .action-timer { position: relative; z-index: 30; }
 .sidepanel { position: relative; z-index: 30; }
 .action-main { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; }
-.action-left { display: flex; gap: 10px; align-items: center; }
+.action-proceed { display: flex; gap: 10px; align-items: center; }
 /* 버튼 개수(2개·3개)와 상관없이 항상 같은 크기로 고정 */
 .action-main button { flex: 0 0 134px; width: 134px; min-width: 0; padding: 16px 6px; }
 .action-raise { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; flex-wrap: wrap; min-height: 54px; }
@@ -718,11 +718,13 @@ button { font-family: inherit; }
   .timebank-btn { left: auto; right: 8px; bottom: 6px; transform: none;
     width: 40px; height: 40px; padding: 0; font-size: 19px; line-height: 1; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; }
-  /* 승리 알림: 보드 아래(팟 영역)로 내려 커뮤니티 카드를 가리지 않게 + 줄바꿈 방지 */
-  .winner-banner { top: 64%; font-size: clamp(13px, 3.7vw, 18px); max-width: 96vw; padding: 9px 18px; }
+  /* 결과/몬스터팟 메시지: 커뮤니티 카드 '위'로 올려 보드를 가리지 않게 */
+  .winner-banner { top: 30%; font-size: clamp(13px, 3.7vw, 18px); max-width: 96vw; padding: 9px 18px; }
   .winner-banner .wb-title, .winner-banner .wb-sub { white-space: nowrap; }
+  .monster-pot { top: 30%; }
   .community { gap: 5px; top: 47%; }
-  .pot-display { top: 63%; }
+  /* 전체 팟 개수: 커뮤니티 카드 '아래' */
+  .pot-display { top: 62%; }
   .seat-inner { padding: 4px 5px; }
   /* 모바일은 간결하게: 채팅/로그·칩 더미·칩 애니메이션 숨김 */
   .sidepanel { display: none; }
@@ -748,10 +750,14 @@ button { font-family: inherit; }
   .actionbar.myturn { animation: none; } /* 오버레이라 전체 글로우 제거 */
   .actionbar button { padding: 12px 14px; font-size: 16px;
     box-shadow: 0 3px 0 rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.5); } /* 펠트 위에서 떠보이게 */
-  /* 메인 줄: 카드 왼쪽엔 폴드/체크 묶음, 오른쪽엔 레이즈 */
+  /* 메인 줄: 한쪽엔 폴드(단독), 반대쪽엔 자주 쓰는 액션(체크/콜·레이즈) 세로 묶음 */
   .action-main { justify-content: space-between; align-items: flex-end; gap: 0; padding: 0; }
-  .action-left { display: flex; flex-direction: column; gap: 8px; }
+  .action-proceed { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+  .action-main > button { align-self: flex-end; } /* 폴드: 묶음 하단과 정렬 */
   .action-main button { flex: 0 0 auto; width: auto; min-width: 90px; }
+  /* 왼손 모드: 좌우 반전(폴드 오른쪽, 자주쓰는 버튼 왼쪽) */
+  body.lefty .action-main { flex-direction: row-reverse; }
+  body.lefty .action-raise { flex-direction: row-reverse; }
   /* 사이징 스트립: 하단 가로 한 줄(반투명 배경) */
   .action-raise { gap: 8px; padding: 7px 10px; width: 100%; min-height: 0;
     background: rgba(0,0,0,.5); backdrop-filter: blur(3px); }

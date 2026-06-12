@@ -86,7 +86,7 @@ document.addEventListener('keydown', (e) => {
 // ---------- 효과음 (Web Audio, 에셋 없이 생성) + 설정 ----------
 function loadSound() {
   const prefRM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const base = { master: true, turn: true, fx: true, bbUnits: false, reduceMotion: prefRM, volume: 1, theme: 'green' };
+  const base = { master: true, turn: true, fx: true, bbUnits: false, reduceMotion: prefRM, volume: 1, theme: 'green', lefty: false };
   try { return Object.assign(base, JSON.parse(localStorage.getItem('dice_sound') || '{}')); }
   catch (e) { return base; }
 }
@@ -106,6 +106,9 @@ const soundSettings = loadSound();
 applyMotionPref();
 function applyTheme() { document.body.dataset.theme = soundSettings.theme || 'green'; }
 applyTheme();
+// 왼손 모드: 모바일 액션 버튼 좌우 반전
+function applyLefty() { document.body.classList.toggle('lefty', !!soundSettings.lefty); }
+applyLefty();
 let audioCtx = null;
 function ac() {
   if (!audioCtx) {
@@ -211,6 +214,7 @@ $('settingsBtn').onclick = () => {
   $('optTurn').checked = soundSettings.turn;
   $('optFx').checked = soundSettings.fx;
   if ($('optReduceMotion')) $('optReduceMotion').checked = !!soundSettings.reduceMotion;
+  if ($('optLefty')) $('optLefty').checked = !!soundSettings.lefty;
   if ($('optVolume')) $('optVolume').value = Math.round((soundSettings.volume == null ? 1 : soundSettings.volume) * 100);
   show('settingsPanel');
 };
@@ -239,6 +243,8 @@ if ($('optVolume')) {
 }
 $('optBBUnits').checked = !!soundSettings.bbUnits;
 $('optBBUnits').onchange = (e) => { soundSettings.bbUnits = e.target.checked; saveSound(); if (lastState) renderGame(lastState); };
+if ($('optLefty')) { $('optLefty').checked = !!soundSettings.lefty;
+  $('optLefty').onchange = (e) => { soundSettings.lefty = e.target.checked; saveSound(); applyLefty(); }; }
 // 자리 비움 토글(상단바 버튼) — 현재 상태는 _amSittingOut에 보관
 let _amSittingOut = false;
 $('sitOutBtn').onclick = () => {
@@ -763,6 +769,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v96', ['자주 쓰는 버튼(체크/콜·레이즈)을 오른쪽, 폴드는 왼쪽으로 분리', '설정에 왼손 모드(버튼 좌우 반전) 추가', '결과·몬스터팟 메시지를 커뮤니티 카드 위로, 팟 개수는 아래로']],
   ['v88~95', ['접속자 목록 호버 팝오버 · 버전 클릭 시 패치 노트', '방 만들기에 시작 스택(BB) 설정 추가', '모바일 좌석 균등 분산 · 테이블 위치/크기 조정', '현재 차례 좌석이 살짝 커지는 강조 애니메이션', '쇼다운 승리배너를 보드 아래로 이동(카드 안 가림)', '모바일 액션 버튼을 카드 양옆 오버레이로 → 턴 무관 테이블 크기 고정', '참여하기 방코드 입력칸 표시 수정']],
   ['v83~87', ['로그인 30분 자동 로그아웃 · 중복 로그인 차단', '아이폰 화면 잘림(safe-area·100dvh) 수정', '상단바 컨트롤(나가기 등) 모바일 고정', '타이머를 외곽선 카운트다운 테두리로', '칩 스택 보유 BB 반영 표시']],
   ['v78~82', ['한판 더(리매치) · 블라인드 프리셋 · 봇 난이도', '모바일 채팅/기록 하단 드로어', '방 코드 대신 방장 이름 표시', '게임 로그 스크롤백']],
@@ -2022,13 +2029,14 @@ function renderActions(s) {
   const mainRow = document.createElement('div');
   mainRow.className = 'action-main';
 
-  // 폴드 + 체크/콜 → 왼쪽 묶음(모바일: 카드 왼쪽 옆)
-  const leftGrp = document.createElement('div');
-  leftGrp.className = 'action-left';
-  leftGrp.appendChild(btn('btn-fold', '폴드', () => act('fold')));
-  if (checkAct) leftGrp.appendChild(btn('btn-check', '체크', () => act('check')));
-  else if (callAct) leftGrp.appendChild(btn('btn-call', `콜 ${fmtAmt(callAct.amount)}`, () => act('call')));
-  mainRow.appendChild(leftGrp);
+  // 폴드: 잘 안 쓰는 버튼 → 카드 한쪽(기본 왼쪽). 오작동 방지 겸 격리
+  mainRow.appendChild(btn('btn-fold', '폴드', () => act('fold')));
+  // 자주 쓰는 액션(체크/콜·레이즈)을 한 묶음으로 반대쪽(기본 오른쪽, 오른손 엄지)
+  const proceedGrp = document.createElement('div');
+  proceedGrp.className = 'action-proceed';
+  if (checkAct) proceedGrp.appendChild(btn('btn-check', '체크', () => act('check')));
+  else if (callAct) proceedGrp.appendChild(btn('btn-call', `콜 ${fmtAmt(callAct.amount)}`, () => act('call')));
+  mainRow.appendChild(proceedGrp);
 
   // 레이즈/벳 — 사이징 행(슬라이더·퀵벳) 위, 메인 버튼 아래
   if (raiseAct) {
@@ -2067,7 +2075,7 @@ function renderActions(s) {
     raiseRow.appendChild(quick);
     raiseRow.appendChild(slider);
     raiseRow.appendChild(amt);
-    mainRow.appendChild(goBtn); // 레이즈 버튼: 슬라이더로 금액 조절 후 사용
+    proceedGrp.appendChild(goBtn); // 레이즈: 체크/콜과 같은 묶음(많이 쓰는 쪽)
   } else {
     raiseRow.classList.add('empty'); // 공간만 유지
   }
