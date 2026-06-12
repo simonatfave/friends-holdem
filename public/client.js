@@ -769,6 +769,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v104', ['시작하기 버튼을 테이블 정중앙에 정확히 배치(테이블 기준 절대배치)', '대기 좌석에도 카드 뒷면 표시 → 시작 전후 좌석 높이·테이블 모습 동일']],
   ['v103', ['적은 인원(헤즈업 등)에서 내 좌석이 너무 커서 하단 액션 스트립과 겹치던 문제 수정(크기·위치 조정)']],
   ['v102', ['상단바·하단바 공간 유지를 전체 화면폭에 적용 → 대기/플레이 테이블 크기·위치 고정 강화']],
   ['v101', ['대기 화면 좌석 배치를 플레이 화면과 완전히 동일하게(아래 중앙=나, 나머지는 같은 호·같은 크기)', '시작 전후 좌석 위치·크기 일치']],
@@ -1153,6 +1154,7 @@ function renderWaitingSeats(s) {
         <div class="seat-inner">
           <div class="pname">${esc(p.name)} ${isMe ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''}</div>
           <div class="pchips"><span class="chip-mini"></span><span class="amt">${p.chips}</span></div>
+          <div class="phole"><div class="card sm back"></div><div class="card sm back"></div></div>
           ${(isHost && p.isBot) ? `<button class="bot-x" data-bot="${esc(p.id)}" title="봇 제거">×</button>` : ''}
         </div>`;
     } else {

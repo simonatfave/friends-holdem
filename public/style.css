@@ -827,14 +827,12 @@ body.waiting-mode .sidepanel,
 body.waiting-mode .community,
 body.waiting-mode .pot-stack,
 body.waiting-mode .pot-display { display: none !important; }
-/* 대기: 중앙엔 시작 버튼만(투명 박스라 뒤 +좌석 클릭 통과), 나가기는 우상단 */
+/* 대기: 시작 버튼은 테이블 정중앙(.poker-table 기준 50%). 투명 박스라 뒤 +좌석 클릭 통과, 나가기는 우상단 */
 body.waiting-mode #waitBanner {
   display: block; position: absolute; left: 50%; top: 50%;
   transform: translate(-50%, -50%); z-index: 40; margin: 0; width: auto;
 }
-/* 모바일: 테이블이 하단 정렬이라 시각적 중앙(≈56%)에 맞춤 + 하단바 공간 유지해 위치 고정 */
 @media (max-width: 640px) {
-  body.waiting-mode #waitBanner { top: 56%; }
   /* 시작 버튼: 모바일은 더 좁게(양옆 좌석과 안 겹치게) */
   .wait-banner #wbStart { min-width: 112px; padding: 13px 22px; font-size: 16px; }
 }

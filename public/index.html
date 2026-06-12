@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=103" />
+  <link rel="stylesheet" href="style.css?v=104" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -298,23 +298,24 @@
       </div>
     </div>
 
-    <!-- 대기 모드 배너: 방을 만들면 테이블이 보이는 채로 대기 시작 -->
+    <!-- 대기 모드: 나가기는 화면 우상단 고정 -->
     <button id="wbLeave" class="wb-leave-corner">나가기</button>
-    <div id="waitBanner" class="wait-banner hidden">
-      <button id="wbStart" class="primary hidden">시작하기</button>
-      <button id="wbInfoToggle" class="wb-info-toggle">방 코드·초대 <span class="wb-caret">▾</span></button>
-      <div id="wbInfo" class="wb-info hidden">
-        <div class="wb-row">
-          <span class="wb-code">방 코드 <b id="wbCode">----</b></span>
-          <button id="wbCopy" class="ghost">복사</button>
-          <button id="wbInvite" class="ghost">🔗 초대링크</button>
-        </div>
-        <p id="wbHint" class="wb-hint"></p>
-      </div>
-    </div>
 
     <div class="table-wrap">
       <div class="poker-table">
+        <!-- 대기 배너: 테이블 정중앙에 위치(테이블 기준 절대배치) -->
+        <div id="waitBanner" class="wait-banner hidden">
+          <button id="wbStart" class="primary hidden">시작하기</button>
+          <button id="wbInfoToggle" class="wb-info-toggle">방 코드·초대 <span class="wb-caret">▾</span></button>
+          <div id="wbInfo" class="wb-info hidden">
+            <div class="wb-row">
+              <span class="wb-code">방 코드 <b id="wbCode">----</b></span>
+              <button id="wbCopy" class="ghost">복사</button>
+              <button id="wbInvite" class="ghost">🔗 초대링크</button>
+            </div>
+            <p id="wbHint" class="wb-hint"></p>
+          </div>
+        </div>
         <div class="table-logo" aria-hidden="true">
           <svg viewBox="0 0 200 250" xmlns="http://www.w3.org/2000/svg">
             <rect x="55" y="6" width="90" height="90" rx="20" fill="none" stroke="currentColor" stroke-width="5"/>
@@ -398,7 +399,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="util.js?v=103"></script>
-  <script src="client.js?v=103"></script>
+  <script src="util.js?v=104"></script>
+  <script src="client.js?v=104"></script>
 </body>
 </html>
