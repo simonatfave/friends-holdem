@@ -1029,7 +1029,9 @@ body.time-critical-strong::after {
 #allinFx {
   /* 게임 테이블(.poker-table) 안에 들어가 테이블 중앙에 표시 */
   position: absolute; inset: 0; z-index: 40; pointer-events: none;
-  display: none; align-items: center; justify-content: center; overflow: visible;
+  display: none; align-items: center; justify-content: center;
+  /* iOS: 링(150vmax)이 뷰포트 밖으로 넘쳐 페이지가 축소/이동되는 문제 → 테이블 안으로 클립 */
+  overflow: hidden; contain: layout paint;
 }
 #allinFx.show { display: flex; }
 #allinFx::before { /* 화면 플래시 */
