@@ -750,8 +750,11 @@ io.on('connection', (socket) => {
       );
       levelDurationSec = levelMinutes * 60;
     }
+    // 시작 스택: 방장이 BB 단위로 지정(기본 160BB). startingChips = startStackBB × 첫 BB
+    const firstBB = (blindSchedule[0] && blindSchedule[0].bb) || 2;
+    const startStackBB = clampInt(settings?.startStackBB, 10, 100000, 160);
     const game = new Game({
-      startingChips: 320, // 친목용: 블랙20·레드20·그린20 고정
+      startingChips: startStackBB * firstBB,
       levelDurationSec,
       levelDurations,
       blindSchedule,

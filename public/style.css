@@ -1406,6 +1406,27 @@ body[data-theme=charcoal] { --felt: #46505e; --felt-dark: #232a33; }
 .theme-swatches .sw { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #3a4756; cursor: pointer; padding: 0; }
 .theme-swatches .sw.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
 
+/* 접속자 호버 팝오버(데스크탑) */
+.online-wrap { position: relative; display: flex; justify-content: center; margin: -8px 0 14px; }
+.online-wrap .online-line { margin: 0; }
+.online-pop {
+  display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 6px; z-index: 60;
+  background: rgba(20,26,34,.98); border: 1px solid #33404f; border-radius: 12px; padding: 8px;
+  min-width: 190px; max-width: 280px; max-height: 50vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+@media (hover: hover) { .online-wrap:hover .online-pop { display: block; } }
+.op-row { display: flex; align-items: center; gap: 9px; padding: 5px 6px; }
+.op-row .avatar-pic.sm { width: 26px; height: 26px; font-size: 12px; }
+.op-row .op-nick { font-size: 13px; color: var(--text); font-weight: 600; }
+
+/* 패치 노트 모달 */
+.patch-card { max-width: 420px; width: 92vw; }
+.patch-list { max-height: 60vh; overflow-y: auto; margin-bottom: 14px; }
+.patch-item { padding: 8px 0; border-bottom: 1px solid #2a3340; }
+.patch-ver { color: var(--gold); font-weight: 800; font-size: 14px; margin-bottom: 4px; }
+.patch-item ul { margin: 0; padding-left: 18px; }
+.patch-item li { font-size: 13px; color: var(--text); line-height: 1.6; }
+
 /* ================= v79: 모바일 최적화 ================= */
 /* 모달이 작은 화면을 넘지 않게 */
 .overlay .settings-card, .overlay .final-card { max-height: 92vh; overflow-y: auto; }

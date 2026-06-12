@@ -70,7 +70,7 @@ socket.on('connect', () => clearTimeout(_coldTimer));
 // 모달 ESC로 닫기(게임 진행에 영향 없는 오버레이만)
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  ['accountPanel', 'signupPanel', 'onlinePanel', 'settingsPanel', 'timerPopup', 'leaderboardPanel', 'logPanel', 'oppProfilePanel'].forEach((id) => {
+  ['accountPanel', 'signupPanel', 'onlinePanel', 'settingsPanel', 'timerPopup', 'leaderboardPanel', 'logPanel', 'oppProfilePanel', 'patchPanel'].forEach((id) => {
     const el = $(id); if (el && !el.classList.contains('hidden')) hide(id);
   });
 });
@@ -645,6 +645,13 @@ $('segVis').querySelectorAll('.seg-btn').forEach((b) => (b.onclick = () => {
   b.classList.add('active'); createSecret = b.dataset.secret === '1';
   $('secretCodeRow').classList.toggle('hidden', !createSecret);
 }));
+// 시작 스택 미리보기 갱신
+function updateStackPreview() {
+  const sp = $('stackPreview'); if (!sp) return;
+  const bb = parseInt($('startStackBB') && $('startStackBB').value, 10) || 160;
+  sp.textContent = bb + 'BB';
+}
+if ($('startStackBB')) $('startStackBB').addEventListener('input', updateStackPreview);
 // 봇 난이도 세그먼트
 let createBotLevel = 'normal';
 $('segBotLevel') && $('segBotLevel').querySelectorAll('.seg-btn').forEach((b) => (b.onclick = () => {
@@ -729,14 +736,51 @@ function renderOnlineList() {
     box.appendChild(row);
   });
 }
+// 호버 팝오버(데스크탑): 접속자 목록을 마우스 오버로 표시
+function renderOnlinePop() {
+  const pop = $('onlinePop'); if (!pop) return;
+  if (!onlineUsers.length) { pop.innerHTML = '<div class="room-empty" style="padding:8px">접속 중인 사용자가 없어요</div>'; return; }
+  pop.innerHTML = '';
+  onlineUsers.forEach((u) => {
+    const row = document.createElement('div'); row.className = 'op-row';
+    const av = document.createElement('span'); av.className = 'avatar-pic sm'; paintAvatar(av, u.avatar, u.nick);
+    const nm = document.createElement('span'); nm.className = 'op-nick'; nm.textContent = u.nick
+      + (myProfile && u.nick.toLowerCase() === myProfile.nick.toLowerCase() ? ' (나)' : '');
+    row.appendChild(av); row.appendChild(nm);
+    pop.appendChild(row);
+  });
+}
 socket.on('online', (d) => {
   const count = (d && typeof d === 'object') ? d.count : d;
   onlineUsers = (d && d.users) || ((d && d.names) ? d.names.map((n) => ({ nick: n, avatar: null })) : []);
   const cEl = $('onlineCount'); if (cEl) cEl.textContent = count;
+  renderOnlinePop();
   if (!$('onlinePanel').classList.contains('hidden')) renderOnlineList();
 });
+// 클릭은 모바일(터치)용 모달 — 데스크탑은 호버 팝오버로 표시
 $('onlineLine').onclick = () => { renderOnlineList(); show('onlinePanel'); };
 $('onlineClose').onclick = () => hide('onlinePanel');
+
+// ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
+const PATCH_NOTES = [
+  ['v83~87', ['로그인 30분 자동 로그아웃 · 중복 로그인 차단', '아이폰 화면 잘림(safe-area·100dvh) 수정', '상단바 컨트롤(나가기 등) 모바일 고정', '타이머를 외곽선 카운트다운 테두리로', '칩 스택 보유 BB 반영 표시']],
+  ['v78~82', ['한판 더(리매치) · 블라인드 프리셋 · 봇 난이도', '모바일 채팅/기록 하단 드로어', '방 코드 대신 방장 이름 표시', '게임 로그 스크롤백']],
+  ['v71~77', ['봇 랜덤 이름 · 방 초대 링크 · 베팅 단축키(F/C/R)', '테이블 색상 테마', '빠른 채팅 · 볼륨 슬라이더 · 상대 프로필 보기', '게임 기록에 보드/쇼다운 카드 표기']],
+  ['v63~70', ['프로필 이미지 · 회원가입 모달 · 리더보드 · 타임뱅크', '세션 토큰 재접속 유지 · 진행중 게임 중간참여', '방 상태 DB 영속화 · 턴 중 끊김 자동 처리']],
+];
+function openPatchNotes() {
+  const box = $('patchList');
+  box.innerHTML = PATCH_NOTES.map(([ver, items]) =>
+    `<div class="patch-item"><div class="patch-ver">${esc(ver)}</div><ul>${items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>`
+  ).join('');
+  show('patchPanel');
+}
+$('patchClose').onclick = () => hide('patchPanel');
+(function wireVersionBadge() {
+  const vb = $('versionBadge'); if (!vb) return;
+  vb.style.cursor = 'pointer'; vb.title = '패치 노트 보기';
+  vb.onclick = openPatchNotes;
+})();
 
 // 시스템 안내(관전 입장 등) 토스트
 let _noticeTimer = null;
@@ -835,6 +879,7 @@ $('createBtn').onclick = () => {
     settings: {
       maxPlayers: createMax,
       botLevel: createBotLevel,
+      startStackBB: parseInt($('startStackBB').value, 10) || 160,
       startBB: $('startBB').value,
       secret: createSecret,
       password: createSecret ? sc : '',
@@ -1923,21 +1968,10 @@ function ovalPositions(n) {
 function othersPositions(k) {
   if (k <= 0) return [];
   const mobile = window.innerWidth <= 640;
-  if (mobile) {
-    // 모바일(세로): 다른 좌석을 '위쪽 호'에만 배치 → 가운데 커뮤니티 보드와 안 겹침
-    const cx = 50, cy = 35, rx = 44, ry = 28;
-    const a0 = Math.PI * (203 / 180), a1 = Math.PI * (337 / 180); // 좌상 ~ 우상 호
-    const out = [];
-    for (let j = 0; j < k; j++) {
-      const t = k === 1 ? 0.5 : j / (k - 1);
-      const a = a0 + (a1 - a0) * t;
-      out.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
-    }
-    return out;
-  }
-  const cx = 50, cy = 47;
-  const rx = 48, ry = 37;
-  const gap = 0.62; // 아래 중앙 양옆으로 비우는 반각(라디안)
+  // 아래 중앙(내 자리)만 비우고 나머지는 테두리를 따라 균등 배치. 모바일은 테두리로 더 밀고 위로 올림
+  const cx = 50, cy = mobile ? 42 : 47;
+  const rx = mobile ? 46 : 48, ry = mobile ? 42 : 37;
+  const gap = mobile ? 0.72 : 0.62; // 아래 중앙 양옆으로 비우는 반각(라디안)
   const span = 2 * Math.PI - 2 * gap;
   const out = [];
   for (let j = 0; j < k; j++) {
