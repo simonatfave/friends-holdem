@@ -745,27 +745,30 @@ button { font-family: inherit; }
     background: transparent; border-radius: 0; z-index: 30;
     flex-direction: column-reverse; /* 메인(폴드/레이즈) 위, 사이징 스트립 아래 */
     pointer-events: none; /* 빈 영역은 테이블 터치 통과 */
+    gap: 10px; /* 메인 버튼줄과 사이징 스트립 사이 간격(겹침 방지) */
   }
   .actionbar > * { pointer-events: auto; }
   .actionbar.myturn { animation: none; } /* 오버레이라 전체 글로우 제거 */
-  .actionbar button { padding: 12px 14px; font-size: 16px;
+  .actionbar button { padding: 11px 12px; font-size: 15px;
     box-shadow: 0 3px 0 rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.5); } /* 펠트 위에서 떠보이게 */
   /* 메인 줄: 한쪽엔 폴드(단독), 반대쪽엔 자주 쓰는 액션(체크/콜·레이즈) 세로 묶음 */
   .action-main { justify-content: space-between; align-items: flex-end; gap: 0; padding: 0; }
-  .action-proceed { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+  .action-proceed { display: flex; flex-direction: column; gap: 7px; align-items: stretch; }
   .action-main > button { align-self: flex-end; } /* 폴드: 묶음 하단과 정렬 */
-  .action-main button { flex: 0 0 auto; width: auto; min-width: 90px; }
+  .action-main button { flex: 0 0 auto; width: auto; min-width: 84px; }
   /* 왼손 모드: 좌우 반전(폴드 오른쪽, 자주쓰는 버튼 왼쪽) */
   body.lefty .action-main { flex-direction: row-reverse; }
   body.lefty .action-raise { flex-direction: row-reverse; }
-  /* 사이징 스트립: 하단 가로 한 줄(반투명 배경) */
-  .action-raise { gap: 8px; padding: 7px 10px; width: 100%; min-height: 0;
+  /* 사이징 스트립: 하단 가로 한 줄(반투명 배경). 우측은 타임뱅크 버튼 공간 확보 */
+  .action-raise { gap: 6px; padding: 7px 52px 7px 10px; width: 100%; min-height: 0;
     background: rgba(0,0,0,.5); backdrop-filter: blur(3px); }
   .action-raise.empty { display: none; } /* 오버레이라 자리 유지 불필요 */
-  .quick-bets { flex: 0 0 auto; }
-  .quick-bets button { padding: 8px 12px; font-size: 13px; }
-  .action-raise input[type=range] { flex: 1 1 80px; width: auto; min-width: 70px; }
-  .raise-amount { font-size: 17px; min-width: 46px; }
+  .quick-bets { flex: 0 0 auto; gap: 6px; }
+  .quick-bets button { padding: 7px 9px; font-size: 12px; }
+  .action-raise input[type=range] { flex: 1 1 70px; width: auto; min-width: 60px; }
+  .raise-amount { font-size: 16px; min-width: 40px; }
+  /* 타임뱅크: 사이징 스트립 우측 확보 공간 안에 배치(겹침 방지) */
+  .timebank-btn { width: 38px; height: 38px; font-size: 17px; }
   /* 차례 대기 텍스트: 오버레이 하단 중앙 알약 */
   .actionbar .waiting-turn, .actionbar .btn-join-table {
     align-self: center; background: rgba(0,0,0,.5); padding: 8px 16px; border-radius: 18px; backdrop-filter: blur(3px); }
@@ -813,7 +816,7 @@ button { font-family: inherit; }
 /* 대기 중엔 그리드 해제하고 배너+테이블만 세로로.
    align-items는 stretch(기본) 유지 — center로 두면 사파리에서 table-wrap 너비가 0으로 무너짐.
    배너는 자체 margin auto로, 테이블은 table-wrap 내부 정렬로 가운데 배치 */
-body.waiting-mode #game { display: flex; flex-direction: column; }
+body.waiting-mode #game { display: flex; flex-direction: column; position: relative; }
 body.waiting-mode .topbar,
 body.waiting-mode .actionbar,
 body.waiting-mode .action-timer,
@@ -822,13 +825,22 @@ body.waiting-mode .sidepanel,
 body.waiting-mode .community,
 body.waiting-mode .pot-stack,
 body.waiting-mode .pot-display { display: none !important; }
-body.waiting-mode #waitBanner { display: block; }
+/* 대기 안내·시작/나가기 버튼을 테이블 중앙 팝업으로 → 테이블 크기·위치는 항상 고정 */
+body.waiting-mode #waitBanner {
+  display: block; position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%); z-index: 40; margin: 0;
+  width: min(360px, calc(100% - 32px));
+}
+/* 모바일: 테이블이 하단 정렬이라 시각적 중앙(≈62%)에 맞춤 */
+@media (max-width: 640px) {
+  body.waiting-mode #waitBanner { top: 60%; width: min(330px, calc(100% - 40px)); }
+}
 
 .wait-banner {
-  text-align: center; margin: 10px auto 2px; padding: 12px 18px;
-  background: rgba(20,26,34,.82); border: 1px solid #2a3442; border-radius: 14px;
-  max-width: 460px; width: calc(100% - 24px);
-  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); z-index: 5;
+  text-align: center; padding: 16px 18px;
+  background: rgba(16,20,27,.94); border: 1px solid #33404f; border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.6);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); z-index: 40;
 }
 .wait-banner .wb-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .wait-banner .wb-code { font-size: 15px; color: var(--text); }
