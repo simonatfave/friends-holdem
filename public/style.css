@@ -748,7 +748,7 @@ button { font-family: inherit; }
   .fly-chip { display: none !important; }
   .bet-chip, .chip-s { animation: none !important; }
   /* 내 카드는 모바일에서도 크게(다른 좌석보다), 컴팩트하게 */
-  .seat.me-seat { --hc-h: min(65px, 10.5vh, 14.9vw); } /* 내 카드 (+10%) */
+  .seat.me-seat { --hc-h: min(72px, 11.6vh, 16.4vw); } /* 내 카드 추가 +10% */
   /* 액션바: 플레이어 카드 양옆 오버레이 → 흐름에서 빼서 테이블 크기를 턴과 무관하게 고정 */
   .actionbar {
     position: absolute; left: 0; right: 0; bottom: calc(46px + env(safe-area-inset-bottom));
