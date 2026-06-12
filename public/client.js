@@ -1971,7 +1971,7 @@ function othersPositions(k) {
   const mobile = window.innerWidth <= 640;
   // 아래 중앙(내 자리)만 비우고 나머지는 테두리를 따라 균등 배치. 모바일은 테두리로 더 밀고 위로 올림
   const cx = 50, cy = mobile ? 42 : 47;
-  const rx = mobile ? 48 : 48, ry = mobile ? 42 : 37; // 모바일도 테두리(사이드)로 더 밀기
+  const rx = mobile ? 49 : 48, ry = mobile ? 43 : 37; // 모바일은 테두리(사이드)로 최대한 밀기
   const gap = mobile ? 0.72 : 0.62; // 아래 중앙 양옆으로 비우는 반각(라디안)
   const span = 2 * Math.PI - 2 * gap;
   const out = [];
