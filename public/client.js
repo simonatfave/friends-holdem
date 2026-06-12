@@ -769,6 +769,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v103', ['적은 인원(헤즈업 등)에서 내 좌석이 너무 커서 하단 액션 스트립과 겹치던 문제 수정(크기·위치 조정)']],
   ['v102', ['상단바·하단바 공간 유지를 전체 화면폭에 적용 → 대기/플레이 테이블 크기·위치 고정 강화']],
   ['v101', ['대기 화면 좌석 배치를 플레이 화면과 완전히 동일하게(아래 중앙=나, 나머지는 같은 호·같은 크기)', '시작 전후 좌석 위치·크기 일치']],
   ['v100', ['시작 버튼 폭 더 축소 → 양옆 좌석과 안 겹침', '대기 좌석을 좌우로 더 벌려 사이드 여백 활용', '대기/플레이 테이블 크기·위치 완전 고정(상단바·하단바 공간 유지)']],
@@ -1128,11 +1129,11 @@ function renderWaitingSeats(s) {
   const n = TOTAL;
   // 플레이 화면과 '동일한' 좌석 스케일·배치(아래 중앙=나, 나머지는 호) → 시작 전후 일치
   seatsEl.style.setProperty('--seat-scale', n <= 3 ? '1' : n <= 5 ? '0.84' : n <= 7 ? '0.72' : '0.62');
-  seatsEl.style.setProperty('--me-scale', n <= 4 ? '1' : n <= 6 ? '0.9' : '0.8');
+  seatsEl.style.setProperty('--me-scale', n <= 4 ? '0.88' : n <= 6 ? '0.85' : '0.8');
   const me = s.players.find((p) => p.id === myId);
   const mySeat = me ? me.chair : 0;
   const opos = othersPositions(TOTAL - 1); // 나(아래 중앙) 제외 나머지 좌석
-  const meTop = (window.innerWidth <= 640) ? 84 : 88;
+  const meTop = (window.innerWidth <= 640) ? (n <= 4 ? 82 : 84) : 88;
   const bySeat = {};
   s.players.forEach((p) => { bySeat[p.chair] = p; });
   for (let seatIdx = 0; seatIdx < TOTAL; seatIdx++) {
@@ -1821,7 +1822,7 @@ function renderSeats(s) {
   // 인원이 많을수록 좌석을 축소해 겹침 방지
   // 인원 많을수록 더 적극적으로 축소 → 겹침 방지
   seatsEl.style.setProperty('--seat-scale', n <= 3 ? '1' : n <= 5 ? '0.84' : n <= 7 ? '0.72' : '0.62');
-  seatsEl.style.setProperty('--me-scale', n <= 4 ? '1' : n <= 6 ? '0.9' : '0.8');
+  seatsEl.style.setProperty('--me-scale', n <= 4 ? '0.88' : n <= 6 ? '0.85' : '0.8');
   // 나를 맨 아래(6시 방향)에 배치, 나머지는 아래 중앙을 비운 위쪽 호에 균등 배치(겹침 방지)
   const hasMe = players.some((p) => p.id === myId); // 관전자는 내 자리 없음
   const meIdx = Math.max(0, players.findIndex((p) => p.id === myId));
@@ -1855,7 +1856,7 @@ function renderSeats(s) {
       seat = document.createElement('div');
       seat.dataset.pid = p.id;
       const pos = isMe ? null : (hasMe ? (opos[i - 1] || { x: 50, y: 20 }) : opos[i]);
-      const meTop = (window.innerWidth <= 640) ? 84 : 88; // 모바일은 내 카드가 펠트 밖으로 안 나가게 살짝 위로
+      const meTop = (window.innerWidth <= 640) ? (n <= 4 ? 82 : 84) : 88; // 적은 인원(큰 내 좌석)일 때 살짝 더 위로 → 하단 스트립과 겹침 방지
       seat.style.left = (isMe ? 50 : pos.x) + '%';
       seat.style.top = (isMe ? meTop : pos.y) + '%';
       const result = s.results?.reveal?.find((r) => r.id === p.id);
