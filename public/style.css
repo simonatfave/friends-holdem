@@ -575,6 +575,7 @@ button { font-family: inherit; }
 .action-timer { position: relative; z-index: 30; }
 .sidepanel { position: relative; z-index: 30; }
 .action-main { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; }
+.action-left { display: flex; gap: 10px; align-items: center; }
 /* 버튼 개수(2개·3개)와 상관없이 항상 같은 크기로 고정 */
 .action-main button { flex: 0 0 134px; width: 134px; min-width: 0; padding: 16px 6px; }
 .action-raise { display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; max-width: 560px; flex-wrap: wrap; min-height: 54px; }
@@ -708,10 +709,11 @@ button { font-family: inherit; }
 /* 카드 크기는 :root의 반응형 값(vh·vw 비례)이 모든 화면을 처리 */
 /* 휴대폰 (가로 폭 기준) */
 @media (max-width: 640px) {
+  #game { position: relative; } /* 액션바 오버레이 기준 */
   /* 세로 테이블: 하단 영역을 줄인 만큼 더 키움(63dvh) + 넓은 비율 */
   .poker-table { height: min(63dvh, 124vw); width: calc(min(63dvh, 124vw) * 5 / 6.3); aspect-ratio: 5 / 6.3; border-width: 9px; }
-  /* 테이블을 아래쪽으로 정렬 → 상단에 여백을 둬서 위쪽 좌석이 상단바와 안 겹침 */
-  .table-wrap { align-items: flex-end; padding-bottom: 14px; }
+  /* 테이블을 아래쪽 정렬하되, 하단에 액션 오버레이 공간 확보 */
+  .table-wrap { align-items: flex-end; padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
   /* 타임뱅크: 모바일은 우측 하단에 아이콘만(최소화) */
   .timebank-btn { left: auto; right: 8px; bottom: 6px; transform: none;
     width: 40px; height: 40px; padding: 0; font-size: 19px; line-height: 1; border-radius: 50%;
@@ -734,16 +736,33 @@ button { font-family: inherit; }
   .bet-chip, .chip-s { animation: none !important; }
   /* 내 카드는 모바일에서도 크게(다른 좌석보다), 컴팩트하게 */
   .seat.me-seat { --hc-h: min(65px, 10.5vh, 14.9vw); } /* 내 카드 (+10%) */
-  /* 액션바: 높이를 줄여 테이블에 공간 양보 */
-  .actionbar { gap: 6px; height: auto; padding: 6px 0; }
-  .actionbar button { padding: 11px 16px; font-size: 16px; }
-  .action-main { gap: 8px; padding: 0 4px; }
-  .action-main button { flex: 0 0 30%; width: 30%; min-width: 0; padding: 12px 4px; } /* 개수 무관 동일 크기 */
-  .action-raise { gap: 8px; padding: 6px 10px; width: calc(100% - 8px); min-height: 44px; } /* 빈 행도 같은 높이 유지(흔들림 방지) */
+  /* 액션바: 플레이어 카드 양옆 오버레이 → 흐름에서 빼서 테이블 크기를 턴과 무관하게 고정 */
+  .actionbar {
+    position: absolute; left: 0; right: 0; bottom: calc(46px + env(safe-area-inset-bottom));
+    height: auto; min-height: 0; padding: 0 8px; gap: 8px;
+    background: transparent; border-radius: 0; z-index: 30;
+    flex-direction: column-reverse; /* 메인(폴드/레이즈) 위, 사이징 스트립 아래 */
+    pointer-events: none; /* 빈 영역은 테이블 터치 통과 */
+  }
+  .actionbar > * { pointer-events: auto; }
+  .actionbar.myturn { animation: none; } /* 오버레이라 전체 글로우 제거 */
+  .actionbar button { padding: 12px 14px; font-size: 16px;
+    box-shadow: 0 3px 0 rgba(0,0,0,.3), 0 6px 16px rgba(0,0,0,.5); } /* 펠트 위에서 떠보이게 */
+  /* 메인 줄: 카드 왼쪽엔 폴드/체크 묶음, 오른쪽엔 레이즈 */
+  .action-main { justify-content: space-between; align-items: flex-end; gap: 0; padding: 0; }
+  .action-left { display: flex; flex-direction: column; gap: 8px; }
+  .action-main button { flex: 0 0 auto; width: auto; min-width: 90px; }
+  /* 사이징 스트립: 하단 가로 한 줄(반투명 배경) */
+  .action-raise { gap: 8px; padding: 7px 10px; width: 100%; min-height: 0;
+    background: rgba(0,0,0,.5); backdrop-filter: blur(3px); }
+  .action-raise.empty { display: none; } /* 오버레이라 자리 유지 불필요 */
   .quick-bets { flex: 0 0 auto; }
   .quick-bets button { padding: 8px 12px; font-size: 13px; }
   .action-raise input[type=range] { flex: 1 1 80px; width: auto; min-width: 70px; }
   .raise-amount { font-size: 17px; min-width: 46px; }
+  /* 차례 대기 텍스트: 오버레이 하단 중앙 알약 */
+  .actionbar .waiting-turn, .actionbar .btn-join-table {
+    align-self: center; background: rgba(0,0,0,.5); padding: 8px 16px; border-radius: 18px; backdrop-filter: blur(3px); }
 }
 /* 작은 휴대폰 */
 @media (max-width: 400px) {
