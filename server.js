@@ -143,6 +143,9 @@ function rateOk(key, ms) {
 }
 // 계정당 활성 세션 1개 — 중복 로그인 시 기존 기기를 강제 로그아웃
 const activeSessions = new Map(); // nickLower -> socketId
+// 계정별 '마지막 실제 활동' 시각(닉 기준) — 재접속/자동호출로는 갱신 안 됨 → 방치 사용자 정확 판정
+const lastActivity = new Map(); // nickLower -> timestamp
+function touchActivity(socket) { if (socket && socket.account) lastActivity.set(socket.account.toLowerCase(), Date.now()); }
 function claimSession(socket, nick) {
   const nl = String(nick).toLowerCase();
   const prev = activeSessions.get(nl);
@@ -358,7 +361,9 @@ function broadcastOnline() {
     const key = nm.toLowerCase();
     let st = statusBySock.get(sid) || 'lobby';
     const sock = io.sockets.sockets.get(sid);
-    if (st !== 'playing' && sock && now - (sock.lastActivity || now) > AWAY_MS) st = 'away';
+    // 자리 비움 판정: 계정은 '실제 활동'(재접속 무관) 기준, 비로그인 식별자는 소켓 기준
+    const la = (sock && sock.account) ? lastActivity.get(sock.account.toLowerCase()) : (sock && sock.lastActivity);
+    if (st !== 'playing' && la && now - la > AWAY_MS) st = 'away';
     if (idxByKey.has(key)) {
       const cur = list[idxByKey.get(key)];
       if ((STATUS_RANK[st] ?? 0) > (STATUS_RANK[cur.status] ?? 0)) cur.status = st;
@@ -638,10 +643,12 @@ io.on('connection', (socket) => {
   let roomCode = null;
   let playerId = socket.id;
   socket.lastActivity = Date.now(); // 마지막 사용자 액션 시각(비활동 자동 로그아웃용)
+  // 재접속/자동 호출은 '활동'에서 제외 → 백그라운드 방치 사용자가 계속 online으로 남지 않게
+  const PASSIVE_EVENTS = new Set(['identify', 'resume', 'listRooms', 'getProfile', 'leaderboard', 'profileByNick']);
   // 모든 이벤트 핸들러를 try/catch로 감싸 한 곳의 예외가 전체를 막지 않도록 + 활동 시각 갱신
   const _on = socket.on.bind(socket);
   socket.on = (event, handler) => _on(event, function (...args) {
-    socket.lastActivity = Date.now(); // 어떤 이벤트든 들어오면 활동으로 간주
+    if (!PASSIVE_EVENTS.has(event)) { socket.lastActivity = Date.now(); touchActivity(socket); } // 실제 사용자 동작만 활동으로 간주
     const cb = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null;
     try { return handler.apply(this, args); }
     catch (e) { console.error(`[${event}] 처리 오류:`, e); if (cb) try { cb({ ok: false, error: '서버 오류가 발생했습니다' }); } catch (_) {} }
@@ -669,6 +676,7 @@ io.on('connection', (socket) => {
     users.set(nick.toLowerCase(), acc);
     saveUser(acc);
     socket.account = nick;
+    lastActivity.set(nick.toLowerCase(), Date.now());
     claimSession(socket, nick);
     userNames.set(socket.id, nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: ensureToken(acc) });
@@ -678,6 +686,7 @@ io.on('connection', (socket) => {
     const acc = users.get(nick.toLowerCase());
     if (!acc || !verifyPw(acc, password)) return cb?.({ ok: false, error: '닉네임 또는 비밀번호가 올바르지 않습니다' });
     socket.account = acc.nick;
+    lastActivity.set(acc.nick.toLowerCase(), Date.now());
     claimSession(socket, acc.nick);
     userNames.set(socket.id, acc.nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: ensureToken(acc) });
@@ -692,6 +701,7 @@ io.on('connection', (socket) => {
       return cb?.({ ok: false, error: '세션이 만료되었습니다. 다시 로그인해 주세요' });
     }
     socket.account = acc.nick;
+    { const _nl = acc.nick.toLowerCase(); if (!lastActivity.has(_nl)) lastActivity.set(_nl, Date.now()); } // 재접속은 리셋 안 함
     claimSession(socket, acc.nick);
     userNames.set(socket.id, acc.nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: acc.loginToken });
@@ -1229,12 +1239,15 @@ setInterval(() => {
   let changed = false;
   for (const [, socket] of io.sockets.sockets) {
     if (!socket.account) continue; // 로그인 상태만 대상
-    if (now - (socket.lastActivity || now) < IDLE_LOGOUT_MS) continue;
+    const nl = socket.account.toLowerCase();
+    const la = lastActivity.get(nl) ?? now; // 계정 기준(재접속으로 리셋 안 됨)
+    if (now - la < IDLE_LOGOUT_MS) continue;
     try {
-      const acc = users.get(socket.account.toLowerCase());
+      const acc = users.get(nl);
       if (acc) { revokeToken(acc); saveUser(acc); } // 토큰 무효화 → 자동 재로그인 방지
       releaseSession(socket);
       socket.account = null;
+      lastActivity.delete(nl);
       userNames.delete(socket.id);
       socket.emit('forceLogout', { reason: '30분 동안 활동이 없어 자동 로그아웃되었습니다' });
       changed = true;
