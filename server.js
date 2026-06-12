@@ -615,9 +615,11 @@ function maybeBotAct(code) {
 io.on('connection', (socket) => {
   let roomCode = null;
   let playerId = socket.id;
-  // 모든 이벤트 핸들러를 try/catch로 감싸 한 곳의 예외가 전체를 막지 않도록
+  socket.lastActivity = Date.now(); // 마지막 사용자 액션 시각(비활동 자동 로그아웃용)
+  // 모든 이벤트 핸들러를 try/catch로 감싸 한 곳의 예외가 전체를 막지 않도록 + 활동 시각 갱신
   const _on = socket.on.bind(socket);
   socket.on = (event, handler) => _on(event, function (...args) {
+    socket.lastActivity = Date.now(); // 어떤 이벤트든 들어오면 활동으로 간주
     const cb = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null;
     try { return handler.apply(this, args); }
     catch (e) { console.error(`[${event}] 처리 오류:`, e); if (cb) try { cb({ ok: false, error: '서버 오류가 발생했습니다' }); } catch (_) {} }
@@ -1196,6 +1198,27 @@ setInterval(() => {
     }
   }
 }, 60000);
+
+// 비활동 자동 로그아웃: 로그인 상태로 30분간 어떤 액션도 없으면 세션 종료(서버 강제)
+const IDLE_LOGOUT_MS = 30 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  let changed = false;
+  for (const [, socket] of io.sockets.sockets) {
+    if (!socket.account) continue; // 로그인 상태만 대상
+    if (now - (socket.lastActivity || now) < IDLE_LOGOUT_MS) continue;
+    try {
+      const acc = users.get(socket.account.toLowerCase());
+      if (acc) { revokeToken(acc); saveUser(acc); } // 토큰 무효화 → 자동 재로그인 방지
+      releaseSession(socket);
+      socket.account = null;
+      userNames.delete(socket.id);
+      socket.emit('forceLogout', { reason: '30분 동안 활동이 없어 자동 로그아웃되었습니다' });
+      changed = true;
+    } catch (e) { console.error('idle logout 오류:', e); }
+  }
+  if (changed) broadcastOnline();
+}, 60 * 1000);
 
 httpServer.listen(PORT, () => {
   console.log(`🎲 Dice 서버 실행: http://localhost:${PORT}`);
