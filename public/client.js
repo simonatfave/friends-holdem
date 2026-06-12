@@ -733,6 +733,23 @@ $('timerClose').onclick = () => { timerSettings.actionSeconds = $('actionSeconds
 // 접속 인원 표시(봇 제외) + 클릭 시 아바타 목록 패널
 function identify() { if (myName) socket.emit('identify', myName); }
 let onlineUsers = [];
+// 접속자 상태 배지(게임 중 / 대기 / 관전 / 자리 비움 / 로비)
+function onlineStatusMeta(status) {
+  switch (status) {
+    case 'playing': return { label: '게임 중', cls: 'st-playing' };
+    case 'waiting': return { label: '대기 중', cls: 'st-waiting' };
+    case 'spectating': return { label: '관전', cls: 'st-spec' };
+    case 'away': return { label: '자리 비움', cls: 'st-away' };
+    default: return { label: '온라인', cls: 'st-lobby' };
+  }
+}
+function statusBadge(status) {
+  const m = onlineStatusMeta(status);
+  const s = document.createElement('span');
+  s.className = 'st-badge ' + m.cls;
+  s.innerHTML = `<span class="st-dot"></span>${m.label}`;
+  return s;
+}
 function renderOnlineList() {
   $('onlinePanelCount').textContent = onlineUsers.length;
   const box = $('onlineUserList');
@@ -750,6 +767,7 @@ function renderOnlineList() {
     if (myProfile && u.nick.toLowerCase() === myProfile.nick.toLowerCase()) {
       const tag = document.createElement('span'); tag.className = 'ou-me'; tag.textContent = '나'; row.appendChild(tag);
     }
+    row.appendChild(statusBadge(u.status));
     row.style.cursor = 'pointer';
     row.onclick = () => openOppProfile(u.nick);
     box.appendChild(row);
@@ -766,6 +784,7 @@ function renderOnlinePop() {
     const nm = document.createElement('span'); nm.className = 'op-nick'; nm.textContent = u.nick
       + (myProfile && u.nick.toLowerCase() === myProfile.nick.toLowerCase() ? ' (나)' : '');
     row.appendChild(av); row.appendChild(nm);
+    row.appendChild(statusBadge(u.status));
     pop.appendChild(row);
   });
 }
@@ -782,6 +801,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v108', ['접속자 목록에 상태 배지 추가(게임 중·대기 중·관전·자리 비움·온라인)', '로그인 페이지 로고: 왼쪽 주사위만 굴러 들어오는 효과(텍스트는 고정)']],
   ['v107', ['서버측 비활동 자동 로그아웃 추가 → 로그인 상태로 30분간 액션 없으면(백그라운드 탭 포함) 강제 로그아웃·접속자 목록에서 제거']],
   ['v106', ['로고 등장 효과를 미니멀하게(부드러운 페이드) 변경 → 화면 딸깍거림 제거']],
   ['v105', ['시작 페이지 DICE 로고 가운데 정렬', '로고가 통통 튀며 등장하는 애니메이션 + 주사위 점 순차 등장']],

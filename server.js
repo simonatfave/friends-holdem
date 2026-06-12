@@ -334,17 +334,39 @@ function broadcast(code) {
 }
 // 닉네임을 입력해 '로그인 완료'한 사람만 접속 수로 집계 (봇 제외)
 const userNames = new Map(); // socketId -> 닉네임
+const AWAY_MS = 3 * 60 * 1000; // 3분 무액션이면 '자리 비움'
+const STATUS_RANK = { playing: 4, waiting: 3, spectating: 2, lobby: 1, away: 0 };
 function broadcastOnline() {
-  // 같은 닉네임(여러 기기) 중복 제거, 아바타 포함
-  const seen = new Set();
+  // socketId별 현재 상태(게임 중 / 대기 / 관전 / 로비 / 자리비움) 계산
+  const now = Date.now();
+  const statusBySock = new Map();
+  for (const [, room] of rooms) {
+    const g = room.game;
+    for (const p of g.players) {
+      if (p.isBot) continue;
+      let st = (g.started && !g.finished) ? 'playing' : 'waiting';
+      if (p.sittingOut) st = 'away';
+      statusBySock.set(p.id, st);
+    }
+    if (room.spectators) for (const sid of room.spectators) if (!statusBySock.has(sid)) statusBySock.set(sid, 'spectating');
+  }
+  // 같은 닉네임(여러 기기) 중복 제거 — 더 활동적인 상태를 대표값으로
+  const idxByKey = new Map();
   const list = [];
-  for (const nm of userNames.values()) {
+  for (const [sid, nm] of userNames) {
     if (!nm) continue;
     const key = nm.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
+    let st = statusBySock.get(sid) || 'lobby';
+    const sock = io.sockets.sockets.get(sid);
+    if (st !== 'playing' && sock && now - (sock.lastActivity || now) > AWAY_MS) st = 'away';
+    if (idxByKey.has(key)) {
+      const cur = list[idxByKey.get(key)];
+      if ((STATUS_RANK[st] ?? 0) > (STATUS_RANK[cur.status] ?? 0)) cur.status = st;
+      continue;
+    }
+    idxByKey.set(key, list.length);
     const acc = users.get(key);
-    list.push({ nick: nm, avatar: (acc && acc.avatar) || null });
+    list.push({ nick: nm, avatar: (acc && acc.avatar) || null, status: st });
   }
   io.emit('online', { count: list.length, users: list, names: list.map((u) => u.nick) });
 }
@@ -852,6 +874,7 @@ io.on('connection', (socket) => {
     if (room.hostId !== playerId) return cb?.({ ok: false, error: '방장만 시작할 수 있습니다' });
     const r = room.game.start();
     cb?.(r);
+    if (r && r.ok !== false) broadcastOnline(); // 좌석 인원 '게임 중'으로 즉시 반영
     startActionTimer(roomCode);
     broadcast(roomCode);
     scheduleNextHand(roomCode);
@@ -1217,7 +1240,7 @@ setInterval(() => {
       changed = true;
     } catch (e) { console.error('idle logout 오류:', e); }
   }
-  if (changed) broadcastOnline();
+  broadcastOnline(); // 상태(게임 중·자리 비움 등) 주기적 갱신
 }, 60 * 1000);
 
 httpServer.listen(PORT, () => {

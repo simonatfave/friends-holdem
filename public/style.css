@@ -401,14 +401,16 @@ button { font-family: inherit; }
 /* 브랜드 로고 (로비) */
 .brand-logo { text-align: center; margin-bottom: 4px; }
 .brand-logo svg { width: 230px; max-width: 82%; height: auto; display: block; margin: 0 auto; transform-origin: center; }
-/* 시작 페이지 로고 등장 효과: 미니멀하게 부드러운 페이드 + 살짝 떠오름(레이아웃 흔들림 없음) */
-@keyframes logoIn {
-  0%   { opacity: 0; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
+/* 로그인(게이트) 페이지에서만: 왼쪽 주사위 아이콘이 굴러 들어오고 'DICE' 글자는 그대로 */
+.brand-logo .dice-ico { transform-box: fill-box; transform-origin: center; }
+#gate .brand-logo.logo-anim .dice-ico { animation: diceRoll 1s cubic-bezier(.2,.75,.2,1) both; }
+@keyframes diceRoll {
+  0%   { transform: rotate(-540deg) scale(.55); opacity: 0; }
+  55%  { opacity: 1; }
+  100% { transform: rotate(0deg) scale(1); opacity: 1; }
 }
-.brand-logo.logo-anim svg { animation: logoIn .4s ease both; will-change: opacity, transform; }
 @media (prefers-reduced-motion: reduce) {
-  .brand-logo.logo-anim svg { animation: none; }
+  #gate .brand-logo.logo-anim .dice-ico { animation: none; }
 }
 
 /* 테이블 중앙 워터마크 로고 */
@@ -1490,7 +1492,20 @@ body[data-theme=charcoal] { --felt: #46505e; --felt-dark: #232a33; }
 @media (hover: hover) { .online-wrap:hover .online-pop { display: block; } }
 .op-row { display: flex; align-items: center; gap: 9px; padding: 5px 6px; }
 .op-row .avatar-pic.sm { width: 26px; height: 26px; font-size: 12px; }
-.op-row .op-nick { font-size: 13px; color: var(--text); font-weight: 600; }
+.op-row .op-nick { font-size: 13px; color: var(--text); font-weight: 600; flex: 1; }
+/* 접속자 상태 배지 */
+.st-badge { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; white-space: nowrap;
+  border: 1px solid transparent; }
+.st-badge .st-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.st-badge.st-playing { color: #41d18b; background: rgba(65,209,139,.12); border-color: rgba(65,209,139,.4); }
+.st-badge.st-playing .st-dot { animation: stPulse 1.4s ease-in-out infinite; }
+.st-badge.st-waiting { color: #e8c466; background: rgba(232,196,102,.12); border-color: rgba(232,196,102,.35); }
+.st-badge.st-spec    { color: #7fb0e8; background: rgba(127,176,232,.12); border-color: rgba(127,176,232,.35); }
+.st-badge.st-lobby   { color: #9fb0c2; background: rgba(159,176,194,.1); border-color: rgba(159,176,194,.28); }
+.st-badge.st-away    { color: #c7794f; background: rgba(199,121,79,.12); border-color: rgba(199,121,79,.35); }
+@keyframes stPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.online-user .st-badge { margin-left: auto; }
 
 /* 패치 노트 모달 */
 .patch-card { max-width: 420px; width: 92vw; }
