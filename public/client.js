@@ -408,11 +408,41 @@ function fileToAvatar(file) {
 function onLoggedIn(profile) {
   myProfile = profile;
   myName = profile.nick;
+  try { localStorage.setItem('dice_lastnick', profile.nick); } catch (e) {} // 다음 로그인 시 자동 채움
   const ni = $('nameInput'); if (ni) ni.value = profile.nick;
   updateMeDisplay();
   identify();
   openLobby();
+  resetIdle(); // 비활동 자동 로그아웃 타이머 시작
 }
+
+// 30분 동안 사용자 입력이 없으면 자동 로그아웃
+let _idleTimer = null;
+function resetIdle() {
+  clearTimeout(_idleTimer);
+  if (!myProfile) return;
+  _idleTimer = setTimeout(() => {
+    socket.emit('logout', {}, () => {});
+    logoutToGate();
+    toast('30분 동안 활동이 없어 자동 로그아웃되었습니다', 'error');
+  }, 30 * 60 * 1000);
+}
+['pointerdown', 'keydown', 'touchstart'].forEach((e) => document.addEventListener(e, resetIdle, { passive: true }));
+
+// 다른 기기에서 로그인 → 이 기기 강제 로그아웃
+socket.on('forceLogout', ({ reason } = {}) => {
+  logoutToGate();
+  toast(reason || '다른 기기에서 로그인되어 로그아웃되었습니다', 'error');
+});
+
+// 비밀번호 표시/숨김 토글
+$('authPwToggle').onclick = () => {
+  const inp = $('authPw');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  $('authPwToggle').style.opacity = inp.type === 'text' ? '1' : '.6';
+};
+// 마지막 닉네임 자동 채움
+try { const ln = localStorage.getItem('dice_lastnick'); if (ln && $('authNick')) $('authNick').value = ln; } catch (e) {}
 function doAuth(kind) {
   const nick = $('authNick').value.trim();
   const password = $('authPw').value;
@@ -549,6 +579,7 @@ $('pwSave').onclick = () => {
 };
 // 로그인 화면으로 되돌리기(세션 종료 공통)
 function logoutToGate() {
+  clearTimeout(_idleTimer);
   setToken(null); myProfile = null; myName = ''; myRoomCode = '';
   document.body.classList.remove('waiting-mode', 'my-turn-glow');
   ['accountPanel', 'game', 'waiting', 'lobby', 'finalScreen', 'signupPanel', 'onlinePanel', 'settingsPanel', 'leaderboardPanel'].forEach((id) => { try { hide(id); } catch (e) {} });

@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>🎲 Dice — 친구들과 포커</title>
   <meta name="theme-color" content="#0e1219" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=85" />
+  <link rel="stylesheet" href="style.css?v=87" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -33,7 +33,10 @@
       <label>닉네임</label>
       <input id="authNick" maxlength="16" autocomplete="username" placeholder="닉네임 (2자 이상)" />
       <label>비밀번호</label>
-      <input id="authPw" type="password" autocomplete="current-password" placeholder="비밀번호 (4자 이상)" maxlength="32" />
+      <div class="pw-field">
+        <input id="authPw" type="password" autocomplete="current-password" placeholder="비밀번호 (4자 이상)" maxlength="32" />
+        <button id="authPwToggle" type="button" class="pw-toggle" aria-label="비밀번호 표시/숨김">👁</button>
+      </div>
       <button id="loginBtn" class="primary">로그인</button>
       <button id="signupBtn" class="primary alt">회원가입</button>
       <p id="gateError" class="error"></p>
@@ -379,7 +382,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="util.js?v=85"></script>
-  <script src="client.js?v=85"></script>
+  <script src="util.js?v=87"></script>
+  <script src="client.js?v=87"></script>
 </body>
 </html>

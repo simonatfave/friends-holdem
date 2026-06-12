@@ -141,6 +141,24 @@ function rateOk(key, ms) {
   _rate.set(key, now);
   return true;
 }
+// 계정당 활성 세션 1개 — 중복 로그인 시 기존 기기를 강제 로그아웃
+const activeSessions = new Map(); // nickLower -> socketId
+function claimSession(socket, nick) {
+  const nl = String(nick).toLowerCase();
+  const prev = activeSessions.get(nl);
+  if (prev && prev !== socket.id) {
+    io.to(prev).emit('forceLogout', { reason: '다른 기기에서 로그인되어 이 기기는 로그아웃됩니다' });
+    const ps = io.sockets.sockets.get(prev);
+    if (ps) { ps.account = null; userNames.delete(prev); }
+  }
+  activeSessions.set(nl, socket.id);
+}
+function releaseSession(socket) {
+  if (socket.account) {
+    const nl = socket.account.toLowerCase();
+    if (activeSessions.get(nl) === socket.id) activeSessions.delete(nl);
+  }
+}
 
 // ---------- 방 관리 ----------
 const rooms = new Map(); // code -> { game, hostId, timer, settings }
@@ -627,6 +645,7 @@ io.on('connection', (socket) => {
     users.set(nick.toLowerCase(), acc);
     saveUser(acc);
     socket.account = nick;
+    claimSession(socket, nick);
     userNames.set(socket.id, nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: ensureToken(acc) });
   });
@@ -635,6 +654,7 @@ io.on('connection', (socket) => {
     const acc = users.get(nick.toLowerCase());
     if (!acc || !verifyPw(acc, password)) return cb?.({ ok: false, error: '닉네임 또는 비밀번호가 올바르지 않습니다' });
     socket.account = acc.nick;
+    claimSession(socket, acc.nick);
     userNames.set(socket.id, acc.nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: ensureToken(acc) });
   });
@@ -648,6 +668,7 @@ io.on('connection', (socket) => {
       return cb?.({ ok: false, error: '세션이 만료되었습니다. 다시 로그인해 주세요' });
     }
     socket.account = acc.nick;
+    claimSession(socket, acc.nick);
     userNames.set(socket.id, acc.nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: acc.loginToken });
   });
@@ -655,6 +676,7 @@ io.on('connection', (socket) => {
   socket.on('logout', (_d, cb) => {
     const acc = socket.account && users.get(socket.account.toLowerCase());
     if (acc) { revokeToken(acc); saveUser(acc); }
+    releaseSession(socket);
     socket.account = null;
     userNames.delete(socket.id); broadcastOnline();
     cb?.({ ok: true });
@@ -1108,6 +1130,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     userNames.delete(socket.id);
+    releaseSession(socket); // 활성 세션 해제(같은 소켓일 때만)
     setTimeout(broadcastOnline, 50); // 접속 종료 → 인원 수 갱신(모든 경우)
     const room = rooms.get(roomCode);
     if (!room) return;
