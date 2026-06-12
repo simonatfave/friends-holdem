@@ -710,8 +710,8 @@ button { font-family: inherit; }
 /* 휴대폰 (가로 폭 기준) */
 @media (max-width: 640px) {
   #game { position: relative; } /* 액션바 오버레이 기준 */
-  /* 세로 테이블: 하단 영역을 줄인 만큼 더 키움(63dvh) + 넓은 비율 */
-  .poker-table { height: min(63dvh, 124vw); width: calc(min(63dvh, 124vw) * 5 / 6.3); aspect-ratio: 5 / 6.3; border-width: 9px; }
+  /* 세로 테이블: 상단 여백을 줄이도록 더 키움(74dvh). 하단 고정이라 위로만 확장 */
+  .poker-table { height: min(74dvh, 122vw); width: calc(min(74dvh, 122vw) * 5 / 6.3); aspect-ratio: 5 / 6.3; border-width: 9px; }
   /* 테이블을 아래쪽 정렬하되, 하단에 액션 오버레이 공간 확보 */
   .table-wrap { align-items: flex-end; padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
   /* 타임뱅크: 모바일은 우측 하단에 아이콘만(최소화) */
@@ -831,9 +831,11 @@ body.waiting-mode #waitBanner {
   transform: translate(-50%, -50%); z-index: 40; margin: 0;
   width: min(360px, calc(100% - 32px));
 }
-/* 모바일: 테이블이 하단 정렬이라 시각적 중앙(≈62%)에 맞춤 */
+/* 모바일: 테이블이 하단 정렬이라 시각적 중앙(≈56%)에 맞춤 + 하단바 공간 유지해 위치 고정 */
 @media (max-width: 640px) {
-  body.waiting-mode #waitBanner { top: 60%; width: min(330px, calc(100% - 40px)); }
+  body.waiting-mode #waitBanner { top: 56%; width: min(330px, calc(100% - 40px)); }
+  /* 이모지바 자리를 비워두기만 함(숨김) → 대기/플레이 어느 때나 테이블 하단 위치 동일 */
+  body.waiting-mode .emoji-bar { display: flex !important; visibility: hidden; }
 }
 
 .wait-banner {
@@ -845,9 +847,17 @@ body.waiting-mode #waitBanner {
 .wait-banner .wb-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .wait-banner .wb-code { font-size: 15px; color: var(--text); }
 .wait-banner .wb-code b { color: var(--gold); letter-spacing: 2px; font-size: 18px; margin-left: 4px; }
-.wait-banner .wb-hint { margin: 8px 0 10px; font-size: 13px; color: #9fb0c2; line-height: 1.5; }
+.wait-banner .wb-hint { margin: 8px 0 0; font-size: 13px; color: #9fb0c2; line-height: 1.5; }
 .wait-banner .wb-actions { display: flex; gap: 8px; justify-content: center; }
 .wait-banner #wbStart { flex: 1; margin-top: 0; }
+/* 방 코드·초대 정보: 토글로 펼치는 툴팁 */
+.wait-banner .wb-info-toggle {
+  margin-top: 12px; background: none; border: none; color: #9fb0c2;
+  font-size: 13px; cursor: pointer; padding: 4px 8px;
+}
+.wait-banner .wb-info-toggle .wb-caret { display: inline-block; transition: transform .2s; }
+.wait-banner .wb-info-toggle.open .wb-caret { transform: rotate(180deg); }
+.wait-banner .wb-info { margin-top: 8px; padding-top: 10px; border-top: 1px solid #2a3442; }
 .wait-banner .wb-leave {
   flex: 0 0 auto; padding: 12px 18px; border-radius: 12px;
   border: 1px solid #5b3a3a; background: rgba(226,85,85,.14); color: #f0a0a0;
