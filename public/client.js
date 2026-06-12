@@ -1892,8 +1892,20 @@ function ovalPositions(n) {
 function othersPositions(k) {
   if (k <= 0) return [];
   const mobile = window.innerWidth <= 640;
-  const cx = 50, cy = mobile ? 45 : 47;
-  const rx = mobile ? 37 : 48, ry = mobile ? 38 : 37;
+  if (mobile) {
+    // 모바일(세로): 다른 좌석을 '위쪽 호'에만 배치 → 가운데 커뮤니티 보드와 안 겹침
+    const cx = 50, cy = 35, rx = 44, ry = 28;
+    const a0 = Math.PI * (203 / 180), a1 = Math.PI * (337 / 180); // 좌상 ~ 우상 호
+    const out = [];
+    for (let j = 0; j < k; j++) {
+      const t = k === 1 ? 0.5 : j / (k - 1);
+      const a = a0 + (a1 - a0) * t;
+      out.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
+    }
+    return out;
+  }
+  const cx = 50, cy = 47;
+  const rx = 48, ry = 37;
   const gap = 0.62; // 아래 중앙 양옆으로 비우는 반각(라디안)
   const span = 2 * Math.PI - 2 * gap;
   const out = [];
