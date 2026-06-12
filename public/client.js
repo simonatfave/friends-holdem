@@ -46,8 +46,21 @@ function sessionLost() {
 }
 
 const $ = (id) => document.getElementById(id);
-const show = (id) => $(id).classList.remove('hidden');
+const show = (id) => { const el = $(id); el.classList.remove('hidden'); triggerLogoAnim(el); };
 const hide = (id) => $(id).classList.add('hidden');
+// 시작 페이지 로고 등장 애니메이션 재시작(리플로우로 매번 재생)
+function triggerLogoAnim(el) {
+  const logo = el && el.querySelector && el.querySelector('.brand-logo');
+  if (!logo) return;
+  logo.classList.remove('logo-anim');
+  void logo.offsetWidth;
+  logo.classList.add('logo-anim');
+}
+// 첫 로드시 보이는 화면의 로고도 한 번 재생
+setTimeout(() => {
+  const v = document.querySelector('.screen:not(.hidden) .brand-logo, #gate:not(.hidden) .brand-logo');
+  if (v) { v.classList.remove('logo-anim'); void v.offsetWidth; v.classList.add('logo-anim'); }
+}, 40);
 
 // 인라인 토스트(브라우저 alert 대체)
 let _appToastTimer = null;
@@ -769,6 +782,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v105', ['시작 페이지 DICE 로고 가운데 정렬', '로고가 통통 튀며 등장하는 애니메이션 + 주사위 점 순차 등장']],
   ['v104', ['시작하기 버튼을 테이블 정중앙에 정확히 배치(테이블 기준 절대배치)', '대기 좌석에도 카드 뒷면 표시 → 시작 전후 좌석 높이·테이블 모습 동일']],
   ['v103', ['적은 인원(헤즈업 등)에서 내 좌석이 너무 커서 하단 액션 스트립과 겹치던 문제 수정(크기·위치 조정)']],
   ['v102', ['상단바·하단바 공간 유지를 전체 화면폭에 적용 → 대기/플레이 테이블 크기·위치 고정 강화']],

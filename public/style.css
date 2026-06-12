@@ -400,7 +400,26 @@ button { font-family: inherit; }
 
 /* 브랜드 로고 (로비) */
 .brand-logo { text-align: center; margin-bottom: 4px; }
-.brand-logo svg { width: 230px; max-width: 82%; height: auto; }
+.brand-logo svg { width: 230px; max-width: 82%; height: auto; transform-origin: center; }
+/* 시작 페이지 로고 등장 효과: 통통 튀며 살짝 회전 후 정착 */
+@keyframes logoIn {
+  0%   { opacity: 0; transform: scale(.4) rotate(-22deg); }
+  55%  { opacity: 1; transform: scale(1.12) rotate(8deg); }
+  72%  { transform: scale(.96) rotate(-3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+.brand-logo.logo-anim svg { animation: logoIn .85s cubic-bezier(.22,.9,.3,1.3) both; }
+/* 주사위 점이 순차적으로 톡톡 등장 */
+@keyframes dotPop { 0% { opacity: 0; transform: scale(0); } 70% { transform: scale(1.25); } 100% { opacity: 1; transform: scale(1); } }
+.brand-logo.logo-anim svg circle { transform-box: fill-box; transform-origin: center; animation: dotPop .4s ease both; }
+.brand-logo.logo-anim svg circle:nth-of-type(1) { animation-delay: .42s; }
+.brand-logo.logo-anim svg circle:nth-of-type(2) { animation-delay: .50s; }
+.brand-logo.logo-anim svg circle:nth-of-type(3) { animation-delay: .58s; }
+.brand-logo.logo-anim svg circle:nth-of-type(4) { animation-delay: .66s; }
+.brand-logo.logo-anim svg circle:nth-of-type(5) { animation-delay: .74s; }
+@media (prefers-reduced-motion: reduce) {
+  .brand-logo.logo-anim svg, .brand-logo.logo-anim svg circle { animation: none; }
+}
 
 /* 테이블 중앙 워터마크 로고 */
 .table-logo {
