@@ -769,6 +769,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v101', ['대기 화면 좌석 배치를 플레이 화면과 완전히 동일하게(아래 중앙=나, 나머지는 같은 호·같은 크기)', '시작 전후 좌석 위치·크기 일치']],
   ['v100', ['시작 버튼 폭 더 축소 → 양옆 좌석과 안 겹침', '대기 좌석을 좌우로 더 벌려 사이드 여백 활용', '대기/플레이 테이블 크기·위치 완전 고정(상단바·하단바 공간 유지)']],
   ['v99', ['대기 화면 중앙은 컴팩트한 "시작하기" 버튼만(좌석 + 클릭 통과)', '나가기 버튼은 우상단 작게 이동', '방 코드·초대는 토글로만 표시']],
   ['v98', ['시작 화면 테이블을 키워 상단 여백 최소화(꽉 찬 배치)', '테이블 크기·위치를 모든 단계에서 동일하게 고정', '대기 팝업은 시작/나가기만, 방 코드·초대는 클릭 시 펼침']],
@@ -1123,16 +1124,21 @@ function renderWaitingSeats(s) {
   const seatsEl = $('seats');
   seatsEl.innerHTML = '';
   const TOTAL = s.maxPlayers || 9; // 방 최대 인원만큼 좌석 표시(6 또는 9)
-  seatsEl.style.setProperty('--seat-scale', '0.72');
-  const positions = ovalPositions(TOTAL);
+  const n = TOTAL;
+  // 플레이 화면과 '동일한' 좌석 스케일·배치(아래 중앙=나, 나머지는 호) → 시작 전후 일치
+  seatsEl.style.setProperty('--seat-scale', n <= 3 ? '1' : n <= 5 ? '0.84' : n <= 7 ? '0.72' : '0.62');
+  seatsEl.style.setProperty('--me-scale', n <= 4 ? '1' : n <= 6 ? '0.9' : '0.8');
   const me = s.players.find((p) => p.id === myId);
   const mySeat = me ? me.chair : 0;
+  const opos = othersPositions(TOTAL - 1); // 나(아래 중앙) 제외 나머지 좌석
+  const meTop = (window.innerWidth <= 640) ? 84 : 88;
   const bySeat = {};
   s.players.forEach((p) => { bySeat[p.chair] = p; });
   for (let seatIdx = 0; seatIdx < TOTAL; seatIdx++) {
     // 내 자리를 항상 화면 아래 중앙(visual 0)에 오도록 회전
     const visual = (seatIdx - mySeat + TOTAL) % TOTAL;
-    const pos = positions[visual];
+    const isMeSlot = visual === 0;
+    const pos = isMeSlot ? { x: 50, y: meTop } : (opos[visual - 1] || { x: 50, y: 20 });
     const seat = document.createElement('div');
     seat.className = 'seat wait-seat';
     seat.style.left = pos.x + '%';
@@ -1140,6 +1146,7 @@ function renderWaitingSeats(s) {
     const p = bySeat[seatIdx];
     if (p) {
       const isMe = p.id === myId;
+      if (isMe) seat.classList.add('me-seat');
       seat.innerHTML = `
         <div class="seat-inner">
           <div class="pname">${esc(p.name)} ${isMe ? '<span class="tag you">나</span>' : ''} ${p.isBot ? '<span class="tag">봇</span>' : ''}</div>
