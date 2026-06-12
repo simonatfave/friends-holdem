@@ -710,8 +710,8 @@ button { font-family: inherit; }
 /* 휴대폰 (가로 폭 기준) */
 @media (max-width: 640px) {
   #game { position: relative; } /* 액션바 오버레이 기준 */
-  /* 세로 테이블: 상단 여백을 줄이도록 더 키움(74dvh). 하단 고정이라 위로만 확장 */
-  .poker-table { height: min(74dvh, 122vw); width: calc(min(74dvh, 122vw) * 5 / 6.3); aspect-ratio: 5 / 6.3; border-width: 9px; }
+  /* 세로 테이블: 상단바·하단바 공간을 둔 상태에서 최대한 채우는 높이(68dvh) → 대기/플레이 동일 */
+  .poker-table { height: min(68dvh, 120vw); width: calc(min(68dvh, 120vw) * 5 / 6.3); aspect-ratio: 5 / 6.3; border-width: 9px; }
   /* 테이블을 아래쪽 정렬하되, 하단에 액션 오버레이 공간 확보 */
   .table-wrap { align-items: flex-end; padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
   /* 타임뱅크: 모바일은 우측 하단에 아이콘만(최소화) */
@@ -833,8 +833,11 @@ body.waiting-mode #waitBanner {
 /* 모바일: 테이블이 하단 정렬이라 시각적 중앙(≈56%)에 맞춤 + 하단바 공간 유지해 위치 고정 */
 @media (max-width: 640px) {
   body.waiting-mode #waitBanner { top: 56%; }
-  /* 이모지바 자리를 비워두기만 함(숨김) → 대기/플레이 어느 때나 테이블 하단 위치 동일 */
+  /* 상단바·이모지바 자리를 비워두기만 함(숨김) → 대기/플레이 어느 때나 테이블 크기·위치 동일 */
+  body.waiting-mode .topbar,
   body.waiting-mode .emoji-bar { display: flex !important; visibility: hidden; }
+  /* 시작 버튼: 모바일은 더 좁게(양옆 좌석과 안 겹치게) */
+  .wait-banner #wbStart { min-width: 112px; padding: 13px 22px; font-size: 16px; }
 }
 
 /* 팝업 컨테이너는 투명 + 클릭 통과(빈 영역으로 뒤 좌석 +를 누를 수 있게) */
