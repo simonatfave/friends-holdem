@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=98" />
+  <link rel="stylesheet" href="style.css?v=99" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -299,11 +299,9 @@
     </div>
 
     <!-- 대기 모드 배너: 방을 만들면 테이블이 보이는 채로 대기 시작 -->
+    <button id="wbLeave" class="wb-leave-corner">나가기</button>
     <div id="waitBanner" class="wait-banner hidden">
-      <div class="wb-actions">
-        <button id="wbStart" class="primary hidden">게임 시작</button>
-        <button id="wbLeave" class="wb-leave">나가기</button>
-      </div>
+      <button id="wbStart" class="primary hidden">시작하기</button>
       <button id="wbInfoToggle" class="wb-info-toggle">방 코드·초대 <span class="wb-caret">▾</span></button>
       <div id="wbInfo" class="wb-info hidden">
         <div class="wb-row">
@@ -400,7 +398,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="util.js?v=98"></script>
-  <script src="client.js?v=98"></script>
+  <script src="util.js?v=99"></script>
+  <script src="client.js?v=99"></script>
 </body>
 </html>

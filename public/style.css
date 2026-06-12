@@ -825,46 +825,55 @@ body.waiting-mode .sidepanel,
 body.waiting-mode .community,
 body.waiting-mode .pot-stack,
 body.waiting-mode .pot-display { display: none !important; }
-/* 대기 안내·시작/나가기 버튼을 테이블 중앙 팝업으로 → 테이블 크기·위치는 항상 고정 */
+/* 대기: 중앙엔 시작 버튼만(투명 박스라 뒤 +좌석 클릭 통과), 나가기는 우상단 */
 body.waiting-mode #waitBanner {
   display: block; position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%, -50%); z-index: 40; margin: 0;
-  width: min(360px, calc(100% - 32px));
+  transform: translate(-50%, -50%); z-index: 40; margin: 0; width: auto;
 }
 /* 모바일: 테이블이 하단 정렬이라 시각적 중앙(≈56%)에 맞춤 + 하단바 공간 유지해 위치 고정 */
 @media (max-width: 640px) {
-  body.waiting-mode #waitBanner { top: 56%; width: min(330px, calc(100% - 40px)); }
+  body.waiting-mode #waitBanner { top: 56%; }
   /* 이모지바 자리를 비워두기만 함(숨김) → 대기/플레이 어느 때나 테이블 하단 위치 동일 */
   body.waiting-mode .emoji-bar { display: flex !important; visibility: hidden; }
 }
 
-.wait-banner {
-  text-align: center; padding: 16px 18px;
-  background: rgba(16,20,27,.94); border: 1px solid #33404f; border-radius: 16px;
-  box-shadow: 0 18px 50px rgba(0,0,0,.6);
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); z-index: 40;
+/* 팝업 컨테이너는 투명 + 클릭 통과(빈 영역으로 뒤 좌석 +를 누를 수 있게) */
+.wait-banner { text-align: center; pointer-events: none; z-index: 40; }
+.wait-banner > * { pointer-events: auto; }
+/* 시작 버튼: 컴팩트하게(양옆 좌석과 안 겹치도록) */
+.wait-banner #wbStart {
+  margin: 0 auto; min-width: 150px; padding: 14px 28px; font-size: 17px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+/* 방 코드·초대 토글: 펠트 위 작은 알약 */
+.wait-banner .wb-info-toggle {
+  margin: 10px auto 0; background: rgba(0,0,0,.45); border: none; color: #cdd8e4;
+  font-size: 13px; cursor: pointer; padding: 6px 14px; border-radius: 16px;
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+.wait-banner .wb-info-toggle .wb-caret { display: inline-block; transition: transform .2s; }
+.wait-banner .wb-info-toggle.open .wb-caret { transform: rotate(180deg); }
+/* 펼친 정보: 자체 카드 배경 */
+.wait-banner .wb-info {
+  margin: 8px auto 0; max-width: 300px; padding: 12px 16px;
+  background: rgba(16,20,27,.95); border: 1px solid #33404f; border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(0,0,0,.55);
 }
 .wait-banner .wb-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .wait-banner .wb-code { font-size: 15px; color: var(--text); }
 .wait-banner .wb-code b { color: var(--gold); letter-spacing: 2px; font-size: 18px; margin-left: 4px; }
 .wait-banner .wb-hint { margin: 8px 0 0; font-size: 13px; color: #9fb0c2; line-height: 1.5; }
-.wait-banner .wb-actions { display: flex; gap: 8px; justify-content: center; }
-.wait-banner #wbStart { flex: 1; margin-top: 0; }
-/* 방 코드·초대 정보: 토글로 펼치는 툴팁 */
-.wait-banner .wb-info-toggle {
-  margin-top: 12px; background: none; border: none; color: #9fb0c2;
-  font-size: 13px; cursor: pointer; padding: 4px 8px;
+/* 나가기: 화면 우상단 작은 버튼(대기 중에만 표시) */
+.wb-leave-corner { display: none; }
+body.waiting-mode .wb-leave-corner {
+  display: block; position: fixed; z-index: 201;
+  top: calc(8px + env(safe-area-inset-top)); right: 70px; /* 버전 배지 왼쪽 */
+  padding: 7px 14px; border-radius: 16px;
+  border: 1px solid #5b3a3a; background: rgba(226,85,85,.18); color: #f0a0a0;
+  font-weight: 700; font-size: 13px; cursor: pointer;
 }
-.wait-banner .wb-info-toggle .wb-caret { display: inline-block; transition: transform .2s; }
-.wait-banner .wb-info-toggle.open .wb-caret { transform: rotate(180deg); }
-.wait-banner .wb-info { margin-top: 8px; padding-top: 10px; border-top: 1px solid #2a3442; }
-.wait-banner .wb-leave {
-  flex: 0 0 auto; padding: 12px 18px; border-radius: 12px;
-  border: 1px solid #5b3a3a; background: rgba(226,85,85,.14); color: #f0a0a0;
-  font-weight: 700; font-size: 15px; cursor: pointer;
-}
-.wait-banner .wb-leave:hover { background: rgba(226,85,85,.24); }
-.wait-banner .wb-leave:active { transform: translateY(1px); }
+.wb-leave-corner:hover { background: rgba(226,85,85,.3); }
+.wb-leave-corner:active { transform: translateY(1px); }
 
 /* ---------- 이모지 감정 연출: 큰 이모지 팝업 + 좌석 반응 ---------- */
 .emoji-pop {
