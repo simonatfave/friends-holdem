@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=82" />
+  <link rel="stylesheet" href="style.css?v=83" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -265,16 +265,20 @@
   <!-- 게임 테이블 -->
   <div id="game" class="screen hidden">
     <div class="topbar">
-      <span class="badge" id="handBadge">핸드 #0</span>
-      <span class="badge" id="blindBadge">블라인드 –</span>
-      <span class="badge" id="levelBadge">레벨 1</span>
-      <span class="badge" id="potBadge">팟 0</span>
-      <button class="badge" id="muteBtn" title="소리 켜기/끄기" style="cursor:pointer">🔊</button>
-      <button class="badge" id="settingsBtn" title="설정" style="cursor:pointer">⚙️</button>
-      <button class="badge" id="chatToggle" title="채팅/기록" style="cursor:pointer">💬</button>
-      <button class="badge hidden" id="sitOutBtn" title="자리 비움/복귀" style="cursor:pointer">💺 자리비움</button>
-      <button class="badge hidden" id="specJoinBtn" title="게임 참여" style="cursor:pointer">➕ 참여</button>
-      <button class="badge hidden" id="leaveBtn" title="나가기" style="cursor:pointer">🚪 나가기</button>
+      <div class="tb-info">
+        <span class="badge" id="handBadge">핸드 #0</span>
+        <span class="badge" id="blindBadge">블라인드 –</span>
+        <span class="badge" id="levelBadge">레벨 1</span>
+        <span class="badge" id="potBadge">팟 0</span>
+      </div>
+      <div class="tb-ctrl">
+        <button class="badge" id="muteBtn" title="소리 켜기/끄기" style="cursor:pointer">🔊</button>
+        <button class="badge" id="settingsBtn" title="설정" style="cursor:pointer">⚙️</button>
+        <button class="badge" id="chatToggle" title="채팅/기록" style="cursor:pointer">💬</button>
+        <button class="badge hidden" id="sitOutBtn" title="자리 비움/복귀" style="cursor:pointer">💺<span class="tb-lbl"> 자리비움</span></button>
+        <button class="badge hidden" id="specJoinBtn" title="게임 참여" style="cursor:pointer">➕<span class="tb-lbl"> 참여</span></button>
+        <button class="badge hidden" id="leaveBtn" title="나가기" style="cursor:pointer">🚪<span class="tb-lbl"> 나가기</span></button>
+      </div>
     </div>
 
     <!-- 대기 모드 배너: 방을 만들면 테이블이 보이는 채로 대기 시작 -->
@@ -375,7 +379,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="util.js?v=82"></script>
-  <script src="client.js?v=82"></script>
+  <script src="util.js?v=83"></script>
+  <script src="client.js?v=83"></script>
 </body>
 </html>

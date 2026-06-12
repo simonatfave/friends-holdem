@@ -252,7 +252,7 @@ $('sitOutBtn').onclick = () => {
 function updateSitOutBtn() {
   const btn = $('sitOutBtn');
   if (!btn) return;
-  btn.textContent = _amSittingOut ? '▶ 복귀하기' : '💺 자리비움';
+  btn.innerHTML = _amSittingOut ? '▶<span class="tb-lbl"> 복귀하기</span>' : '💺<span class="tb-lbl"> 자리비움</span>';
   btn.classList.toggle('sitout-on', _amSittingOut);
 }
 
@@ -965,10 +965,10 @@ function tickTimers() {
   if (s.actionDeadline && s.actionLimit && s.toActId) {
     const rem = s.actionDeadline - Date.now();
     const frac = Math.max(0, Math.min(1, rem / s.actionLimit));
-    const bar = document.querySelector('.seat.active .seat-timerbar-fill');
-    if (bar) {
-      bar.style.width = (frac * 100) + '%';
-      bar.classList.toggle('warn', frac < 0.34);
+    const rect = document.querySelector('.seat.active .seat-ring-rect');
+    if (rect) {
+      rect.style.strokeDashoffset = ((1 - frac) * 100).toFixed(1); // 외곽선이 시간에 따라 줄어듦
+      rect.classList.toggle('warn', frac < 0.34);
     }
     // 내 차례 마지막 구간 째깍 소리 + 전체 화면 빨간 경고
     if (s.toActId === myId && rem > 0) {
@@ -1545,14 +1545,18 @@ function updateEquityBar(s) {
 let _maxChips = 1;
 let _seatCount = 0;
 function seatChipStackHtml(p) {
-  // 인원이 많으면(>6) 또는 연출 최소화 시 칩 스택 생략 → 좌석 정보 과밀 방지
-  if (_seatCount > 6 || lowFx()) return '';
   if (p.eliminated || !(p.chips > 0)) return '';
-  const ratio = p.chips / (_maxChips || 1);
-  const discs = Math.max(1, Math.min(8, Math.round(ratio * 8)));
+  // 보유 칩을 BB 단위로 환산해 칩 더미로 표시(스택 약 8BB당 1칩, 최대 10칩)
+  const bb = (lastState && lastState.blinds && lastState.blinds.bb) || 2;
+  const discs = Math.max(1, Math.min(10, Math.round(p.chips / bb / 8)));
   let s = '';
   for (let i = 0; i < discs; i++) s += '<span class="cs-disc"></span>';
   return `<div class="chip-stack" title="${fmtAmt(p.chips)}">${s}</div>`;
+}
+// 현재 차례 좌석 둘레의 카운트다운 테두리(회전 대신 외곽선이 줄어듦)
+function seatRingSvg() {
+  return '<svg class="seat-ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'
+    + '<rect class="seat-ring-rect" x="2.5" y="2.5" width="95" height="95" rx="9" ry="9" pathLength="100"></rect></svg>';
 }
 
 // 핸드 시작: 중앙에서 카드를 셔플(리플)하는 모션
@@ -1759,7 +1763,7 @@ function renderSeats(s) {
           <div class="pname">${seatAvatarHtml(p)}${seatNameTags(p)}</div>
           <div class="pchips">${p.eliminated ? '탈락' : `<span class="chip-mini"></span><span class="amt">${fmtAmt(p.chips)}</span>`}</div>
           ${seatChipStackHtml(p)}
-          ${p.isToAct ? '<div class="seat-timerbar"><div class="seat-timerbar-fill"></div></div>' : ''}
+          ${p.isToAct ? seatRingSvg() : ''}
           <div class="phole">${renderHole(p, i)}</div>
           <div class="hand-result">${result ? esc(result.handName) : ''}</div>
           ${seatResultBadge(s, p)}
@@ -1832,16 +1836,10 @@ function updateSeatInPlace(seat, p, s) {
   // 이름/태그(올인·끊김) — 애니메이션 없음
   const pname = inner.querySelector('.pname');
   if (pname) pname.innerHTML = seatAvatarHtml(p) + seatNameTags(p);
-  // 타임바: 차례일 때만 표시
-  let tb = inner.querySelector('.seat-timerbar');
-  if (p.isToAct && !tb) {
-    tb = document.createElement('div');
-    tb.className = 'seat-timerbar';
-    tb.innerHTML = '<div class="seat-timerbar-fill"></div>';
-    inner.querySelector('.phole').before(tb);
-  } else if (!p.isToAct && tb) {
-    tb.remove();
-  }
+  // 카운트다운 테두리: 차례일 때만 표시(추가/제거 시 애니 자연 재시작)
+  let ring = inner.querySelector('.seat-ring');
+  if (p.isToAct && !ring) { inner.insertAdjacentHTML('afterbegin', seatRingSvg()); }
+  else if (!p.isToAct && ring) ring.remove();
   // 베팅 칩: 값이 바뀔 때만 갱신(매 렌더 chipPop 재생 방지)
   let chip = inner.querySelector('.bet-chip');
   if (p.bet > 0) {

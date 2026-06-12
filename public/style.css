@@ -230,17 +230,16 @@ button { font-family: inherit; }
 .card.muck:not(.win) { opacity: .55; }
 .card.win { box-shadow: 0 0 0 3px var(--gold), 0 0 22px rgba(232,196,102,1); }
 
-/* ---------- 현재 차례 좌석: 회전 스포트라이트 링 ---------- */
+/* ---------- 현재 차례 좌석: 외곽선 카운트다운 테두리(회전 대신 줄어듦) ---------- */
 .seat.active .seat-inner { position: relative; }
-.seat.active .seat-inner::after {
-  content: ''; position: absolute; inset: -6px; border-radius: 16px; z-index: -1; pointer-events: none;
-  background: conic-gradient(from 0deg, transparent 0 28%, rgba(232,196,102,.95) 50%, transparent 72% 100%);
-  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
-          mask: radial-gradient(closest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
-  animation: spotSpin 1.6s linear infinite;
+.seat-ring { position: absolute; inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px); z-index: 4; pointer-events: none; overflow: visible; }
+.seat-ring-rect {
+  fill: none; stroke: var(--gold); stroke-width: 3; stroke-linejoin: round;
+  vector-effect: non-scaling-stroke; stroke-dasharray: 100; stroke-dashoffset: 0;
+  transition: stroke-dashoffset .25s linear; filter: drop-shadow(0 0 4px rgba(232,196,102,.7));
 }
-.seat.active.myturn .seat-inner::after { background: conic-gradient(from 0deg, transparent 0 22%, rgba(120,220,160,1) 50%, transparent 78% 100%); }
-@keyframes spotSpin { to { transform: rotate(360deg); } }
+.seat.active.myturn .seat-ring-rect { stroke: var(--green); filter: drop-shadow(0 0 5px rgba(120,220,160,.8)); }
+.seat-ring-rect.warn { stroke: var(--red); filter: drop-shadow(0 0 5px rgba(226,85,85,.8)); }
 
 /* ---------- 연승 스트릭 뱃지 ---------- */
 .tag.streak { background: linear-gradient(180deg,#ff7a3d,#e23d2b); color:#fff; font-weight:800; animation: streakPulse 1s ease-in-out infinite; }
@@ -309,7 +308,10 @@ button { font-family: inherit; }
 
 /* ---------- 게임 ---------- */
 #game { display: flex; flex-direction: column; height: 100vh; padding: 10px; gap: 8px; }
-.topbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.topbar { display: flex; gap: 8px; align-items: center; }
+.tb-info { display: flex; gap: 8px; flex: 1 1 auto; min-width: 0; overflow-x: auto; flex-wrap: wrap; }
+.tb-info::-webkit-scrollbar { display: none; }
+.tb-ctrl { display: flex; gap: 6px; flex: 0 0 auto; align-items: center; }
 .badge {
   background: var(--panel); border: 1px solid #33404f; padding: 7px 14px;
   border-radius: 20px; font-size: 15px; color: var(--muted);
@@ -1425,10 +1427,12 @@ body[data-theme=charcoal] { --felt: #46505e; --felt-dark: #232a33; }
   .chat-input input { font-size: 16px; padding: 9px 12px; } /* iOS 포커스 줌 방지 */
   .chat-messages { font-size: 14px; }
   .qchat-btn { padding: 6px 12px; font-size: 13px; } /* 탭 영역 확보 */
-  /* 상단바: 한 줄 가로 스크롤로 줄바꿈 난잡함 방지 */
-  .topbar { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; gap: 6px; -webkit-overflow-scrolling: touch; }
-  .topbar::-webkit-scrollbar { display: none; }
-  .topbar .badge { flex: 0 0 auto; white-space: nowrap; }
+  /* 상단바: 정보 배지는 한 줄 가로 스크롤, 컨트롤 버튼(설정·채팅·나가기)은 항상 우측 고정 */
+  .topbar { gap: 6px; }
+  .tb-info { flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .tb-info .badge { flex: 0 0 auto; white-space: nowrap; }
+  .tb-ctrl .tb-lbl { display: none; } /* 컨트롤 버튼은 아이콘만 */
+  .tb-ctrl .badge { padding: 5px 8px; }
   /* 타임뱅크 버튼 모바일 탭 영역 */
   .timebank-btn { padding: 9px 16px; font-size: 14px; }
 }
