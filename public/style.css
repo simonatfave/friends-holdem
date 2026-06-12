@@ -817,10 +817,12 @@ button { font-family: inherit; }
    align-items는 stretch(기본) 유지 — center로 두면 사파리에서 table-wrap 너비가 0으로 무너짐.
    배너는 자체 margin auto로, 테이블은 table-wrap 내부 정렬로 가운데 배치 */
 body.waiting-mode #game { display: flex; flex-direction: column; position: relative; }
+/* 상단바·이모지바는 '공간을 유지'한 채 숨김(모든 화면폭) → 대기/플레이 테이블 크기·위치 동일 */
 body.waiting-mode .topbar,
+body.waiting-mode .emoji-bar { visibility: hidden; }
+/* 완전히 숨김(레이아웃 영향 없음) — 액션바는 모바일에서 absolute 오버레이라 흐름에 영향 없음 */
 body.waiting-mode .actionbar,
 body.waiting-mode .action-timer,
-body.waiting-mode .emoji-bar,
 body.waiting-mode .sidepanel,
 body.waiting-mode .community,
 body.waiting-mode .pot-stack,
@@ -833,9 +835,6 @@ body.waiting-mode #waitBanner {
 /* 모바일: 테이블이 하단 정렬이라 시각적 중앙(≈56%)에 맞춤 + 하단바 공간 유지해 위치 고정 */
 @media (max-width: 640px) {
   body.waiting-mode #waitBanner { top: 56%; }
-  /* 상단바·이모지바 자리를 비워두기만 함(숨김) → 대기/플레이 어느 때나 테이블 크기·위치 동일 */
-  body.waiting-mode .topbar,
-  body.waiting-mode .emoji-bar { display: flex !important; visibility: hidden; }
   /* 시작 버튼: 모바일은 더 좁게(양옆 좌석과 안 겹치게) */
   .wait-banner #wbStart { min-width: 112px; padding: 13px 22px; font-size: 16px; }
 }
