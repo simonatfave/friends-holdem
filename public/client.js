@@ -591,6 +591,7 @@ function showLobbyPane(which) {
   $('createPane').classList.toggle('hidden', which !== 'create');
   $('joinPane').classList.toggle('hidden', which !== 'join');
   $('lobbyError').textContent = '';
+  const lob = $('lobby'); if (lob) lob.dataset.pane = which; // 모바일 화면 압축용
 }
 $('goCreate').onclick = () => { const n = getName(); if (!n) return; myName = n; identify(); showLobbyPane('create'); };
 $('goJoin').onclick = () => { const n = getName(); if (!n) return; myName = n; identify(); showLobbyPane('join'); refreshRooms(); };

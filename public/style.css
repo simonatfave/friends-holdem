@@ -1435,4 +1435,19 @@ body[data-theme=charcoal] { --felt: #46505e; --felt-dark: #232a33; }
   .tb-ctrl .badge { padding: 5px 8px; }
   /* 타임뱅크 버튼 모바일 탭 영역 */
   .timebank-btn { padding: 9px 16px; font-size: 14px; }
+
+  /* 방 만들기/참여 화면을 스크롤 없이 한 화면에 — 로고·부제 숨기고 폼 압축 */
+  #lobby[data-pane="create"] .brand-logo, #lobby[data-pane="join"] .brand-logo,
+  #lobby[data-pane="create"] .sub, #lobby[data-pane="join"] .sub,
+  #lobby[data-pane="create"] .online-line, #lobby[data-pane="join"] .online-line { display: none; }
+  #lobby[data-pane="create"], #lobby[data-pane="join"] { align-items: flex-start; overflow-y: auto; padding: 10px; }
+  #lobby[data-pane="create"] .lobby-card, #lobby[data-pane="join"] .lobby-card { padding: 14px 16px; }
+  #createPane .pane-title, #joinPane .pane-title { margin: 0 0 8px; font-size: 18px; }
+  #createPane label { margin: 7px 0 3px; font-size: 11px; }
+  #createPane .seg { margin-bottom: 0; }
+  #createPane .seg-btn { padding: 9px; font-size: 14px; }
+  #createPane input { padding: 9px 12px; }
+  #createPane .stack-info { margin-top: 8px; padding: 7px; font-size: 12px; }
+  #createPane .ghost.wide { margin-top: 7px; padding: 9px; }
+  #createPane .primary, #createPane .back-btn { margin-top: 8px; padding: 11px; }
 }
