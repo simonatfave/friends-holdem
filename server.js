@@ -92,6 +92,14 @@ function saveUsersSoon() {
   }, 1000);
 }
 function hashPw(pw, salt) { return scryptSync(String(pw), salt, 32).toString('hex'); }
+// 계정 삭제(메모리 + 영구 저장소)
+async function deleteUser(nl) {
+  const acc = users.get(nl); if (!acc) return;
+  if (acc.loginToken) tokenIndex.delete(acc.loginToken);
+  users.delete(nl); _dirtyUsers.delete(nl);
+  if (pool) { try { await pool.query('DELETE FROM accounts WHERE nick=$1', [nl]); } catch (e) { console.error('DB 계정 삭제 실패:', e.message); } }
+  else { try { writeFileSync(USERS_FILE, JSON.stringify([...users.values()])); } catch (e) { console.error('계정 저장 실패:', e.message); } }
+}
 function makeAccount(nick, pw) {
   const salt = randomBytes(12).toString('hex');
   return {
@@ -146,6 +154,41 @@ const activeSessions = new Map(); // nickLower -> socketId
 // 계정별 '마지막 실제 활동' 시각(닉 기준) — 재접속/자동호출로는 갱신 안 됨 → 방치 사용자 정확 판정
 const lastActivity = new Map(); // nickLower -> timestamp
 function touchActivity(socket) { if (socket && socket.account) lastActivity.set(socket.account.toLowerCase(), Date.now()); }
+
+// ---------- 관리자 ----------
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || ''; // 설정 시에만 관리자 기능 활성
+function socketsByNick(nl) {
+  const out = [];
+  for (const [, s] of io.sockets.sockets) if (s.account && s.account.toLowerCase() === nl) out.push(s);
+  return out;
+}
+function adminLogoutAccount(nl, reason) {
+  const acc = users.get(nl);
+  if (acc) { revokeToken(acc); saveUser(acc); }
+  for (const s of socketsByNick(nl)) {
+    releaseSession(s); s.account = null; userNames.delete(s.id);
+    s.emit('forceLogout', { reason: reason || '관리자에 의해 로그아웃되었습니다' });
+  }
+  lastActivity.delete(nl);
+}
+function adminOverview() {
+  const roomList = [];
+  for (const [code, room] of rooms) {
+    const g = room.game;
+    roomList.push({
+      code, started: !!g.started, hand: g.handNumber || 0,
+      host: (g.players.find((p) => p.id === room.hostId) || {}).name || null,
+      players: g.players.map((p) => ({ id: p.id, name: p.name, isBot: !!p.isBot, chips: p.chips, connected: !!p.connected })),
+      spectators: room.spectators ? room.spectators.size : 0,
+    });
+  }
+  const onlineNicks = new Set([...userNames.values()].filter(Boolean).map((n) => n.toLowerCase()));
+  const accounts = [...users.values()].map((a) => ({
+    nick: a.nick, balance: a.balance, banned: !!a.banned, online: onlineNicks.has(a.nick.toLowerCase()),
+    games: (a.stats && a.stats.games) || 0, wins: (a.stats && a.stats.wins) || 0,
+  })).sort((x, y) => (y.online - x.online) || (y.balance - x.balance));
+  return { rooms: roomList, accounts, online: onlineNicks.size };
+}
 function claimSession(socket, nick) {
   const nl = String(nick).toLowerCase();
   const prev = activeSessions.get(nl);
@@ -685,6 +728,7 @@ io.on('connection', (socket) => {
     nick = String(nick || '').trim();
     const acc = users.get(nick.toLowerCase());
     if (!acc || !verifyPw(acc, password)) return cb?.({ ok: false, error: '닉네임 또는 비밀번호가 올바르지 않습니다' });
+    if (acc.banned) return cb?.({ ok: false, error: '차단된 계정입니다. 관리자에게 문의하세요' });
     socket.account = acc.nick;
     lastActivity.set(acc.nick.toLowerCase(), Date.now());
     claimSession(socket, acc.nick);
@@ -700,6 +744,7 @@ io.on('connection', (socket) => {
       revokeToken(acc); saveUser(acc);
       return cb?.({ ok: false, error: '세션이 만료되었습니다. 다시 로그인해 주세요' });
     }
+    if (acc.banned) { revokeToken(acc); saveUser(acc); return cb?.({ ok: false, error: '차단된 계정입니다' }); }
     socket.account = acc.nick;
     { const _nl = acc.nick.toLowerCase(); if (!lastActivity.has(_nl)) lastActivity.set(_nl, Date.now()); } // 재접속은 리셋 안 함
     claimSession(socket, acc.nick);
@@ -1075,6 +1120,69 @@ io.on('connection', (socket) => {
     if (!acc) return cb?.({ ok: false });
     cb?.({ ok: true, profile: { nick: acc.nick, avatar: acc.avatar || null, balance: acc.balance || 0, stats: acc.stats || {} } });
   });
+  // ---------- 관리자 기능(ADMIN_PASSWORD 인증 필요) ----------
+  const reqAdmin = (cb) => { if (!socket.isAdmin) { cb?.({ ok: false, error: '관리자 인증이 필요합니다' }); return false; } return true; };
+  socket.on('admin:auth', ({ password } = {}, cb) => {
+    if (!rateOk('adminauth:' + clientIp, 1500)) return cb?.({ ok: false, error: '잠시 후 다시 시도하세요' });
+    if (!ADMIN_PASSWORD) return cb?.({ ok: false, error: '서버에 관리자 비밀번호(ADMIN_PASSWORD)가 설정되어 있지 않습니다' });
+    if (String(password || '') !== ADMIN_PASSWORD) return cb?.({ ok: false, error: '비밀번호가 올바르지 않습니다' });
+    socket.isAdmin = true;
+    cb?.({ ok: true, data: adminOverview() });
+  });
+  socket.on('admin:overview', (_d, cb) => { if (!reqAdmin(cb)) return; cb?.({ ok: true, data: adminOverview() }); });
+  socket.on('admin:closeRoom', ({ code } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const room = rooms.get(code); if (!room) return cb?.({ ok: false, error: '방을 찾을 수 없습니다' });
+    for (const p of room.game.players) if (p.socketId) io.to(p.socketId).emit('leftToLobby');
+    if (room.spectators) for (const sid of room.spectators) io.to(sid).emit('leftToLobby');
+    clearRoomTimers(room); rooms.delete(code); saveRoomsSoon(); broadcastOnline();
+    cb?.({ ok: true, data: adminOverview() });
+  });
+  socket.on('admin:kick', ({ code, pid } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const room = rooms.get(code); if (!room) return cb?.({ ok: false, error: '방을 찾을 수 없습니다' });
+    const p = room.game.players.find((x) => x.id === pid);
+    if (p && p.socketId) io.to(p.socketId).emit('leftToLobby');
+    finalizeLeave(code, pid); broadcastOnline();
+    cb?.({ ok: true, data: adminOverview() });
+  });
+  socket.on('admin:setBalance', ({ nick, balance } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const acc = users.get(String(nick || '').toLowerCase()); if (!acc) return cb?.({ ok: false, error: '계정을 찾을 수 없습니다' });
+    acc.balance = clampInt(balance, 0, 1e12, acc.balance); saveUser(acc);
+    for (const s of socketsByNick(acc.nick.toLowerCase())) s.emit('balanceUpdate', { balance: acc.balance });
+    cb?.({ ok: true, data: adminOverview() });
+  });
+  socket.on('admin:ban', ({ nick } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const nl = String(nick || '').toLowerCase(); const acc = users.get(nl); if (!acc) return cb?.({ ok: false, error: '계정을 찾을 수 없습니다' });
+    acc.banned = true; saveUser(acc);
+    for (const [code, room] of rooms) { const pl = room.game.players.find((p) => p.name && p.name.toLowerCase() === nl); if (pl) finalizeLeave(code, pl.id); }
+    adminLogoutAccount(nl, '관리자에 의해 차단되었습니다'); broadcastOnline();
+    cb?.({ ok: true, data: adminOverview() });
+  });
+  socket.on('admin:unban', ({ nick } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const acc = users.get(String(nick || '').toLowerCase()); if (!acc) return cb?.({ ok: false, error: '계정을 찾을 수 없습니다' });
+    acc.banned = false; saveUser(acc); cb?.({ ok: true, data: adminOverview() });
+  });
+  socket.on('admin:forceLogout', ({ nick } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    adminLogoutAccount(String(nick || '').toLowerCase(), '관리자에 의해 로그아웃되었습니다'); broadcastOnline();
+    cb?.({ ok: true, data: adminOverview() });
+  });
+  socket.on('admin:deleteAccount', ({ nick } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const nl = String(nick || '').toLowerCase(); if (!users.has(nl)) return cb?.({ ok: false, error: '계정을 찾을 수 없습니다' });
+    adminLogoutAccount(nl, '계정이 삭제되었습니다');
+    deleteUser(nl).then(() => { broadcastOnline(); cb?.({ ok: true, data: adminOverview() }); });
+  });
+  socket.on('admin:broadcast', ({ text } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const t = String(text || '').slice(0, 300).trim(); if (!t) return cb?.({ ok: false, error: '내용을 입력하세요' });
+    io.emit('announce', { text: t }); cb?.({ ok: true });
+  });
+
   socket.on('react', ({ emoji }) => {
     if (!rateOk('react:' + socket.id, 500)) return; // 도배 방지
     const room = rooms.get(roomCode);

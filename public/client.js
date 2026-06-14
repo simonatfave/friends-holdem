@@ -801,6 +801,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v114', ['관리자 기능 추가(ADMIN_PASSWORD 인증): 방 관리(강제종료·강퇴), 계정·칩 관리(잔액수정·차단·강제로그아웃·삭제), 전체 공지 — 주소 끝에 #admin']],
   ['v113', ['모바일 내 좌석 전체 20% 확대']],
   ['v112', ['접속 상태 정확도 개선: 재접속·자동호출은 활동에서 제외, 계정 기준으로 방치 판정 → 방치 사용자는 자리비움/자동로그아웃 정상 처리', '모바일 상대 좌석 10% 확대(가독성)']],
   ['v111', ['아이폰(iOS)에서 올인 연출 시 화면이 작아지며 좌하단으로 밀리던 버그 수정(올인 링 클립)']],
@@ -2408,3 +2409,112 @@ function flashError(msg) {
   clearTimeout(errTimer);
   errTimer = setTimeout(() => (el.style.display = 'none'), 2500);
 }
+
+// ---------- 관리자 패널 (#admin 으로 열기, ADMIN_PASSWORD 인증) ----------
+let _adminData = null, _adminTab = 'rooms', _adminAuthed = false;
+function openAdmin() {
+  show('adminPanel');
+  if (_adminAuthed) { $('adminAuth').classList.add('hidden'); $('adminMain').classList.remove('hidden'); adminCall('admin:overview').then(renderAdmin); }
+  else { $('adminAuth').classList.remove('hidden'); $('adminMain').classList.add('hidden'); setTimeout(() => $('adminPw').focus(), 60); }
+}
+function adminCall(event, payload) {
+  return new Promise((res) => socket.emit(event, payload || {}, (r) => {
+    if (r && r.ok && r.data) _adminData = r.data;
+    if (!r || !r.ok) toast((r && r.error) || '실패했습니다', 'error');
+    res(r || { ok: false });
+  }));
+}
+if ($('adminLogin')) {
+  $('adminLogin').onclick = async () => {
+    const r = await adminCall('admin:auth', { password: $('adminPw').value });
+    if (r.ok) { _adminAuthed = true; $('adminPw').value = ''; $('adminAuthErr').textContent = ''; $('adminAuth').classList.add('hidden'); $('adminMain').classList.remove('hidden'); renderAdmin(); }
+    else { $('adminAuthErr').textContent = r.error || '인증 실패'; }
+  };
+  $('adminPw').onkeydown = (e) => { if (e.key === 'Enter') $('adminLogin').click(); };
+  $('adminCloseA').onclick = () => hide('adminPanel');
+  $('adminCloseB').onclick = () => hide('adminPanel');
+  document.querySelectorAll('.admin-tab').forEach((b) => b.onclick = () => {
+    _adminTab = b.dataset.tab;
+    document.querySelectorAll('.admin-tab').forEach((x) => x.classList.toggle('active', x === b));
+    renderAdmin();
+  });
+}
+function renderAdmin() {
+  const box = $('adminBody'); if (!box) return;
+  if (!_adminData) { box.innerHTML = '<div class="room-empty">불러오는 중...</div>'; return; }
+  if (_adminTab === 'rooms') renderAdminRooms(box);
+  else if (_adminTab === 'accounts') renderAdminAccounts(box);
+  else renderAdminNotice(box);
+}
+function renderAdminRooms(box) {
+  const rooms = _adminData.rooms || [];
+  if (!rooms.length) { box.innerHTML = '<div class="room-empty">열린 방이 없습니다</div>'; return; }
+  box.innerHTML = '';
+  rooms.forEach((rm) => {
+    const humans = rm.players.filter((p) => !p.isBot);
+    const card = document.createElement('div'); card.className = 'admin-item';
+    card.innerHTML = `<div class="ai-head"><b>${esc(rm.code)}</b><span class="ai-sub"> ${rm.started ? '게임중' : '대기'} · 핸드 ${rm.hand} · ${humans.length}명${rm.spectators ? (' · 관전 ' + rm.spectators) : ''}</span></div>`;
+    const plist = document.createElement('div'); plist.className = 'ai-plist';
+    rm.players.forEach((p) => {
+      const chip = document.createElement('span'); chip.className = 'ai-chip';
+      chip.textContent = `${p.isBot ? '🤖 ' : ''}${p.name} (${p.chips})`;
+      if (!p.isBot) { const k = document.createElement('button'); k.className = 'ai-x'; k.textContent = '강퇴'; k.onclick = async () => { await adminCall('admin:kick', { code: rm.code, pid: p.id }); renderAdmin(); }; chip.appendChild(k); }
+      plist.appendChild(chip);
+    });
+    card.appendChild(plist);
+    const close = document.createElement('button'); close.className = 'ai-danger'; close.textContent = '방 강제 종료';
+    close.onclick = async () => { if (!confirm(rm.code + ' 방을 종료할까요?')) return; await adminCall('admin:closeRoom', { code: rm.code }); renderAdmin(); };
+    card.appendChild(close);
+    box.appendChild(card);
+  });
+}
+function renderAdminAccounts(box) {
+  const accts = _adminData.accounts || [];
+  box.innerHTML = '';
+  const search = document.createElement('input'); search.className = 'admin-search'; search.placeholder = `닉네임 검색 (총 ${accts.length}명)`;
+  box.appendChild(search);
+  const list = document.createElement('div'); box.appendChild(list);
+  const draw = (f) => {
+    list.innerHTML = '';
+    accts.filter((a) => !f || a.nick.toLowerCase().includes(f)).slice(0, 200).forEach((a) => {
+      const row = document.createElement('div'); row.className = 'admin-item';
+      row.innerHTML = `<div class="ai-head"><b>${esc(a.nick)}</b>${a.online ? ' <span class="st-badge st-playing"><span class="st-dot"></span>온라인</span>' : ''}${a.banned ? ' <span class="ai-ban">차단됨</span>' : ''}<span class="ai-sub"> · ${a.games}전 ${a.wins}승</span></div>`;
+      const bal = document.createElement('div'); bal.className = 'ai-bal';
+      const inp = document.createElement('input'); inp.type = 'number'; inp.value = a.balance; inp.className = 'ai-bal-input';
+      const setb = document.createElement('button'); setb.className = 'ghost'; setb.textContent = '💰 저장';
+      setb.onclick = async () => { await adminCall('admin:setBalance', { nick: a.nick, balance: Number(inp.value) }); renderAdmin(); };
+      bal.appendChild(inp); bal.appendChild(setb); row.appendChild(bal);
+      const acts = document.createElement('div'); acts.className = 'ai-acts';
+      const fo = document.createElement('button'); fo.className = 'ghost'; fo.textContent = '로그아웃'; fo.onclick = async () => { await adminCall('admin:forceLogout', { nick: a.nick }); renderAdmin(); };
+      const ban = document.createElement('button'); ban.className = 'ghost'; ban.textContent = a.banned ? '차단해제' : '차단'; ban.onclick = async () => { await adminCall(a.banned ? 'admin:unban' : 'admin:ban', { nick: a.nick }); renderAdmin(); };
+      const del = document.createElement('button'); del.className = 'ai-danger sm'; del.textContent = '삭제'; del.onclick = async () => { if (!confirm(a.nick + ' 계정을 삭제할까요? 되돌릴 수 없습니다.')) return; await adminCall('admin:deleteAccount', { nick: a.nick }); renderAdmin(); };
+      acts.appendChild(fo); acts.appendChild(ban); acts.appendChild(del); row.appendChild(acts);
+      list.appendChild(row);
+    });
+  };
+  draw(''); search.oninput = () => draw(search.value.trim().toLowerCase());
+}
+function renderAdminNotice(box) {
+  box.innerHTML = '';
+  const ta = document.createElement('textarea'); ta.className = 'admin-notice-input'; ta.placeholder = '전체 접속자에게 보낼 공지 내용...'; ta.maxLength = 300;
+  const send = document.createElement('button'); send.className = 'primary'; send.textContent = '📢 전체 공지 보내기';
+  send.onclick = async () => { const t = ta.value.trim(); if (!t) return; const r = await adminCall('admin:broadcast', { text: t }); if (r.ok) { toast('공지를 보냈습니다', 'ok'); ta.value = ''; } };
+  box.appendChild(ta); box.appendChild(send);
+}
+// 공지 수신(모든 사용자에게 배너 표시)
+socket.on('announce', ({ text } = {}) => {
+  if (!text) return;
+  let el = document.getElementById('announceBanner');
+  if (!el) { el = document.createElement('div'); el.id = 'announceBanner'; el.className = 'announce-banner'; document.body.appendChild(el); }
+  el.innerHTML = '<span class="ab-ico">📢</span><span class="ab-text"></span><button class="ab-x">✕</button>';
+  el.querySelector('.ab-text').textContent = text;
+  el.classList.add('show');
+  el.querySelector('.ab-x').onclick = () => el.classList.remove('show');
+  clearTimeout(window._annTimer); window._annTimer = setTimeout(() => el.classList.remove('show'), 15000);
+});
+socket.on('balanceUpdate', ({ balance } = {}) => {
+  if (myProfile && typeof balance === 'number') { myProfile.balance = balance; if (typeof updateMeDisplay === 'function') updateMeDisplay(); }
+});
+function checkAdminHash() { if (location.hash === '#admin') openAdmin(); }
+window.addEventListener('hashchange', checkAdminHash);
+checkAdminHash();
