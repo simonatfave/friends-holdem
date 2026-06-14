@@ -130,6 +130,16 @@ function ac() {
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
+// 모바일(iOS 등): 오디오는 첫 사용자 제스처에서만 잠금 해제됨 → 터치/클릭 시 컨텍스트 resume + 무음 버퍼 재생
+let _audioUnlocked = false;
+function unlockAudio() {
+  const c = ac(); if (!c) return;
+  if (c.state === 'suspended') c.resume();
+  if (!_audioUnlocked) {
+    try { const b = c.createBuffer(1, 1, 22050); const s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); _audioUnlocked = true; } catch (e) {}
+  }
+}
+['touchend', 'pointerdown', 'mousedown', 'keydown'].forEach((ev) => document.addEventListener(ev, unlockAudio, { passive: true }));
 const volMul = () => (soundSettings.volume == null ? 1 : Math.max(0, Math.min(1, soundSettings.volume)));
 function tone(freq, dur, type = 'sine', vol = 0.15, when = 0) {
   if (!soundSettings.master) return;
@@ -801,6 +811,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v115', ['모바일: 사운드 미출력 수정(첫 터치에 오디오 잠금 해제)', '모바일: 커뮤니티 카드 탭하면 크게 보기', '핸드 승리 시 팟에서 승자에게 칩 날아가는 효과 모바일에도 표시']],
   ['v114', ['관리자 기능 추가(ADMIN_PASSWORD 인증): 방 관리(강제종료·강퇴), 계정·칩 관리(잔액수정·차단·강제로그아웃·삭제), 전체 공지 — 주소 끝에 #admin']],
   ['v113', ['모바일 내 좌석 전체 20% 확대']],
   ['v112', ['접속 상태 정확도 개선: 재접속·자동호출은 활동에서 제외, 계정 기준으로 방치 판정 → 방치 사용자는 자리비움/자동로그아웃 정상 처리', '모바일 상대 좌석 10% 확대(가독성)']],
@@ -2308,6 +2319,16 @@ $('seats').addEventListener('click', (e) => {
   const seat = e.target.closest('.seat.me-seat');
   if (seat && e.target.closest('.phole')) showCardPeek();
 });
+// 커뮤니티(보드) 카드 탭 → 크게 보기
+function showCommunityPeek() {
+  const board = (lastState && lastState.community) || [];
+  if (!board.length) return;
+  let ov = document.getElementById('cardPeek');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'cardPeek'; ov.className = 'card-peek-overlay'; ov.onclick = () => ov.classList.remove('show'); document.body.appendChild(ov); }
+  ov.innerHTML = `<div class="card-peek-cards board">${board.map(peekCardBig).join('')}</div><div class="card-peek-hint">탭하여 닫기</div>`;
+  ov.classList.add('show');
+}
+$('community').addEventListener('click', () => showCommunityPeek());
 
 // ---------- 채팅 ----------
 $('chatSend').onclick = sendChat;
