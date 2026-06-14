@@ -1605,6 +1605,13 @@ body[data-theme=charcoal] { --felt: #46505e; --felt-dark: #232a33; }
 .ai-danger:hover { background: rgba(226,40,40,.3); }
 .admin-search { width: 100%; box-sizing: border-box; padding: 9px 12px; margin-bottom: 6px; border-radius: 9px; border: 1px solid #33404f; background: #0e1219; color: var(--text); font-size: 14px; }
 .admin-notice-input { width: 100%; box-sizing: border-box; min-height: 110px; padding: 11px 13px; border-radius: 11px; border: 1px solid #33404f; background: #0e1219; color: var(--text); font-size: 15px; resize: vertical; margin-bottom: 10px; }
+.admin-summary { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+.admin-summary b { color: var(--gold); }
+.admin-st-row { position: relative; }
+.admin-st-row .ai-mini { position: absolute; top: 10px; right: 10px; padding: 4px 10px; font-size: 12px; flex: 0 0 auto; }
+.admin-back { width: auto; align-self: flex-start; margin-bottom: 2px; padding: 7px 14px; }
+.admin-log-row { font-size: 12.5px; color: #cdd8e4; padding: 5px 0; border-top: 1px solid #232c38; }
+.admin-log-row:first-of-type { border-top: none; }
 /* 전체 공지 배너 */
 .announce-banner { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translate(-50%, -140%);
   z-index: 300; display: flex; align-items: center; gap: 10px; max-width: min(520px, calc(100% - 24px));

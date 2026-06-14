@@ -811,6 +811,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v116', ['관리자: 전체 접속 현황 탭(상태·방·최근활동), 사용자 로그(게임 기록·통계) 보기, 계정 닉네임 변경·비밀번호 초기화 추가']],
   ['v115', ['모바일: 사운드 미출력 수정(첫 터치에 오디오 잠금 해제)', '모바일: 커뮤니티 카드 탭하면 크게 보기', '핸드 승리 시 팟에서 승자에게 칩 날아가는 효과 모바일에도 표시']],
   ['v114', ['관리자 기능 추가(ADMIN_PASSWORD 인증): 방 관리(강제종료·강퇴), 계정·칩 관리(잔액수정·차단·강제로그아웃·삭제), 전체 공지 — 주소 끝에 #admin']],
   ['v113', ['모바일 내 좌석 전체 20% 확대']],
@@ -2432,7 +2433,15 @@ function flashError(msg) {
 }
 
 // ---------- 관리자 패널 (#admin 으로 열기, ADMIN_PASSWORD 인증) ----------
-let _adminData = null, _adminTab = 'rooms', _adminAuthed = false;
+let _adminData = null, _adminTab = 'status', _adminAuthed = false;
+function fmtAgo(ts, nowTs) {
+  if (!ts) return '기록 없음';
+  const s = Math.max(0, Math.floor(((nowTs || Date.now()) - ts) / 1000));
+  if (s < 60) return s + '초 전';
+  if (s < 3600) return Math.floor(s / 60) + '분 전';
+  if (s < 86400) return Math.floor(s / 3600) + '시간 전';
+  return Math.floor(s / 86400) + '일 전';
+}
 function openAdmin() {
   show('adminPanel');
   if (_adminAuthed) { $('adminAuth').classList.add('hidden'); $('adminMain').classList.remove('hidden'); adminCall('admin:overview').then(renderAdmin); }
@@ -2463,9 +2472,26 @@ if ($('adminLogin')) {
 function renderAdmin() {
   const box = $('adminBody'); if (!box) return;
   if (!_adminData) { box.innerHTML = '<div class="room-empty">불러오는 중...</div>'; return; }
-  if (_adminTab === 'rooms') renderAdminRooms(box);
+  if (_adminTab === 'status') renderAdminStatus(box);
+  else if (_adminTab === 'rooms') renderAdminRooms(box);
   else if (_adminTab === 'accounts') renderAdminAccounts(box);
   else renderAdminNotice(box);
+}
+const ADMIN_ST = { playing: ['게임 중', 'st-playing'], waiting: ['대기 중', 'st-waiting'], spectating: ['관전', 'st-spec'], away: ['자리 비움', 'st-away'], lobby: ['로비', 'st-lobby'] };
+function renderAdminStatus(box) {
+  const accts = (_adminData.accounts || []).filter((a) => a.online);
+  const now = _adminData.serverTime || Date.now();
+  box.innerHTML = `<div class="admin-summary">접속 중 <b>${accts.length}</b>명 · 열린 방 <b>${(_adminData.rooms || []).length}</b>개</div>`;
+  if (!accts.length) { box.innerHTML += '<div class="room-empty">접속 중인 사용자가 없습니다</div>'; return; }
+  accts.forEach((a) => {
+    const meta = ADMIN_ST[a.status] || ADMIN_ST.lobby;
+    const row = document.createElement('div'); row.className = 'admin-item admin-st-row';
+    row.innerHTML = `<div class="ai-head"><b>${esc(a.nick)}</b> <span class="st-badge ${meta[1]}"><span class="st-dot"></span>${meta[0]}</span>${a.room ? `<span class="ai-sub"> · 방 ${esc(a.room)}</span>` : ''}</div><div class="ai-sub">최근 활동 ${fmtAgo(a.lastActive, now)} · 잔액 ${a.balance}</div>`;
+    const log = document.createElement('button'); log.className = 'ghost ai-mini'; log.textContent = '로그';
+    log.onclick = () => openUserDetail(a.nick);
+    row.appendChild(log);
+    box.appendChild(row);
+  });
 }
 function renderAdminRooms(box) {
   const rooms = _adminData.rooms || [];
@@ -2506,10 +2532,13 @@ function renderAdminAccounts(box) {
       setb.onclick = async () => { await adminCall('admin:setBalance', { nick: a.nick, balance: Number(inp.value) }); renderAdmin(); };
       bal.appendChild(inp); bal.appendChild(setb); row.appendChild(bal);
       const acts = document.createElement('div'); acts.className = 'ai-acts';
+      const logb = document.createElement('button'); logb.className = 'ghost'; logb.textContent = '로그'; logb.onclick = () => openUserDetail(a.nick);
+      const ren = document.createElement('button'); ren.className = 'ghost'; ren.textContent = '이름변경'; ren.onclick = async () => { const nn = prompt('새 닉네임 (2~16자)', a.nick); if (nn == null) return; await adminCall('admin:rename', { nick: a.nick, newNick: nn }); renderAdmin(); };
+      const rpw = document.createElement('button'); rpw.className = 'ghost'; rpw.textContent = '비번초기화'; rpw.onclick = async () => { const pw = prompt(a.nick + ' 새 비밀번호 (4자 이상)'); if (!pw) return; const r = await adminCall('admin:resetPassword', { nick: a.nick, newPassword: pw }); if (r.ok) toast('비밀번호를 변경했습니다', 'ok'); renderAdmin(); };
       const fo = document.createElement('button'); fo.className = 'ghost'; fo.textContent = '로그아웃'; fo.onclick = async () => { await adminCall('admin:forceLogout', { nick: a.nick }); renderAdmin(); };
       const ban = document.createElement('button'); ban.className = 'ghost'; ban.textContent = a.banned ? '차단해제' : '차단'; ban.onclick = async () => { await adminCall(a.banned ? 'admin:unban' : 'admin:ban', { nick: a.nick }); renderAdmin(); };
       const del = document.createElement('button'); del.className = 'ai-danger sm'; del.textContent = '삭제'; del.onclick = async () => { if (!confirm(a.nick + ' 계정을 삭제할까요? 되돌릴 수 없습니다.')) return; await adminCall('admin:deleteAccount', { nick: a.nick }); renderAdmin(); };
-      acts.appendChild(fo); acts.appendChild(ban); acts.appendChild(del); row.appendChild(acts);
+      acts.appendChild(logb); acts.appendChild(ren); acts.appendChild(rpw); acts.appendChild(fo); acts.appendChild(ban); acts.appendChild(del); row.appendChild(acts);
       list.appendChild(row);
     });
   };
@@ -2521,6 +2550,36 @@ function renderAdminNotice(box) {
   const send = document.createElement('button'); send.className = 'primary'; send.textContent = '📢 전체 공지 보내기';
   send.onclick = async () => { const t = ta.value.trim(); if (!t) return; const r = await adminCall('admin:broadcast', { text: t }); if (r.ok) { toast('공지를 보냈습니다', 'ok'); ta.value = ''; } };
   box.appendChild(ta); box.appendChild(send);
+}
+// 사용자 상세/로그 보기
+async function openUserDetail(nick) {
+  const r = await new Promise((res) => socket.emit('admin:userDetail', { nick }, res));
+  if (!r || !r.ok) { toast((r && r.error) || '불러오기 실패', 'error'); return; }
+  renderAdminDetail(r.detail);
+}
+function fmtHist(h, nowTs) {
+  if (typeof h === 'string') return h;
+  const date = h.at ? new Date(h.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  const place = (h.place != null) ? `${h.place}위` : '';
+  const res = h.win ? '🏆 우승' : place;
+  return [date, h.code ? ('방 ' + h.code) : '', (h.players != null ? h.players + '명' : ''), res].filter(Boolean).join(' · ');
+}
+function renderAdminDetail(d) {
+  const box = $('adminBody'); if (!box) return;
+  const now = d.serverTime || Date.now(); const st = d.stats || {};
+  box.innerHTML = '';
+  const back = document.createElement('button'); back.className = 'ghost admin-back'; back.textContent = '← 목록으로'; back.onclick = renderAdmin;
+  box.appendChild(back);
+  const head = document.createElement('div'); head.className = 'admin-item';
+  head.innerHTML = `<div class="ai-head"><b>${esc(d.nick)}</b>${d.online ? ' <span class="st-badge st-playing"><span class="st-dot"></span>온라인</span>' : ''}${d.banned ? ' <span class="ai-ban">차단됨</span>' : ''}</div>
+    <div class="ai-sub">잔액 ${d.balance} · 가입 ${d.createdAt ? fmtAgo(d.createdAt, now) : '-'} · 최근 활동 ${fmtAgo(d.lastActive, now)}</div>
+    <div class="ai-sub">게임 ${st.games || 0} · 우승 ${st.wins || 0} · 핸드승 ${st.handsWon || 0} · 최고 팟 ${st.biggestPot || 0}</div>`;
+  box.appendChild(head);
+  const hist = d.history || [];
+  const hbox = document.createElement('div'); hbox.className = 'admin-item';
+  hbox.innerHTML = '<div class="ai-head" style="margin-bottom:6px">게임 기록 (최근 ' + hist.length + '건)</div>' +
+    (hist.length ? hist.map((h) => `<div class="admin-log-row">${esc(fmtHist(h, now))}</div>`).join('') : '<div class="ai-sub">기록이 없습니다</div>');
+  box.appendChild(hbox);
 }
 // 공지 수신(모든 사용자에게 배너 표시)
 socket.on('announce', ({ text } = {}) => {

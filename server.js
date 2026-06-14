@@ -172,9 +172,19 @@ function adminLogoutAccount(nl, reason) {
   lastActivity.delete(nl);
 }
 function adminOverview() {
+  const now = Date.now();
   const roomList = [];
+  // 온라인 계정의 현재 상태/방 매핑(nickLower -> {status, room})
+  const presence = {};
   for (const [code, room] of rooms) {
     const g = room.game;
+    for (const p of g.players) {
+      if (p.isBot) continue;
+      const s = io.sockets.sockets.get(p.id);
+      const nl = s && s.account && s.account.toLowerCase();
+      if (nl) presence[nl] = { status: (g.started && !g.finished) ? 'playing' : 'waiting', room: code };
+    }
+    if (room.spectators) for (const sid of room.spectators) { const s = io.sockets.sockets.get(sid); const nl = s && s.account && s.account.toLowerCase(); if (nl && !presence[nl]) presence[nl] = { status: 'spectating', room: code }; }
     roomList.push({
       code, started: !!g.started, hand: g.handNumber || 0,
       host: (g.players.find((p) => p.id === room.hostId) || {}).name || null,
@@ -183,11 +193,20 @@ function adminOverview() {
     });
   }
   const onlineNicks = new Set([...userNames.values()].filter(Boolean).map((n) => n.toLowerCase()));
-  const accounts = [...users.values()].map((a) => ({
-    nick: a.nick, balance: a.balance, banned: !!a.banned, online: onlineNicks.has(a.nick.toLowerCase()),
-    games: (a.stats && a.stats.games) || 0, wins: (a.stats && a.stats.wins) || 0,
-  })).sort((x, y) => (y.online - x.online) || (y.balance - x.balance));
-  return { rooms: roomList, accounts, online: onlineNicks.size };
+  const accounts = [...users.values()].map((a) => {
+    const nl = a.nick.toLowerCase();
+    const online = onlineNicks.has(nl);
+    const la = lastActivity.get(nl) || null;
+    let status = online ? ((presence[nl] && presence[nl].status) || 'lobby') : null;
+    if (online && status !== 'playing' && la && now - la > AWAY_MS) status = 'away';
+    return {
+      nick: a.nick, balance: a.balance, banned: !!a.banned, online,
+      status, room: (presence[nl] && presence[nl].room) || null,
+      lastActive: la, createdAt: a.createdAt || null,
+      games: (a.stats && a.stats.games) || 0, wins: (a.stats && a.stats.wins) || 0,
+    };
+  }).sort((x, y) => (y.online - x.online) || (y.balance - x.balance));
+  return { rooms: roomList, accounts, online: onlineNicks.size, serverTime: now };
 }
 function claimSession(socket, nick) {
   const nl = String(nick).toLowerCase();
@@ -1181,6 +1200,49 @@ io.on('connection', (socket) => {
     if (!reqAdmin(cb)) return;
     const t = String(text || '').slice(0, 300).trim(); if (!t) return cb?.({ ok: false, error: '내용을 입력하세요' });
     io.emit('announce', { text: t }); cb?.({ ok: true });
+  });
+  // 사용자 상세/로그(게임 기록·통계·접속 정보)
+  socket.on('admin:userDetail', ({ nick } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const acc = users.get(String(nick || '').toLowerCase());
+    if (!acc) return cb?.({ ok: false, error: '계정을 찾을 수 없습니다' });
+    const nl = acc.nick.toLowerCase();
+    cb?.({ ok: true, detail: {
+      nick: acc.nick, balance: acc.balance, banned: !!acc.banned, online: socketsByNick(nl).length > 0,
+      createdAt: acc.createdAt || null, lastActive: lastActivity.get(nl) || null, hasToken: !!acc.loginToken,
+      stats: acc.stats || {}, history: (acc.history || []).slice(0, 40), serverTime: Date.now(),
+    } });
+  });
+  // 비밀번호 초기화(재로그인 필요)
+  socket.on('admin:resetPassword', ({ nick, newPassword } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const acc = users.get(String(nick || '').toLowerCase());
+    if (!acc) return cb?.({ ok: false, error: '계정을 찾을 수 없습니다' });
+    if (!newPassword || String(newPassword).length < 4) return cb?.({ ok: false, error: '비밀번호는 4자 이상이어야 합니다' });
+    acc.salt = randomBytes(12).toString('hex'); acc.hash = hashPw(newPassword, acc.salt);
+    revokeToken(acc); saveUser(acc);
+    adminLogoutAccount(acc.nick.toLowerCase(), '비밀번호가 변경되었습니다. 다시 로그인해 주세요');
+    cb?.({ ok: true, data: adminOverview() });
+  });
+  // 닉네임 변경
+  socket.on('admin:rename', ({ nick, newNick } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    const oldNl = String(nick || '').toLowerCase(); const acc = users.get(oldNl);
+    if (!acc) return cb?.({ ok: false, error: '계정을 찾을 수 없습니다' });
+    const nn = String(newNick || '').trim().slice(0, 16); const newNl = nn.toLowerCase();
+    if (nn.length < 2) return cb?.({ ok: false, error: '닉네임은 2자 이상이어야 합니다' });
+    if (newNl !== oldNl && users.has(newNl)) return cb?.({ ok: false, error: '이미 사용 중인 닉네임입니다' });
+    acc.nick = nn;
+    if (newNl !== oldNl) {
+      users.delete(oldNl); users.set(newNl, acc);
+      if (activeSessions.has(oldNl)) { activeSessions.set(newNl, activeSessions.get(oldNl)); activeSessions.delete(oldNl); }
+      if (lastActivity.has(oldNl)) { lastActivity.set(newNl, lastActivity.get(oldNl)); lastActivity.delete(oldNl); }
+      for (const s of io.sockets.sockets.values()) if (s.account && s.account.toLowerCase() === oldNl) { s.account = nn; userNames.set(s.id, nn); }
+      if (acc.loginToken) tokenIndex.set(acc.loginToken, newNl);
+      if (pool) pool.query('DELETE FROM accounts WHERE nick=$1', [oldNl]).catch(() => {});
+    }
+    saveUser(acc); broadcastOnline();
+    cb?.({ ok: true, data: adminOverview() });
   });
 
   socket.on('react', ({ emoji }) => {
