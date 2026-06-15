@@ -1612,6 +1612,16 @@ body[data-theme=charcoal] { --felt: #46505e; --felt-dark: #232a33; }
 .admin-back { width: auto; align-self: flex-start; margin-bottom: 2px; padding: 7px 14px; }
 .admin-log-row { font-size: 12.5px; color: #cdd8e4; padding: 5px 0; border-top: 1px solid #232c38; }
 .admin-log-row:first-of-type { border-top: none; }
+/* 독립 관리자 페이지(/admin) */
+body.admin-page { margin: 0; min-height: 100vh; min-height: 100dvh; background: radial-gradient(1200px 800px at 50% -10%, #16202c, #0b0e13 60%); }
+.admin-standalone { width: 100%; min-height: 100vh; min-height: 100dvh; display: flex; align-items: flex-start; justify-content: center; padding: 24px 12px calc(24px + env(safe-area-inset-bottom)); box-sizing: border-box; }
+.admin-standalone .admin-card { margin: 0; }
+.admin-page #adminUser, .admin-page #adminPw { width: 100%; box-sizing: border-box; margin-bottom: 8px; padding: 11px 13px; border-radius: 9px; border: 1px solid #33404f; background: #0e1219; color: var(--text); font-size: 15px; }
+.admin-page .admin-body { max-height: 64vh; }
+.admin-toast { position: fixed; bottom: 20px; left: 50%; transform: translate(-50%, 24px); opacity: 0; background: #1a2230; border: 1px solid #33404f; color: var(--text); padding: 10px 18px; border-radius: 10px; z-index: 500; transition: transform .25s, opacity .25s; font-size: 14px; pointer-events: none; }
+.admin-toast.show { transform: translate(-50%, 0); opacity: 1; }
+.admin-toast.error { border-color: #7a2f2f; color: #ffb3b3; }
+.admin-toast.ok { border-color: #2f7a4f; color: #b3ffcf; }
 /* 전체 공지 배너 */
 .announce-banner { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translate(-50%, -140%);
   z-index: 300; display: flex; align-items: center; gap: 10px; max-width: min(520px, calc(100% - 24px));

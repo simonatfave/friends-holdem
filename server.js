@@ -20,6 +20,7 @@ app.use(
   })
 );
 app.get('/health', (_req, res) => res.json({ ok: true, rooms: rooms.size }));
+app.get('/admin', (_req, res) => res.sendFile(join(__dirname, 'public', 'admin.html')));
 
 const PORT = process.env.PORT || 3000;
 
@@ -156,7 +157,9 @@ const lastActivity = new Map(); // nickLower -> timestamp
 function touchActivity(socket) { if (socket && socket.account) lastActivity.set(socket.account.toLowerCase(), Date.now()); }
 
 // ---------- 관리자 ----------
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || ''; // 설정 시에만 관리자 기능 활성
+// 관리자 계정(기본 admin/dice1234, 환경변수로 덮어쓰기 권장 — 보안)
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'dice1234';
 function socketsByNick(nl) {
   const out = [];
   for (const [, s] of io.sockets.sockets) if (s.account && s.account.toLowerCase() === nl) out.push(s);
@@ -1141,10 +1144,10 @@ io.on('connection', (socket) => {
   });
   // ---------- 관리자 기능(ADMIN_PASSWORD 인증 필요) ----------
   const reqAdmin = (cb) => { if (!socket.isAdmin) { cb?.({ ok: false, error: '관리자 인증이 필요합니다' }); return false; } return true; };
-  socket.on('admin:auth', ({ password } = {}, cb) => {
+  socket.on('admin:auth', ({ user, password } = {}, cb) => {
     if (!rateOk('adminauth:' + clientIp, 1500)) return cb?.({ ok: false, error: '잠시 후 다시 시도하세요' });
-    if (!ADMIN_PASSWORD) return cb?.({ ok: false, error: '서버에 관리자 비밀번호(ADMIN_PASSWORD)가 설정되어 있지 않습니다' });
-    if (String(password || '') !== ADMIN_PASSWORD) return cb?.({ ok: false, error: '비밀번호가 올바르지 않습니다' });
+    const u = String(user == null ? ADMIN_USER : user);
+    if (u !== ADMIN_USER || String(password || '') !== ADMIN_PASSWORD) return cb?.({ ok: false, error: '아이디 또는 비밀번호가 올바르지 않습니다' });
     socket.isAdmin = true;
     cb?.({ ok: true, data: adminOverview() });
   });

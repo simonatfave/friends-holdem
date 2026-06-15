@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex" />
+  <title>🛠️ Dice 관리자</title>
+  <link rel="stylesheet" href="style.css?v=117" />
+</head>
+<body class="admin-page">
+  <div class="admin-standalone">
+    <div class="settings-card admin-card">
+      <h3>🛠️ Dice 관리자</h3>
+      <div id="adminAuth">
+        <p class="sub" style="margin:0 0 10px">관리자 계정으로 로그인하세요</p>
+        <input id="adminUser" placeholder="아이디" autocomplete="username" />
+        <input type="password" id="adminPw" placeholder="비밀번호" autocomplete="current-password" />
+        <div id="adminAuthErr" class="form-err"></div>
+        <button id="adminLogin" class="primary" style="width:100%">로그인</button>
+      </div>
+      <div id="adminMain" class="hidden">
+        <div class="admin-tabs">
+          <button class="admin-tab active" data-tab="status">현황</button>
+          <button class="admin-tab" data-tab="rooms">방</button>
+          <button class="admin-tab" data-tab="accounts">계정</button>
+          <button class="admin-tab" data-tab="notice">공지</button>
+        </div>
+        <div id="adminBody" class="admin-body"></div>
+        <div class="admin-row-btns">
+          <button id="adminRefresh" class="primary">새로고침</button>
+          <button id="adminLogoutBtn" class="ghost">로그아웃</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="admin.js?v=117"></script>
+</body>
+</html>
