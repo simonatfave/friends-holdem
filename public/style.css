@@ -661,6 +661,15 @@ button.btn-loading.primary.alt::after, button.ghost.btn-loading::after { border-
 .quick-bets button.qb { display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1.1; flex: 0 0 auto; width: 62px; min-width: 62px; padding: 8px 4px; }
 .quick-bets .qb-lbl { font-size: 14px; }
 .quick-bets .qb-amt { font-size: 12px; font-weight: 800; color: var(--gold); }
+/* 사이징 버튼 색상(작은 베팅 → 큰 베팅 순으로 차가운색→따뜻한색, 올인은 빨강) */
+.quick-bets button.qb-half  { background: linear-gradient(180deg, #1f3a4d, #142a38); border-color: #2f6f8f; }
+.quick-bets button.qb-half  .qb-lbl, .quick-bets button.qb-half  .qb-amt { color: #7fd0e8; }
+.quick-bets button.qb-two   { background: linear-gradient(180deg, #2c2b52, #1c1b38); border-color: #5b58a8; }
+.quick-bets button.qb-two   .qb-lbl, .quick-bets button.qb-two   .qb-amt { color: #b0aef0; }
+.quick-bets button.qb-pot   { background: linear-gradient(180deg, #4a3a18, #2e2510); border-color: #9a7d34; }
+.quick-bets button.qb-pot   .qb-lbl, .quick-bets button.qb-pot   .qb-amt { color: var(--gold); }
+.quick-bets button.qb-allin { background: linear-gradient(180deg, #5a2320, #3a1513); border-color: #a84038; }
+.quick-bets button.qb-allin .qb-lbl, .quick-bets button.qb-allin .qb-amt { color: #ff9a90; }
 
 /* 내 차례일 때 액션바 은은한 강조 */
 .actionbar.myturn { animation: barTurnGlow 1.5s ease-in-out infinite; }

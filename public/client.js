@@ -818,6 +818,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v121', ['베팅 사이징 버튼(½팟·⅔팟·팟·올인)에 색상 추가']],
   ['v120', ['모바일 양옆 좌석을 테두리 안쪽으로 더 들임']],
   ['v119', ['로그인 로고 주사위가 계속 회전', '로그인 실패 시 입력칸 빨간 테두리·흔들림', '로그인 버튼 스피너', '모바일 상대 좌석 화면 안쪽으로 보정', '내 차례에 내 좌석 하단 잘림 수정', '게임 나가기 확인을 게임 UI 모달로 변경']],
   ['v118', ['관리자 페이지에 전체 데이터 초기화(계정·방 전부 삭제) 버튼 추가(DELETE 확인 필요)']],
@@ -2167,10 +2168,10 @@ function renderActions(s) {
     // ½팟 / ⅔팟 / 팟 — 누르면 즉시 레이즈. 버튼에 베팅(레이즈 to) 금액 표시
     const quick = document.createElement('div');
     quick.className = 'quick-bets';
-    quick.appendChild(qbtn('½팟', potBet(0.5), () => act('raise', potBet(0.5))));
-    quick.appendChild(qbtn('⅔팟', potBet(2 / 3), () => act('raise', potBet(2 / 3))));
-    quick.appendChild(qbtn('팟', potBet(1), () => act('raise', potBet(1))));
-    if (max > potBet(1)) quick.appendChild(qbtn('올인', max, () => act('raise', max)));
+    quick.appendChild(qbtn('½팟', potBet(0.5), () => act('raise', potBet(0.5)), 'qb-half'));
+    quick.appendChild(qbtn('⅔팟', potBet(2 / 3), () => act('raise', potBet(2 / 3)), 'qb-two'));
+    quick.appendChild(qbtn('팟', potBet(1), () => act('raise', potBet(1)), 'qb-pot'));
+    if (max > potBet(1)) quick.appendChild(qbtn('올인', max, () => act('raise', max), 'qb-allin'));
 
     raiseRow.appendChild(quick);
     raiseRow.appendChild(slider);
@@ -2189,9 +2190,9 @@ function btn(cls, label, fn) {
   b.className = cls; b.textContent = label; b.onclick = fn;
   return b;
 }
-function qbtn(label, amount, fn) {
+function qbtn(label, amount, fn, cls) {
   const b = document.createElement('button');
-  b.className = 'qb';
+  b.className = 'qb' + (cls ? ' ' + cls : '');
   b.innerHTML = `<span class="qb-lbl">${label}</span><span class="qb-amt">${fmtAmt(amount)}</span>`;
   b.onclick = fn;
   return b;
