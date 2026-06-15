@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=118" />
+  <link rel="stylesheet" href="style.css?v=119" />
 </head>
 <body>
   <div id="versionBadge" class="version-badge"></div>
@@ -413,6 +413,16 @@
       </div>
     </div>
 
+    <div id="confirmModal" class="overlay hidden">
+      <div class="settings-card confirm-card">
+        <p id="confirmMsg" class="confirm-msg"></p>
+        <div class="confirm-btns">
+          <button id="confirmCancel" class="ghost">취소</button>
+          <button id="confirmOk" class="primary">확인</button>
+        </div>
+      </div>
+    </div>
+
     <div id="finalScreen" class="overlay hidden">
       <div id="confetti" class="confetti"></div>
       <div class="final-card">
@@ -428,7 +438,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="util.js?v=118"></script>
-  <script src="client.js?v=118"></script>
+  <script src="util.js?v=119"></script>
+  <script src="client.js?v=119"></script>
 </body>
 </html>

@@ -472,13 +472,19 @@ $('authPwToggle').onclick = () => {
 };
 // 마지막 닉네임 자동 채움
 try { const ln = localStorage.getItem('dice_lastnick'); if (ln && $('authNick')) $('authNick').value = ln; } catch (e) {}
+function shakeInput(id) { const el = $(id); if (!el) return; el.classList.remove('input-error'); void el.offsetWidth; el.classList.add('input-error'); }
+function clearAuthError() { $('gateError').textContent = ''; ['authNick', 'authPw'].forEach((id) => $(id) && $(id).classList.remove('input-error')); }
+function authFail(msg, markNick, markPw) { $('gateError').textContent = msg; if (markNick) shakeInput('authNick'); if (markPw) shakeInput('authPw'); }
+function setLoginLoading(on) { ['loginBtn', 'signupBtn'].forEach((id) => { const b = $(id); if (b) { b.classList.toggle('btn-loading', on); b.disabled = on; } }); }
 function doAuth(kind) {
   const nick = $('authNick').value.trim();
   const password = $('authPw').value;
-  if (!nick || !password) { $('gateError').textContent = '닉네임과 비밀번호를 입력하세요'; return; }
-  $('gateError').textContent = '';
+  clearAuthError();
+  if (!nick || !password) { return authFail('닉네임과 비밀번호를 입력하세요', !nick, !password); }
+  setLoginLoading(true);
   socket.emit(kind, { nick, password }, (res) => {
-    if (!res || !res.ok) { $('gateError').textContent = (res && res.error) || '실패했습니다'; return; }
+    setLoginLoading(false);
+    if (!res || !res.ok) { return authFail((res && res.error) || '실패했습니다', true, true); }
     setToken(res.token);
     onLoggedIn(res.profile);
   });
@@ -486,6 +492,7 @@ function doAuth(kind) {
 $('loginBtn').onclick = () => doAuth('login');
 $('authPw').addEventListener('keydown', (e) => { if (e.key === 'Enter') doAuth('login'); });
 $('authNick').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('authPw').focus(); });
+['authNick', 'authPw'].forEach((id) => $(id) && $(id).addEventListener('input', () => $(id).classList.remove('input-error')));
 setTimeout(() => $('authNick') && $('authNick').focus(), 50);
 
 // ---------- 회원가입 모달 ----------
@@ -811,6 +818,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v119', ['로그인 로고 주사위가 계속 회전', '로그인 실패 시 입력칸 빨간 테두리·흔들림', '로그인 버튼 스피너', '모바일 상대 좌석 화면 안쪽으로 보정', '내 차례에 내 좌석 하단 잘림 수정', '게임 나가기 확인을 게임 UI 모달로 변경']],
   ['v118', ['관리자 페이지에 전체 데이터 초기화(계정·방 전부 삭제) 버튼 추가(DELETE 확인 필요)']],
   ['v117', ['전용 관리자 페이지(/admin) + 관리자 계정 로그인(admin/dice1234, 환경변수로 변경 권장)']],
   ['v116', ['관리자: 전체 접속 현황 탭(상태·방·최근활동), 사용자 로그(게임 기록·통계) 보기, 계정 닉네임 변경·비밀번호 초기화 추가']],
@@ -1037,8 +1045,23 @@ function resetToLobby() {
   $('versionBadge').classList.remove('hidden');
   if (myProfile) socket.emit('getProfile', {}, (r) => { if (r && r.ok) { myProfile = r.profile; updateMeDisplay(); } });
 }
-function doLeaveToLobby(confirmMsg) {
-  if (confirmMsg && !confirm(confirmMsg)) return;
+// 게임 UI 확인 모달(시스템 alert 대체)
+function uiConfirm(message, opts = {}) {
+  return new Promise((resolve) => {
+    const ov = $('confirmModal'); if (!ov) { resolve(window.confirm(message)); return; }
+    $('confirmMsg').textContent = message;
+    const ok = $('confirmOk'), cancel = $('confirmCancel');
+    ok.textContent = opts.okText || '확인'; ok.className = 'primary' + (opts.danger ? ' danger' : '');
+    cancel.textContent = opts.cancelText || '취소';
+    show('confirmModal');
+    const done = (v) => { hide('confirmModal'); ok.onclick = cancel.onclick = ov.onclick = null; resolve(v); };
+    ok.onclick = () => done(true);
+    cancel.onclick = () => done(false);
+    ov.onclick = (e) => { if (e.target === ov) done(false); }; // 배경 클릭 = 취소
+  });
+}
+async function doLeaveToLobby(confirmMsg) {
+  if (confirmMsg && !(await uiConfirm(confirmMsg))) return;
   socket.emit('leave', {}, () => resetToLobby());
 }
 // 진행 중이던 핸드가 끝나 서버가 로비로 보낼 때
@@ -1046,10 +1069,10 @@ socket.on('leftToLobby', () => { resetToLobby(); toast('로비로 나왔습니�
 // 최종 화면: '로비로 이동'(로그인 세션 유지, 새로고침 없음)
 $('finalToLobby').onclick = () => doLeaveToLobby();
 $('wbLeave').onclick = () => doLeaveToLobby('대기 중인 방에서 나갈까요?');
-$('leaveBtn').onclick = () => {
+$('leaveBtn').onclick = async () => {
   if (isSpectator) { doLeaveToLobby('관전을 종료할까요?'); return; } // 관전자는 바로 로비로
   // 플레이어 나가기: 전적 기록 후, 진행 중이면 이번 핸드 끝나고 로비로(세션 유지)
-  if (!confirm('게임에서 나가시겠어요?\n진행 중이면 이번 핸드가 끝난 뒤 로비로 나갑니다.')) return;
+  if (!(await uiConfirm('게임에서 나가시겠어요? 진행 중이면 이번 핸드가 끝난 뒤 로비로 나갑니다.', { okText: '나가기', danger: true }))) return;
   socket.emit('leaveGame', {}, (r) => {
     if (r && r.profile) { myProfile = r.profile; updateMeDisplay(); }
     if (r && r.deferred) toast('이번 핸드가 끝나면 로비로 나갑니다', 'ok');
@@ -1190,7 +1213,7 @@ function renderWaitingSeats(s) {
   const me = s.players.find((p) => p.id === myId);
   const mySeat = me ? me.chair : 0;
   const opos = othersPositions(TOTAL - 1); // 나(아래 중앙) 제외 나머지 좌석
-  const meTop = (window.innerWidth <= 640) ? (n <= 4 ? 82 : 84) : 88;
+  const meTop = (window.innerWidth <= 640) ? (n <= 4 ? 80 : 82) : 88;
   const bySeat = {};
   s.players.forEach((p) => { bySeat[p.chair] = p; });
   for (let seatIdx = 0; seatIdx < TOTAL; seatIdx++) {
@@ -1914,7 +1937,7 @@ function renderSeats(s) {
       seat = document.createElement('div');
       seat.dataset.pid = p.id;
       const pos = isMe ? null : (hasMe ? (opos[i - 1] || { x: 50, y: 20 }) : opos[i]);
-      const meTop = (window.innerWidth <= 640) ? (n <= 4 ? 82 : 84) : 88; // 적은 인원(큰 내 좌석)일 때 살짝 더 위로 → 하단 스트립과 겹침 방지
+      const meTop = (window.innerWidth <= 640) ? (n <= 4 ? 80 : 82) : 88; // 적은 인원(큰 내 좌석)일 때 살짝 더 위로 → 하단 스트립과 겹침 방지
       seat.style.left = (isMe ? 50 : pos.x) + '%';
       seat.style.top = (isMe ? meTop : pos.y) + '%';
       const result = s.results?.reveal?.find((r) => r.id === p.id);
@@ -2054,7 +2077,7 @@ function othersPositions(k) {
   const mobile = window.innerWidth <= 640;
   // 아래 중앙(내 자리)만 비우고 나머지는 테두리를 따라 균등 배치. 모바일은 테두리로 더 밀고 위로 올림
   const cx = 50, cy = mobile ? 42 : 47;
-  const rx = mobile ? 49 : 48, ry = mobile ? 43 : 37; // 모바일은 테두리(사이드)로 최대한 밀기
+  const rx = mobile ? 45 : 48, ry = mobile ? 43 : 37; // 모바일: 좌석이 화면 밖으로 안 나가게 살짝 안쪽
   const gap = mobile ? 0.72 : 0.62; // 아래 중앙 양옆으로 비우는 반각(라디안)
   const span = 2 * Math.PI - 2 * gap;
   const out = [];

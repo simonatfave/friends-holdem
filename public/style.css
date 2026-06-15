@@ -164,6 +164,29 @@ button { font-family: inherit; }
   padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;
 }
 .error { color: var(--red); font-size: 13px; margin-top: 12px; min-height: 18px; text-align: center; }
+/* 로그인 입력 오류: 빨간 테두리 + 흔들림 */
+input.input-error { border-color: var(--red) !important; box-shadow: 0 0 0 2px rgba(226,85,85,.25); animation: inputShake .4s cubic-bezier(.36,.07,.19,.97); }
+@keyframes inputShake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+/* 버튼 로딩 스피너 */
+button.btn-loading { color: transparent !important; position: relative; pointer-events: none; }
+button.btn-loading::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+  border: 2.5px solid rgba(0,0,0,.25); border-top-color: rgba(0,0,0,.7); border-radius: 50%;
+  animation: btnSpin .6s linear infinite;
+}
+button.btn-loading.primary.alt::after, button.ghost.btn-loading::after { border-color: rgba(255,255,255,.25); border-top-color: #fff; }
+@keyframes btnSpin { to { transform: rotate(360deg); } }
+/* 게임 UI 확인 모달 */
+.confirm-card { max-width: 360px; width: calc(100% - 40px); text-align: center; }
+.confirm-msg { font-size: 15px; line-height: 1.55; color: var(--text); margin: 6px 0 18px; white-space: pre-line; }
+.confirm-btns { display: flex; gap: 10px; }
+.confirm-btns button { flex: 1; padding: 12px; }
+.confirm-btns .primary.danger { background: linear-gradient(180deg, #d6584f, #a8362f); border-color: #7a2f2f; color: #fff; }
 .code { font-family: monospace; font-size: 22px; letter-spacing: 4px; color: var(--gold); font-weight: 700; }
 .player-list { list-style: none; margin: 14px 0; }
 .player-list li {
@@ -401,16 +424,12 @@ button { font-family: inherit; }
 /* 브랜드 로고 (로비) */
 .brand-logo { text-align: center; margin-bottom: 4px; }
 .brand-logo svg { width: 230px; max-width: 82%; height: auto; display: block; margin: 0 auto; transform-origin: center; }
-/* 로그인(게이트) 페이지에서만: 왼쪽 주사위 아이콘이 굴러 들어오고 'DICE' 글자는 그대로 */
+/* 로그인(게이트) 페이지: 왼쪽 주사위 아이콘이 계속 굴러감('DICE' 글자는 고정) */
 .brand-logo .dice-ico { transform-box: fill-box; transform-origin: center; }
-#gate .brand-logo.logo-anim .dice-ico { animation: diceRoll 1s cubic-bezier(.2,.75,.2,1) both; }
-@keyframes diceRoll {
-  0%   { transform: rotate(-540deg) scale(.55); opacity: 0; }
-  55%  { opacity: 1; }
-  100% { transform: rotate(0deg) scale(1); opacity: 1; }
-}
+#gate .brand-logo .dice-ico { animation: diceSpin 2.6s linear infinite; }
+@keyframes diceSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  #gate .brand-logo.logo-anim .dice-ico { animation: none; }
+  #gate .brand-logo .dice-ico { animation: none; }
 }
 
 /* 테이블 중앙 워터마크 로고 */
@@ -475,6 +494,7 @@ button { font-family: inherit; }
 }
 /* 현재 차례 좌석: 카드/패널이 살짝 커져 눈에 띄게 */
 .seat.active { --active-bump: 1.14; z-index: 8; }
+.seat.me-seat.active { --active-bump: 1; } /* 내 좌석은 이미 크므로 차례에 더 안 키움(하단 잘림 방지) */
 /* 내 좌석: 카드 크게(다른 좌석보다), 가로를 더 넓혀 비율 보정 */
 .seat.me-seat {
   --hc-h: min(79px, 10.3vh, 11.9vw); /* 내 카드 (+10%) */
