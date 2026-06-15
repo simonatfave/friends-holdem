@@ -37,6 +37,13 @@ $('adminPw').onkeydown = (e) => { if (e.key === 'Enter') $('adminLogin').click()
 $('adminUser').onkeydown = (e) => { if (e.key === 'Enter') $('adminPw').focus(); };
 $('adminRefresh').onclick = async () => { await adminCall('admin:overview'); renderAdmin(); };
 $('adminLogoutBtn').onclick = () => location.reload();
+$('adminWipe').onclick = async () => {
+  if (!confirm('정말 모든 계정과 방 데이터를 삭제할까요?\n되돌릴 수 없습니다.')) return;
+  const c = prompt("최종 확인: 대문자로 DELETE 를 입력하세요");
+  if (c == null) return;
+  const r = await adminCall('admin:wipeData', { confirm: c });
+  if (r.ok) { toast('전체 데이터를 초기화했습니다', 'ok'); renderAdmin(); }
+};
 document.querySelectorAll('.admin-tab').forEach((b) => b.onclick = () => {
   _adminTab = b.dataset.tab;
   document.querySelectorAll('.admin-tab').forEach((x) => x.classList.toggle('active', x === b));

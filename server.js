@@ -93,6 +93,16 @@ function saveUsersSoon() {
   }, 1000);
 }
 function hashPw(pw, salt) { return scryptSync(String(pw), salt, 32).toString('hex'); }
+// 전체 데이터 초기화(계정 + 방) — 메모리 + 영구 저장소
+async function wipePersistence() {
+  if (pool) {
+    try { await pool.query('DELETE FROM accounts'); } catch (e) { console.error('DB 계정 초기화 실패:', e.message); }
+    try { await pool.query('DELETE FROM room_states'); } catch (e) { console.error('DB 방 초기화 실패:', e.message); }
+  } else {
+    try { writeFileSync(USERS_FILE, '[]'); } catch (e) { console.error('계정 파일 초기화 실패:', e.message); }
+    try { writeFileSync(SAVE_FILE, '[]'); } catch (e) { console.error('방 파일 초기화 실패:', e.message); }
+  }
+}
 // 계정 삭제(메모리 + 영구 저장소)
 async function deleteUser(nl) {
   const acc = users.get(nl); if (!acc) return;
@@ -1203,6 +1213,25 @@ io.on('connection', (socket) => {
     if (!reqAdmin(cb)) return;
     const t = String(text || '').slice(0, 300).trim(); if (!t) return cb?.({ ok: false, error: '내용을 입력하세요' });
     io.emit('announce', { text: t }); cb?.({ ok: true });
+  });
+  // 전체 데이터 초기화(계정 + 방 모두 삭제) — 확인 문구 'DELETE' 필요
+  socket.on('admin:wipeData', ({ confirm } = {}, cb) => {
+    if (!reqAdmin(cb)) return;
+    if (confirm !== 'DELETE') return cb?.({ ok: false, error: "확인 문구('DELETE')가 일치하지 않습니다" });
+    // 1) 모든 방 종료(플레이어/관전자 로비로) + 타이머 정리
+    for (const [, room] of rooms) {
+      for (const p of room.game.players) if (p.socketId) io.to(p.socketId).emit('leftToLobby');
+      if (room.spectators) for (const sid of room.spectators) io.to(sid).emit('leftToLobby');
+      clearRoomTimers(room);
+    }
+    rooms.clear();
+    // 2) 모든 로그인 세션 종료 + 메모리 비우기
+    for (const [, s] of io.sockets.sockets) { if (s.account) s.account = null; }
+    io.emit('forceLogout', { reason: '관리자에 의해 전체 데이터가 초기화되었습니다' });
+    users.clear(); tokenIndex.clear(); activeSessions.clear(); lastActivity.clear(); userNames.clear();
+    _dirtyUsers.clear();
+    // 3) 영구 저장소 비우기
+    wipePersistence().then(() => { broadcastOnline(); cb?.({ ok: true, data: adminOverview() }); console.log('⚠️ 관리자: 전체 데이터 초기화됨'); });
   });
   // 사용자 상세/로그(게임 기록·통계·접속 정보)
   socket.on('admin:userDetail', ({ nick } = {}, cb) => {

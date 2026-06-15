@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex" />
   <title>🛠️ Dice 관리자</title>
-  <link rel="stylesheet" href="style.css?v=117" />
+  <link rel="stylesheet" href="style.css?v=118" />
 </head>
 <body class="admin-page">
   <div class="admin-standalone">
@@ -30,10 +30,13 @@
           <button id="adminRefresh" class="primary">새로고침</button>
           <button id="adminLogoutBtn" class="ghost">로그아웃</button>
         </div>
+        <div class="admin-danger-zone">
+          <button id="adminWipe" class="ai-danger">⚠️ 전체 데이터 초기화 (계정·방 전부 삭제)</button>
+        </div>
       </div>
     </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="admin.js?v=117"></script>
+  <script src="admin.js?v=118"></script>
 </body>
 </html>
