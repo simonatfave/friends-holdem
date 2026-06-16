@@ -1,0 +1,75 @@
+<svg width="760" height="1500" viewBox="0 0 760 1500" xmlns="http://www.w3.org/2000/svg" font-family="'Noto Sans CJK KR',-apple-system,'Segoe UI',sans-serif">
+  <defs>
+    <linearGradient id="appbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#13160f"/><stop offset="100%" stop-color="#0a0c08"/></linearGradient>
+    <radialGradient id="felt" cx="50%" cy="42%" r="62%"><stop offset="0%" stop-color="#2a8a59"/><stop offset="70%" stop-color="#1c6f47"/><stop offset="100%" stop-color="#0f3f29"/></radialGradient>
+    <radialGradient id="wglow" cx="50%" cy="40%" r="55%"><stop offset="0%" stop-color="#e8c46633"/><stop offset="100%" stop-color="#00000000"/></radialGradient>
+    <linearGradient id="rail" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7a4d28"/><stop offset="100%" stop-color="#4d3019"/></linearGradient>
+    <linearGradient id="cardg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#eef1f4"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f4d77e"/><stop offset="100%" stop-color="#d4a93f"/></linearGradient>
+    <linearGradient id="cb" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3b6fb0"/><stop offset="100%" stop-color="#274d82"/></linearGradient>
+    <filter id="cs" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#000" flood-opacity="0.5"/></filter>
+    <filter id="wg"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#e8c466" flood-opacity="0.85"/></filter>
+  </defs>
+  <rect width="760" height="1500" fill="url(#appbg)"/>
+  <g font-size="22" font-weight="700">
+    <rect x="24" y="30" width="120" height="48" rx="24" fill="#141b25" stroke="#2a3340"/><text x="84" y="61" text-anchor="middle" fill="#9fb0c2">핸드 #21</text>
+    <rect x="156" y="30" width="186" height="48" rx="24" fill="#141b25" stroke="#2a3340"/><text x="249" y="61" text-anchor="middle" fill="#9fb0c2">블라인드 200/400</text>
+  </g>
+  <ellipse cx="380" cy="700" rx="338" ry="520" fill="url(#rail)"/>
+  <ellipse cx="380" cy="700" rx="312" ry="494" fill="url(#felt)"/>
+  <rect width="760" height="1500" fill="url(#wglow)"/>
+  <!-- confetti -->
+  <g>
+    <rect x="120" y="200" width="12" height="18" rx="2" fill="#e8c466" transform="rotate(20 126 209)"/>
+    <rect x="640" y="170" width="12" height="18" rx="2" fill="#41d18b" transform="rotate(-25 646 179)"/>
+    <rect x="540" y="320" width="11" height="16" rx="2" fill="#5b9cf0" transform="rotate(35 545 328)"/>
+    <rect x="200" y="380" width="11" height="16" rx="2" fill="#ff9a90" transform="rotate(-15 205 388)"/>
+    <circle cx="90" cy="320" r="6" fill="#e8c466"/><circle cx="680" cy="430" r="6" fill="#b0aef0"/>
+  </g>
+
+  <!-- opponent (dimmed, LOSE) -->
+  <g transform="translate(380,250)" opacity="0.5">
+    <rect x="-150" y="-46" width="300" height="170" rx="16" fill="#101822" stroke="#2a3340"/>
+    <text x="0" y="-16" text-anchor="middle" font-size="22" font-weight="700" fill="#9fb0c2">헨리 봇</text>
+    <g transform="translate(-78,2)"><rect width="68" height="96" rx="10" fill="url(#cardg)" opacity="0.85"/><text x="11" y="32" font-size="26" font-weight="800" fill="#111">A</text><text x="11" y="54" font-size="18" fill="#111">♠</text><text x="34" y="72" font-size="40" text-anchor="middle" fill="#111">♠</text></g>
+    <g transform="translate(8,2)"><rect width="68" height="96" rx="10" fill="url(#cardg)" opacity="0.85"/><text x="11" y="32" font-size="26" font-weight="800" fill="#111">K</text><text x="11" y="54" font-size="18" fill="#111">♠</text><text x="34" y="72" font-size="40" text-anchor="middle" fill="#111">♠</text></g>
+    <g transform="translate(0,108)"><rect x="-42" y="-15" width="84" height="30" rx="15" fill="#2a323c"/><text x="0" y="7" text-anchor="middle" font-size="18" font-weight="800" fill="#9fb0c2">LOSE</text></g>
+  </g>
+
+  <!-- community -->
+  <g transform="translate(380,540)">
+    <g transform="translate(-205,-54)"><g filter="url(#cs)"><rect width="78" height="108" rx="11" fill="url(#cardg)"/><text x="11" y="32" font-size="26" font-weight="800" fill="#c0392b">Q</text><text x="11" y="54" font-size="18" fill="#c0392b">♥</text><text x="39" y="74" font-size="44" text-anchor="middle" fill="#c0392b">♥</text></g></g>
+    <g transform="translate(-122,-54)"><g filter="url(#cs)"><rect width="78" height="108" rx="11" fill="url(#cardg)"/><text x="11" y="32" font-size="26" font-weight="800" fill="#111">7</text><text x="11" y="54" font-size="18" fill="#111">♣</text><text x="39" y="74" font-size="44" text-anchor="middle" fill="#111">♣</text></g></g>
+    <g transform="translate(-39,-54)"><g filter="url(#cs)"><rect width="78" height="108" rx="11" fill="url(#cardg)"/><text x="11" y="32" font-size="26" font-weight="800" fill="#c0392b">2</text><text x="11" y="54" font-size="18" fill="#c0392b">♦</text><text x="39" y="74" font-size="44" text-anchor="middle" fill="#c0392b">♦</text></g></g>
+    <g transform="translate(44,-54)"><g filter="url(#cs)"><rect width="78" height="108" rx="11" fill="url(#cardg)"/><text x="11" y="32" font-size="26" font-weight="800" fill="#111">Q</text><text x="11" y="54" font-size="18" fill="#111">♠</text><text x="39" y="74" font-size="44" text-anchor="middle" fill="#111">♠</text></g></g>
+    <g transform="translate(127,-54)"><g filter="url(#cs)"><rect width="78" height="108" rx="11" fill="url(#cardg)"/><text x="11" y="32" font-size="26" font-weight="800" fill="#c0392b">Q</text><text x="11" y="54" font-size="18" fill="#c0392b">♦</text><text x="39" y="74" font-size="44" text-anchor="middle" fill="#c0392b">♦</text></g></g>
+  </g>
+
+  <!-- winner banner -->
+  <g transform="translate(380,720)" filter="url(#wg)">
+    <rect x="-235" y="-44" width="470" height="116" rx="20" fill="#1a1407" stroke="#e8c466" stroke-width="2.5"/>
+    <!-- trophy -->
+    <g transform="translate(-198,-6)"><path d="M-14,-18 h28 v18 a14,14 0 0 1 -28,0 z" fill="#e8c466"/><path d="M-14,-15 h-9 a8,8 0 0 0 9,13 M14,-15 h9 a8,8 0 0 0 -9,13" fill="none" stroke="#e8c466" stroke-width="3.5"/><rect x="-5" y="12" width="10" height="9" fill="#e8c466"/><rect x="-13" y="21" width="26" height="6" rx="3" fill="#e8c466"/></g>
+    <text x="20" y="-2" text-anchor="middle" font-size="36" font-weight="900" fill="#ffe9a8">Simon 승리!</text>
+    <text x="20" y="44" text-anchor="middle" font-size="28" font-weight="800" fill="#41d18b">+11,800 · 트리플 Q</text>
+  </g>
+
+  <!-- my seat (WIN glow) -->
+  <g transform="translate(380,1010)" filter="url(#wg)">
+    <rect x="-160" y="-46" width="320" height="244" rx="18" fill="#13180e" stroke="#e8c466" stroke-width="3.5"/>
+    <circle cx="-104" cy="-22" r="14" fill="#c9a23c"/><text x="-104" y="-16" text-anchor="middle" font-size="16" font-weight="800" fill="#1a140a">S</text>
+    <text x="14" y="-15" text-anchor="middle" font-size="24" font-weight="800" fill="#fff">Simon</text>
+    <text x="0" y="20" text-anchor="middle" font-size="24" font-weight="800" fill="#e8c466">● 17,000</text>
+    <g transform="translate(80,-44)"><rect x="-34" y="-15" width="74" height="30" rx="15" fill="#e8c466"/><text x="3" y="7" text-anchor="middle" font-size="17" font-weight="900" fill="#1a140a">WIN</text></g>
+    <line x1="-130" y1="40" x2="130" y2="40" stroke="#e8c466" stroke-dasharray="4 6" opacity="0.7"/>
+    <g transform="translate(-128,56)" filter="url(#cs)"><rect width="118" height="118" rx="13" fill="url(#cardg)"/><text x="14" y="42" font-size="38" font-weight="800" fill="#c0392b">Q</text><text x="14" y="74" font-size="26" fill="#c0392b">♦</text><text x="59" y="94" font-size="56" text-anchor="middle" fill="#c0392b">♦</text></g>
+    <g transform="translate(10,56)" filter="url(#cs)"><rect width="118" height="118" rx="13" fill="url(#cardg)"/><text x="14" y="42" font-size="38" font-weight="800" fill="#111">Q</text><text x="14" y="74" font-size="26" fill="#111">♣</text><text x="59" y="94" font-size="56" text-anchor="middle" fill="#111">♣</text></g>
+  </g>
+  <!-- chips flying to winner -->
+  <g>
+    <circle cx="380" cy="800" r="13" fill="url(#gold)" stroke="#b8932f" stroke-width="2"/>
+    <circle cx="410" cy="840" r="12" fill="url(#gold)" stroke="#b8932f" stroke-width="2" opacity="0.85"/>
+    <circle cx="352" cy="860" r="11" fill="url(#gold)" stroke="#b8932f" stroke-width="2" opacity="0.7"/>
+    <circle cx="396" cy="900" r="10" fill="url(#gold)" stroke="#b8932f" stroke-width="2" opacity="0.55"/>
+  </g>
+</svg>

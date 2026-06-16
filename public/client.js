@@ -818,6 +818,7 @@ $('onlineClose').onclick = () => hide('onlinePanel');
 
 // ---------- 패치 노트 (버전 배지 클릭 시 팝업) ----------
 const PATCH_NOTES = [
+  ['v122', ['응답자가 모두 올인이고 남은 사람이 전부 AFK(끊김)면 30초 카운트다운 후 자동 마무리 + AFK 플레이어 테이블에서 제외 → 판이 늘어지지 않게']],
   ['v121', ['베팅 사이징 버튼(½팟·⅔팟·팟·올인)에 색상 추가']],
   ['v120', ['모바일 양옆 좌석을 테두리 안쪽으로 더 들임']],
   ['v119', ['로그인 로고 주사위가 계속 회전', '로그인 실패 시 입력칸 빨간 테두리·흔들림', '로그인 버튼 스피너', '모바일 상대 좌석 화면 안쪽으로 보정', '내 차례에 내 좌석 하단 잘림 수정', '게임 나가기 확인을 게임 UI 모달로 변경']],
@@ -1131,7 +1132,24 @@ socket.on('state', (s) => {
 });
 
 // 타이머 틱 (액션 제한 바 + 블라인드 카운트다운)
+let _afkUntil = 0;
+function updateAfkBanner(s) {
+  if (!s || !s.afkCleanupUntil) { _afkUntil = 0; const el = document.getElementById('afkBanner'); if (el) el.classList.remove('show'); return; }
+  _afkUntil = s.afkCleanupUntil;
+  let el = document.getElementById('afkBanner');
+  if (!el) { el = document.createElement('div'); el.id = 'afkBanner'; el.className = 'afk-banner'; document.body.appendChild(el); }
+  el.classList.add('show');
+  paintAfkBanner();
+}
+function paintAfkBanner() {
+  const el = document.getElementById('afkBanner'); if (!el) return;
+  if (!_afkUntil) { el.classList.remove('show'); return; }
+  const sec = Math.max(0, Math.ceil((_afkUntil - Date.now()) / 1000));
+  el.innerHTML = `<span class="afk-ic">⏳</span> 자리비움 플레이어 자동 정리까지 <b>${sec}</b>초`;
+  if (sec <= 0) el.classList.remove('show');
+}
 function tickTimers() {
+  paintAfkBanner();
   const s = lastState;
   const at = $('actionTimer');
   if (!s || !s.started || s.finished) { if (at) at.classList.add('hidden'); clearTimeAlert(); return; }
@@ -1334,6 +1352,7 @@ function renderGame(s) {
   // 내 차례 화면 가장자리 글로우 / 몬스터 팟 / 헤드업 승률 바
   document.body.classList.toggle('my-turn-glow', s.toActId === myId && !s.finished && !!s.phase && !isSpectator);
   toggleMonsterPot(s);
+  updateAfkBanner(s);
   updateEquityBar(s);
   updateTimeBankBtn(s);
 

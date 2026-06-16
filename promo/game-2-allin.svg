@@ -1,0 +1,56 @@
+<svg width="760" height="1500" viewBox="0 0 760 1500" xmlns="http://www.w3.org/2000/svg" font-family="'Noto Sans CJK KR',-apple-system,'Segoe UI',sans-serif">
+  <defs>
+    <linearGradient id="appbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#160f12"/><stop offset="100%" stop-color="#0a0709"/></linearGradient>
+    <radialGradient id="felt" cx="50%" cy="42%" r="62%"><stop offset="0%" stop-color="#2a8a59"/><stop offset="70%" stop-color="#1c6f47"/><stop offset="100%" stop-color="#0f3f29"/></radialGradient>
+    <radialGradient id="rglow" cx="50%" cy="46%" r="55%"><stop offset="0%" stop-color="#e2552533"/><stop offset="100%" stop-color="#00000000"/></radialGradient>
+    <linearGradient id="rail" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7a4d28"/><stop offset="100%" stop-color="#4d3019"/></linearGradient>
+    <linearGradient id="cardg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#eef1f4"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f4d77e"/><stop offset="100%" stop-color="#d4a93f"/></linearGradient>
+    <filter id="cs" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#000" flood-opacity="0.5"/></filter>
+    <filter id="textglow"><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#e25555" flood-opacity="0.9"/></filter>
+  </defs>
+  <rect width="760" height="1500" fill="url(#appbg)"/>
+  <g font-size="22" font-weight="700">
+    <rect x="24" y="30" width="120" height="48" rx="24" fill="#1a1216" stroke="#3a2326"/><text x="84" y="61" text-anchor="middle" fill="#caa">핸드 #21</text>
+    <rect x="156" y="30" width="186" height="48" rx="24" fill="#1a1216" stroke="#3a2326"/><text x="249" y="61" text-anchor="middle" fill="#caa">블라인드 200/400</text>
+  </g>
+  <ellipse cx="380" cy="700" rx="338" ry="520" fill="url(#rail)"/>
+  <ellipse cx="380" cy="700" rx="312" ry="494" fill="url(#felt)"/>
+  <rect width="760" height="1500" fill="url(#rglow)"/>
+
+  <!-- opponent (revealed) + equity -->
+  <g transform="translate(380,250)">
+    <rect x="-150" y="-46" width="300" height="180" rx="16" fill="#101822" stroke="#e25555" stroke-width="2"/>
+    <text x="0" y="-16" text-anchor="middle" font-size="22" font-weight="800" fill="#fff">헨리 봇 · 올인</text>
+    <g transform="translate(-78,2)" filter="url(#cs)"><rect width="68" height="96" rx="10" fill="url(#cardg)"/><text x="11" y="32" font-size="26" font-weight="800" fill="#111">A</text><text x="11" y="54" font-size="18" fill="#111">♠</text><text x="34" y="72" font-size="40" text-anchor="middle" fill="#111">♠</text></g>
+    <g transform="translate(8,2)" filter="url(#cs)"><rect width="68" height="96" rx="10" fill="url(#cardg)"/><text x="11" y="32" font-size="26" font-weight="800" fill="#111">K</text><text x="11" y="54" font-size="18" fill="#111">♠</text><text x="34" y="72" font-size="40" text-anchor="middle" fill="#111">♠</text></g>
+    <!-- equity bar -->
+    <g transform="translate(0,116)"><rect x="-130" y="-2" width="260" height="20" rx="10" fill="#23303c"/><rect x="-130" y="-2" width="100" height="20" rx="10" fill="#e2693f"/><text x="140" y="14" text-anchor="end" font-size="18" font-weight="800" fill="#ffb38f" transform="translate(-2,0)">38%</text></g>
+  </g>
+
+  <!-- community (4 cards, turn) -->
+  <g transform="translate(380,560)">
+    <g transform="translate(-164,-56)"><g filter="url(#cs)"><rect width="74" height="106" rx="10" fill="url(#cardg)"/><text x="10" y="32" font-size="26" font-weight="800" fill="#c0392b">Q</text><text x="10" y="54" font-size="18" fill="#c0392b">♥</text><text x="37" y="74" font-size="44" text-anchor="middle" fill="#c0392b">♥</text></g></g>
+    <g transform="translate(-82,-56)"><g filter="url(#cs)"><rect width="74" height="106" rx="10" fill="url(#cardg)"/><text x="10" y="32" font-size="26" font-weight="800" fill="#111">7</text><text x="10" y="54" font-size="18" fill="#111">♣</text><text x="37" y="74" font-size="44" text-anchor="middle" fill="#111">♣</text></g></g>
+    <g transform="translate(0,-56)"><g filter="url(#cs)"><rect width="74" height="106" rx="10" fill="url(#cardg)"/><text x="10" y="32" font-size="26" font-weight="800" fill="#c0392b">2</text><text x="10" y="54" font-size="18" fill="#c0392b">♦</text><text x="37" y="74" font-size="44" text-anchor="middle" fill="#c0392b">♦</text></g></g>
+    <g transform="translate(82,-56)"><g filter="url(#cs)"><rect width="74" height="106" rx="10" fill="url(#cardg)"/><text x="10" y="32" font-size="26" font-weight="800" fill="#111">Q</text><text x="10" y="54" font-size="18" fill="#111">♠</text><text x="37" y="74" font-size="44" text-anchor="middle" fill="#111">♠</text></g></g>
+  </g>
+
+  <!-- ALL-IN banner -->
+  <g transform="translate(380,760)">
+    <text x="0" y="0" text-anchor="middle" font-size="96" font-weight="900" fill="#ffe9a8" filter="url(#textglow)" letter-spacing="4">ALL-IN</text>
+    <text x="0" y="48" text-anchor="middle" font-size="28" font-weight="800" fill="#e8c466">팟: 11,800</text>
+  </g>
+
+  <!-- my seat (revealed) + equity -->
+  <g transform="translate(380,1010)">
+    <rect x="-160" y="-46" width="320" height="250" rx="18" fill="#0e1622" stroke="#41d18b" stroke-width="3"/>
+    <circle cx="-104" cy="-22" r="14" fill="#c9a23c"/><text x="-104" y="-16" text-anchor="middle" font-size="16" font-weight="800" fill="#1a140a">S</text>
+    <text x="14" y="-15" text-anchor="middle" font-size="24" font-weight="800" fill="#fff">Simon · 올인</text>
+    <g transform="translate(-128,8)" filter="url(#cs)"><rect width="118" height="118" rx="13" fill="url(#cardg)"/><text x="14" y="42" font-size="38" font-weight="800" fill="#c0392b">Q</text><text x="14" y="74" font-size="26" fill="#c0392b">♦</text><text x="59" y="94" font-size="56" text-anchor="middle" fill="#c0392b">♦</text></g>
+    <g transform="translate(10,8)" filter="url(#cs)"><rect width="118" height="118" rx="13" fill="url(#cardg)"/><text x="14" y="42" font-size="38" font-weight="800" fill="#111">Q</text><text x="14" y="74" font-size="26" fill="#111">♣</text><text x="59" y="94" font-size="56" text-anchor="middle" fill="#111">♣</text></g>
+    <!-- equity -->
+    <g transform="translate(0,160)"><rect x="-140" y="-2" width="280" height="22" rx="11" fill="#23303c"/><rect x="-140" y="-2" width="174" height="22" rx="11" fill="#41d18b"/><text x="-138" y="15" font-size="18" font-weight="800" fill="#0c2a1c" transform="translate(4,0)">62% · 트리플 Q</text></g>
+  </g>
+  <g transform="translate(380,1290)"><rect x="-120" y="-26" width="240" height="52" rx="26" fill="#101822" stroke="#3a4656"/><text x="0" y="9" text-anchor="middle" font-size="22" font-weight="700" fill="#9fb0c2">리버 카드 공개 중…</text></g>
+</svg>

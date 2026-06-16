@@ -1,0 +1,39 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" font-family="'Noto Sans CJK KR',-apple-system,'Segoe UI',sans-serif">
+  <defs>
+    <radialGradient id="bg" cx="30%" cy="0%" r="120%"><stop offset="0%" stop-color="#18222e"/><stop offset="55%" stop-color="#0e1219"/><stop offset="100%" stop-color="#080b10"/></radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f4d77e"/><stop offset="100%" stop-color="#d4a93f"/></linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#eef1f4"/></linearGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000" flood-opacity="0.55"/></filter>
+    <filter id="glow"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#e8c466" flood-opacity="0.5"/></filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <ellipse cx="980" cy="320" rx="430" ry="430" fill="#123a27" opacity="0.45"/>
+  <ellipse cx="980" cy="320" rx="360" ry="360" fill="#1f7a4d" opacity="0.18"/>
+
+  <g transform="translate(96,118)" filter="url(#glow)">
+    <rect x="0" y="0" width="96" height="96" rx="22" fill="url(#gold)"/>
+    <circle cx="28" cy="28" r="9" fill="#14181f"/><circle cx="68" cy="28" r="9" fill="#14181f"/><circle cx="48" cy="48" r="9" fill="#14181f"/><circle cx="28" cy="68" r="9" fill="#14181f"/><circle cx="68" cy="68" r="9" fill="#14181f"/>
+  </g>
+  <text x="212" y="190" font-size="84" font-weight="800" fill="#e8c466" letter-spacing="4">DICE</text>
+
+  <text x="98" y="290" font-size="34" font-weight="800" fill="#eaf1f8">친구들과 즐기는 실시간 텍사스 홀덤</text>
+  <text x="98" y="334" font-size="24" font-weight="600" fill="#95a7ba">방 만들고 코드만 공유하면 바로 시작 · 토너먼트 · 봇 대전</text>
+
+  <g font-size="20" font-weight="700">
+    <g transform="translate(98,372)"><rect width="190" height="52" rx="26" fill="#161c25" stroke="#2f3a48"/><circle cx="28" cy="26" r="6" fill="#7fd0e8"/><text x="48" y="33" fill="#7fd0e8">실시간 멀티</text></g>
+    <g transform="translate(302,372)"><rect width="180" height="52" rx="26" fill="#161c25" stroke="#2f3a48"/><circle cx="28" cy="26" r="6" fill="#b0aef0"/><text x="48" y="33" fill="#b0aef0">봇 AI 대전</text></g>
+    <g transform="translate(496,372)"><rect width="206" height="52" rx="26" fill="#161c25" stroke="#2f3a48"/><circle cx="28" cy="26" r="6" fill="#e8c466"/><text x="48" y="33" fill="#e8c466">토너먼트·랭킹</text></g>
+    <g transform="translate(98,440)"><rect width="206" height="52" rx="26" fill="#161c25" stroke="#2f3a48"/><circle cx="28" cy="26" r="6" fill="#41d18b"/><text x="48" y="33" fill="#41d18b">모바일 최적화</text></g>
+    <g transform="translate(318,440)"><rect width="184" height="52" rx="26" fill="#161c25" stroke="#2f3a48"/><circle cx="28" cy="26" r="6" fill="#ff9a90"/><text x="48" y="33" fill="#ff9a90">친구끼리만</text></g>
+  </g>
+
+  <g transform="translate(98,524)"><rect width="380" height="58" rx="14" fill="#1a2230" stroke="#3a4656"/><text x="24" y="38" font-size="23" font-weight="700" fill="#cdd8e4">friends-holdem.onrender.com</text></g>
+
+  <g transform="translate(905,300)">
+    <g transform="rotate(-26) translate(-30,40)" filter="url(#sh)"><rect width="150" height="210" rx="16" fill="url(#card)"/><text x="18" y="44" font-size="34" font-weight="800" fill="#111">10</text><text x="18" y="74" font-size="26" fill="#111">♠</text><text x="75" y="140" font-size="74" text-anchor="middle" fill="#111">♠</text></g>
+    <g transform="rotate(-13) translate(0,8)" filter="url(#sh)"><rect width="150" height="210" rx="16" fill="url(#card)"/><text x="20" y="44" font-size="36" font-weight="800" fill="#111">J</text><text x="20" y="74" font-size="26" fill="#111">♠</text><text x="75" y="140" font-size="74" text-anchor="middle" fill="#111">♠</text></g>
+    <g transform="translate(20,-10)" filter="url(#sh)"><rect width="150" height="210" rx="16" fill="url(#card)"/><text x="20" y="44" font-size="36" font-weight="800" fill="#111">Q</text><text x="20" y="74" font-size="26" fill="#111">♠</text><text x="75" y="140" font-size="74" text-anchor="middle" fill="#111">♠</text></g>
+    <g transform="rotate(13) translate(40,8)" filter="url(#sh)"><rect width="150" height="210" rx="16" fill="url(#card)"/><text x="20" y="44" font-size="36" font-weight="800" fill="#111">K</text><text x="20" y="74" font-size="26" fill="#111">♠</text><text x="75" y="140" font-size="74" text-anchor="middle" fill="#111">♠</text></g>
+    <g transform="rotate(26) translate(70,40)" filter="url(#sh)"><rect width="150" height="210" rx="16" fill="url(#card)"/><text x="20" y="44" font-size="36" font-weight="800" fill="#c0392b">A</text><text x="20" y="74" font-size="26" fill="#c0392b">♠</text><text x="75" y="140" font-size="74" text-anchor="middle" fill="#111">♠</text></g>
+  </g>
+</svg>

@@ -1,0 +1,66 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" font-family="'Noto Sans CJK KR',-apple-system,'Segoe UI',sans-serif">
+  <defs>
+    <radialGradient id="bg2" cx="50%" cy="-10%" r="120%"><stop offset="0%" stop-color="#16202c"/><stop offset="60%" stop-color="#0e1219"/><stop offset="100%" stop-color="#080b10"/></radialGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f4d77e"/><stop offset="100%" stop-color="#d4a93f"/></linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg2)"/>
+
+  <g transform="translate(60,56)">
+    <rect x="0" y="0" width="58" height="58" rx="14" fill="url(#g2)"/>
+    <circle cx="17" cy="17" r="5.5" fill="#14181f"/><circle cx="41" cy="17" r="5.5" fill="#14181f"/><circle cx="29" cy="29" r="5.5" fill="#14181f"/><circle cx="17" cy="41" r="5.5" fill="#14181f"/><circle cx="41" cy="41" r="5.5" fill="#14181f"/>
+    <text x="74" y="44" font-size="40" font-weight="800" fill="#e8c466" letter-spacing="3">DICE</text>
+    <text x="220" y="44" font-size="26" font-weight="600" fill="#95a7ba">— 친구들과 즐기는 실시간 텍사스 홀덤</text>
+  </g>
+
+  <!-- feature cards with drawn icons -->
+  <!-- card 1: lightning -->
+  <g transform="translate(60,150)">
+    <rect width="350" height="190" rx="20" fill="#141c27" stroke="#26303c"/>
+    <g transform="translate(28,30)"><rect width="58" height="58" rx="14" fill="#16323f"/><path d="M34,12 L20,34 H30 L26,46 L42,24 H32 Z" fill="#7fd0e8"/></g>
+    <text x="28" y="124" font-size="28" font-weight="800" fill="#7fd0e8">실시간 멀티플레이</text>
+    <text x="28" y="158" font-size="20" fill="#9fb0c2">방 만들고 코드 공유 → 즉시 합류.</text>
+    <text x="28" y="184" font-size="20" fill="#9fb0c2">끊겨도 자동 재접속.</text>
+  </g>
+  <!-- card 2: robot -->
+  <g transform="translate(425,150)">
+    <rect width="350" height="190" rx="20" fill="#141c27" stroke="#26303c"/>
+    <g transform="translate(28,30)"><rect width="58" height="58" rx="14" fill="#26244a"/><rect x="16" y="18" width="26" height="22" rx="6" fill="none" stroke="#b0aef0" stroke-width="3"/><circle cx="24" cy="29" r="3" fill="#b0aef0"/><circle cx="34" cy="29" r="3" fill="#b0aef0"/><path d="M29,18 v-6" stroke="#b0aef0" stroke-width="3"/></g>
+    <text x="28" y="124" font-size="28" font-weight="800" fill="#b0aef0">똑똑한 봇 AI</text>
+    <text x="28" y="158" font-size="20" fill="#9fb0c2">난이도별 봇으로 인원 부족해도</text>
+    <text x="28" y="184" font-size="20" fill="#9fb0c2">언제든 풀 테이블.</text>
+  </g>
+  <!-- card 3: trophy -->
+  <g transform="translate(790,150)">
+    <rect width="350" height="190" rx="20" fill="#141c27" stroke="#26303c"/>
+    <g transform="translate(28,30)"><rect width="58" height="58" rx="14" fill="#3a2f12"/><path d="M22,16 h14 v10 a7,7 0 0 1 -14,0 z" fill="#e8c466"/><path d="M22,18 h-5 a5,5 0 0 0 5,8 M36,18 h5 a5,5 0 0 0 -5,8" fill="none" stroke="#e8c466" stroke-width="2.5"/><rect x="26" y="34" width="6" height="6" fill="#e8c466"/><rect x="21" y="40" width="16" height="4" rx="2" fill="#e8c466"/></g>
+    <text x="28" y="124" font-size="28" font-weight="800" fill="#e8c466">토너먼트 · 랭킹</text>
+    <text x="28" y="158" font-size="20" fill="#9fb0c2">블라인드 상승, 리더보드,</text>
+    <text x="28" y="184" font-size="20" fill="#9fb0c2">전적·통계 기록.</text>
+  </g>
+  <!-- card 4: phone -->
+  <g transform="translate(60,360)">
+    <rect width="350" height="190" rx="20" fill="#141c27" stroke="#26303c"/>
+    <g transform="translate(28,30)"><rect width="58" height="58" rx="14" fill="#123a27"/><rect x="22" y="14" width="14" height="30" rx="4" fill="none" stroke="#41d18b" stroke-width="3"/><line x1="27" y1="40" x2="31" y2="40" stroke="#41d18b" stroke-width="3"/></g>
+    <text x="28" y="124" font-size="28" font-weight="800" fill="#41d18b">모바일 최적화</text>
+    <text x="28" y="158" font-size="20" fill="#9fb0c2">한 손 조작, 카드 확대,</text>
+    <text x="28" y="184" font-size="20" fill="#9fb0c2">설치 없이 브라우저로.</text>
+  </g>
+  <!-- card 5: clapper/play -->
+  <g transform="translate(425,360)">
+    <rect width="350" height="190" rx="20" fill="#141c27" stroke="#26303c"/>
+    <g transform="translate(28,30)"><rect width="58" height="58" rx="14" fill="#3a1a18"/><circle cx="29" cy="29" r="15" fill="none" stroke="#ff9a90" stroke-width="3"/><path d="M25,22 v14 l11,-7 z" fill="#ff9a90"/></g>
+    <text x="28" y="124" font-size="28" font-weight="800" fill="#ff9a90">올인·승리 연출</text>
+    <text x="28" y="158" font-size="20" fill="#9fb0c2">올인 애니메이션, 몬스터 팟,</text>
+    <text x="28" y="184" font-size="20" fill="#9fb0c2">승자에게 칩이 날아가는 효과.</text>
+  </g>
+  <!-- card 6: lock -->
+  <g transform="translate(790,360)">
+    <rect width="350" height="190" rx="20" fill="#141c27" stroke="#26303c"/>
+    <g transform="translate(28,30)"><rect width="58" height="58" rx="14" fill="#222b36"/><rect x="19" y="27" width="20" height="16" rx="3" fill="#cdd8e4"/><path d="M22,27 v-5 a7,7 0 0 1 14,0 v5" fill="none" stroke="#cdd8e4" stroke-width="3"/></g>
+    <text x="28" y="124" font-size="28" font-weight="800" fill="#cdd8e4">친구끼리, 안전하게</text>
+    <text x="28" y="158" font-size="20" fill="#9fb0c2">계정·세션 보호, 비활동 자동</text>
+    <text x="28" y="184" font-size="20" fill="#9fb0c2">로그아웃, 관리자 도구.</text>
+  </g>
+
+  <text x="600" y="600" text-anchor="middle" font-size="24" font-weight="700" fill="#cdd8e4">friends-holdem.onrender.com</text>
+</svg>

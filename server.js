@@ -376,6 +376,7 @@ function stateFor(room, viewerId) {
   const st = room.game.getStateFor(viewerId);
   st.actionDeadline = room.actionDeadline || null;
   st.actionLimit = room.actionLimitEffective || room.actionLimit || null;
+  st.afkCleanupUntil = room.afkCleanup ? room.afkCleanup.until : null;
   st.spectator = room.spectators ? room.spectators.has(viewerId) : false;
   st.isHost = room.hostId === viewerId;
   st.maxPlayers = room.maxPlayers || 9;
@@ -608,12 +609,75 @@ function driveRunout(code) {
   room.runoutTimer = setTimeout(step, firstDelay);
 }
 
+/// AFK 자동 정리: 응답 가능한 플레이어가 모두 올인이고, 아직 결정이 남은 사람이 전부 끊긴(AFK) 상태면
+// 한 명씩 18초씩 끄는 대신 한 번의 30초 카운트다운 후 일괄 자동 처리 + 테이블에서 제외(withdraw)
+const AFK_CLEANUP_MS = 30000;
+function afkLocked(g) {
+  const h = g.hand;
+  if (!h) return false;
+  if (['handComplete', 'showdown', 'runout'].includes(h.phase)) return false;
+  let anyAllIn = false, anyAfk = false;
+  for (const s of h.seats) {
+    if (h.folded[s.id]) continue;
+    const p = g.getPlayer(s.id);
+    if (!p) continue;
+    const isAllIn = p.allIn === true || (p.chips || 0) <= 0;
+    if (isAllIn) { anyAllIn = true; continue; }
+    // 폴드도 올인도 아닌데 = 아직 결정할 게 남음
+    if (p.isBot) return false;     // 봇은 maybeBotAct가 진행
+    if (p.connected) return false; // 응답 가능한 사람이 남아 있음
+    anyAfk = true;                 // 끊긴 사람이 결정 보류 중
+  }
+  return anyAllIn && anyAfk;
+}
+function startAfkCleanup(code) {
+  const room = rooms.get(code);
+  if (!room) return;
+  if (room.actionTimer) { clearTimeout(room.actionTimer); room.actionTimer = null; }
+  room.afkCleanup = { until: Date.now() + AFK_CLEANUP_MS };
+  room.actionDeadline = room.afkCleanup.until;
+  room.actionLimitEffective = AFK_CLEANUP_MS;
+  room.game.pushLog('자리비움 플레이어 자동 정리 카운트다운 시작(30초)');
+  room.actionTimer = setTimeout(() => runAfkCleanup(code), AFK_CLEANUP_MS);
+  broadcast(code);
+}
+function runAfkCleanup(code) {
+  const room = rooms.get(code);
+  if (!room) return;
+  room.afkCleanup = null;
+  if (room.actionTimer) { clearTimeout(room.actionTimer); room.actionTimer = null; }
+  const g = room.game;
+  let guard = 0;
+  while (g.hand && !g.finished && !['handComplete', 'showdown', 'runout'].includes(g.hand.phase) && guard++ < 80) {
+    const h = g.hand;
+    const seat = h.seats[h.toActIndex];
+    if (!seat) break;
+    const p = g.getPlayer(seat.id);
+    if (!p) break;
+    if (p.isBot || p.connected) break; // 응답 가능한 차례에 도달 → 중단
+    const legal = g.legalActions(seat.id);
+    if (!legal) break;
+    const check = legal.find((a) => a.type === 'check');
+    const res = g.handleAction(seat.id, check ? 'check' : 'fold');
+    if (!res || !res.ok) break;
+    p.sittingOut = true;
+    p.pendingLeave = true; // 이번 핸드 종료 후 테이블에서 제외
+    g.pushLog(`${p.name} 님이 자리비움(AFK)으로 자동 정리되어 테이블에서 나갑니다`);
+  }
+  startActionTimer(code);
+  broadcast(code);
+  scheduleNextHand(code);
+  maybeBotAct(code);
+  driveRunout(code);
+}
+
 // 턴 시간 제한: 사람 차례에 마감시간 설정, 초과 시 자동 체크/폴드
 function startActionTimer(code) {
   const room = rooms.get(code);
   if (!room) return;
   if (room.actionTimer) { clearTimeout(room.actionTimer); room.actionTimer = null; }
   room.actionDeadline = null;
+  room.afkCleanup = null;
   const g = room.game;
   if (!g.hand || g.finished) return;
   const h = g.hand;
@@ -624,6 +688,8 @@ function startActionTimer(code) {
   const p = g.getPlayer(seat.id);
   if (!p || p.isBot) return; // 봇은 maybeBotAct가 처리
   if (!p.connected) {
+    // 응답 가능한 사람이 전부 올인이고 남은 결정자가 모두 AFK면: 18초씩 끌지 말고 30초 공유 카운트다운
+    if (afkLocked(g)) { startAfkCleanup(code); return; }
     // 끊긴 플레이어가 차례면: 유예(기본 18초) 후 자동 체크/폴드 + 자리비움 → 테이블 진행
     const grace = 18000;
     room.actionLimitEffective = grace;

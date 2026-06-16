@@ -1654,6 +1654,16 @@ body.admin-page { margin: 0; min-height: 100vh; min-height: 100dvh; background: 
 .admin-danger-zone { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #5a2f2f; }
 .admin-danger-zone .ai-danger { width: 100%; }
 /* 전체 공지 배너 */
+/* AFK 자동 정리 카운트다운 배너 */
+.afk-banner { position: fixed; top: calc(60px + env(safe-area-inset-top)); left: 50%; transform: translate(-50%, -160%);
+  z-index: 260; display: none; align-items: center; gap: 8px; max-width: min(440px, calc(100% - 24px));
+  background: linear-gradient(180deg, #3a2c10, #241a08); border: 1px solid #e8c466; border-radius: 14px;
+  padding: 10px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.55); color: #ffe9a8; font-weight: 700; font-size: 14px;
+  white-space: nowrap; transition: transform .35s cubic-bezier(.2,.8,.3,1.3); }
+.afk-banner.show { display: flex; transform: translate(-50%, 0); }
+.afk-banner b { color: #fff; font-size: 16px; margin: 0 1px; }
+.afk-banner .afk-ic { font-size: 17px; }
+
 .announce-banner { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translate(-50%, -140%);
   z-index: 300; display: flex; align-items: center; gap: 10px; max-width: min(520px, calc(100% - 24px));
   background: linear-gradient(180deg, #2a2410, #1a1608); border: 1px solid var(--gold); border-radius: 14px;
