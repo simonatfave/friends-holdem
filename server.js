@@ -164,7 +164,13 @@ function rateOk(key, ms) {
 const activeSessions = new Map(); // nickLower -> socketId
 // 계정별 '마지막 실제 활동' 시각(닉 기준) — 재접속/자동호출로는 갱신 안 됨 → 방치 사용자 정확 판정
 const lastActivity = new Map(); // nickLower -> timestamp
-function touchActivity(socket) { if (socket && socket.account) lastActivity.set(socket.account.toLowerCase(), Date.now()); }
+function touchActivity(socket) {
+  if (!socket || !socket.account) return;
+  const nl = socket.account.toLowerCase();
+  lastActivity.set(nl, Date.now());
+  const acc = users.get(nl);
+  if (acc && (!acc.lastSeenAt || Date.now() - acc.lastSeenAt > 120000)) { acc.lastSeenAt = Date.now(); saveUser(acc); } // 2분 간격으로 마지막 접속 갱신
+}
 
 // ---------- 관리자 ----------
 // 관리자 계정(기본 admin/dice1234, 환경변수로 덮어쓰기 권장 — 보안)
@@ -215,7 +221,7 @@ function adminOverview() {
     return {
       nick: a.nick, balance: a.balance, banned: !!a.banned, online,
       status, room: (presence[nl] && presence[nl].room) || null,
-      lastActive: la, createdAt: a.createdAt || null,
+      lastActive: la, lastSeenAt: a.lastSeenAt || null, createdAt: a.createdAt || null,
       games: (a.stats && a.stats.games) || 0, wins: (a.stats && a.stats.wins) || 0,
     };
   }).sort((x, y) => (y.online - x.online) || (y.balance - x.balance));
@@ -818,6 +824,7 @@ io.on('connection', (socket) => {
     saveUser(acc);
     socket.account = nick;
     lastActivity.set(nick.toLowerCase(), Date.now());
+    acc.lastSeenAt = Date.now();
     claimSession(socket, nick);
     userNames.set(socket.id, nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: ensureToken(acc) });
@@ -829,6 +836,7 @@ io.on('connection', (socket) => {
     if (acc.banned) return cb?.({ ok: false, error: '차단된 계정입니다. 관리자에게 문의하세요' });
     socket.account = acc.nick;
     lastActivity.set(acc.nick.toLowerCase(), Date.now());
+    acc.lastSeenAt = Date.now();
     claimSession(socket, acc.nick);
     userNames.set(socket.id, acc.nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: ensureToken(acc) });
@@ -845,6 +853,7 @@ io.on('connection', (socket) => {
     if (acc.banned) { revokeToken(acc); saveUser(acc); return cb?.({ ok: false, error: '차단된 계정입니다' }); }
     socket.account = acc.nick;
     { const _nl = acc.nick.toLowerCase(); if (!lastActivity.has(_nl)) lastActivity.set(_nl, Date.now()); } // 재접속은 리셋 안 함
+    acc.lastSeenAt = Date.now(); saveUser(acc); // 재접속도 '접속'으로 기록
     claimSession(socket, acc.nick);
     userNames.set(socket.id, acc.nick); broadcastOnline();
     cb?.({ ok: true, profile: profileOf(acc), token: acc.loginToken });

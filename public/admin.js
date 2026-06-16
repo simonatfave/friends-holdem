@@ -99,15 +99,29 @@ function renderAdminRooms(box) {
 }
 function renderAdminAccounts(box) {
   const accts = _adminData.accounts || [];
+  const now = _adminData.serverTime || Date.now();
+  const DAY = 86400000;
   box.innerHTML = '';
-  const search = document.createElement('input'); search.className = 'admin-search'; search.placeholder = `닉네임 검색 (총 ${accts.length}명)`;
+  let only24 = false;
+  const bar = document.createElement('div'); bar.className = 'admin-filterbar';
+  const toggle = document.createElement('button'); toggle.className = 'admin-chip'; toggle.textContent = '최근 24시간 접속';
+  const count = document.createElement('span'); count.className = 'ai-sub';
+  bar.appendChild(toggle); bar.appendChild(count); box.appendChild(bar);
+  const search = document.createElement('input'); search.className = 'admin-search'; search.placeholder = '닉네임 검색';
   box.appendChild(search);
   const list = document.createElement('div'); box.appendChild(list);
-  const draw = (f) => {
+  const draw = () => {
+    const f = search.value.trim().toLowerCase();
+    const recentN = accts.filter((a) => a.lastSeenAt && now - a.lastSeenAt <= DAY).length;
+    count.textContent = ` 24시간 내 ${recentN}명 · 전체 ${accts.length}명`;
+    let arr = accts.filter((a) => !f || a.nick.toLowerCase().includes(f));
+    if (only24) arr = arr.filter((a) => a.lastSeenAt && now - a.lastSeenAt <= DAY).sort((x, y) => (y.lastSeenAt || 0) - (x.lastSeenAt || 0));
     list.innerHTML = '';
-    accts.filter((a) => !f || a.nick.toLowerCase().includes(f)).slice(0, 200).forEach((a) => {
+    if (!arr.length) { list.innerHTML = '<div class="room-empty">해당 계정이 없습니다</div>'; return; }
+    arr.slice(0, 300).forEach((a) => {
       const row = document.createElement('div'); row.className = 'admin-item';
-      row.innerHTML = `<div class="ai-head"><b>${esc(a.nick)}</b>${a.online ? ' <span class="st-badge st-playing"><span class="st-dot"></span>온라인</span>' : ''}${a.banned ? ' <span class="ai-ban">차단됨</span>' : ''}<span class="ai-sub"> · ${a.games}전 ${a.wins}승</span></div>`;
+      const seen = a.lastSeenAt ? fmtAgo(a.lastSeenAt, now) : '기록 없음';
+      row.innerHTML = `<div class="ai-head"><b>${esc(a.nick)}</b>${a.online ? ' <span class="st-badge st-playing"><span class="st-dot"></span>온라인</span>' : ''}${a.banned ? ' <span class="ai-ban">차단됨</span>' : ''}<span class="ai-sub"> · ${a.games}전 ${a.wins}승 · 최근 접속 ${seen}</span></div>`;
       const bal = document.createElement('div'); bal.className = 'ai-bal';
       const inp = document.createElement('input'); inp.type = 'number'; inp.value = a.balance; inp.className = 'ai-bal-input';
       const setb = document.createElement('button'); setb.className = 'ghost'; setb.textContent = '💰 저장';
@@ -124,7 +138,9 @@ function renderAdminAccounts(box) {
       list.appendChild(row);
     });
   };
-  draw(''); search.oninput = () => draw(search.value.trim().toLowerCase());
+  toggle.onclick = () => { only24 = !only24; toggle.classList.toggle('on', only24); draw(); };
+  search.oninput = draw;
+  draw();
 }
 function renderAdminNotice(box) {
   box.innerHTML = '';

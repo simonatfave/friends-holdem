@@ -1634,6 +1634,9 @@ body[data-theme=charcoal] { --felt: #46505e; --felt-dark: #232a33; }
 .ai-danger:hover { background: rgba(226,40,40,.3); }
 .admin-search { width: 100%; box-sizing: border-box; padding: 9px 12px; margin-bottom: 6px; border-radius: 9px; border: 1px solid #33404f; background: #0e1219; color: var(--text); font-size: 14px; }
 .admin-notice-input { width: 100%; box-sizing: border-box; min-height: 110px; padding: 11px 13px; border-radius: 11px; border: 1px solid #33404f; background: #0e1219; color: var(--text); font-size: 15px; resize: vertical; margin-bottom: 10px; }
+.admin-filterbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.admin-chip { padding: 7px 14px; border-radius: 18px; border: 1px solid #33404f; background: #161c25; color: var(--muted); font-weight: 700; font-size: 13px; cursor: pointer; flex: 0 0 auto; }
+.admin-chip.on { color: #14181f; background: var(--gold); border-color: var(--gold); }
 .admin-summary { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
 .admin-summary b { color: var(--gold); }
 .admin-st-row { position: relative; }
